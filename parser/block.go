@@ -1,14 +1,18 @@
 package parser
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"io"
+	"log"
 
 	"github.com/pkg/errors"
 )
 
 const (
-	EQUIHASH_SIZE = 1344 // size of an Equihash solution in bytes
+	EQUIHASH_SIZE         = 1344 // size of an Equihash solution in bytes
+	SER_BLOCK_HEADER_SIZE = 1487 // size of a serialized block header
 )
 
 // A block header as defined in version 2018.0-beta-29 of the Zcash Protocol Spec.
@@ -55,15 +59,46 @@ type RawBlockHeader struct {
 
 // EquihashSize is a concrete instance of Bitcoin's CompactSize encoding.
 type EquihashSize struct {
-	_    byte   // always the byte value 253
-	Size uint16 // always 1344
+	SizeTag byte   // always the byte value 253
+	Size    uint16 // always 1344
 }
 
-func ReadBlockHeader(r io.Reader) (*RawBlockHeader, error) {
+func readRawBlockHeader(r io.Reader) (*RawBlockHeader, error) {
 	var blockHeader RawBlockHeader
 	err := binary.Read(r, binary.LittleEndian, &blockHeader)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed reading block header")
 	}
 	return &blockHeader, nil
+}
+
+func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
+	serBytes := make([]byte, 0, SER_BLOCK_HEADER_SIZE)
+	serBuf := bytes.NewBuffer(serBytes)
+	err := binary.Write(serBuf, binary.LittleEndian, hdr)
+	return serBytes[:SER_BLOCK_HEADER_SIZE], err
+}
+
+type BlockHeader struct {
+	*RawBlockHeader
+	cachedBlockHash []byte
+}
+
+func (hdr *BlockHeader) GetBlockHash() []byte {
+	if hdr.cachedBlockHash != nil {
+		return hdr.cachedBlockHash
+	}
+
+	serializedHeader, err := hdr.MarshalBinary()
+	if err != nil {
+		log.Fatalf("error marshaling block header: %v", err)
+		return nil
+	}
+
+	// SHA256d
+	digest := sha256.Sum256(serializedHeader)
+	digest = sha256.Sum256(digest[:])
+
+	hdr.cachedBlockHash = digest[:]
+	return hdr.cachedBlockHash
 }

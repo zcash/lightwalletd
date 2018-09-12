@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestReadBlockHeader(t *testing.T) {
+func TestBlockHeader(t *testing.T) {
 	testBlocks, err := os.Open("testdata/blocks")
 	if err != nil {
 		t.Fatal(err)
@@ -25,13 +25,16 @@ func TestReadBlockHeader(t *testing.T) {
 			t.Error(err)
 			continue
 		}
+
+		// Try to read the header
 		reader := bytes.NewReader(decodedBlockData)
-		rawHeader, err := ReadBlockHeader(reader)
+		rawHeader, err := readRawBlockHeader(reader)
 		if err != nil {
 			t.Error(err)
-			break
+			continue
 		}
 
+		// Some basic sanity checks
 		if rawHeader.Version != 4 {
 			t.Error("Read wrong version in a test block.")
 			break
@@ -46,6 +49,41 @@ func TestReadBlockHeader(t *testing.T) {
 		if rawHeader.SolutionSize.Size != 1344 {
 			t.Error("Got wrong Equihash solution size.")
 			break
+		}
+
+		// Re-serialize and check for consistency
+		serializedHeader, err := rawHeader.MarshalBinary()
+		if err != nil {
+			t.Errorf("Error serializing header: %v", err)
+			break
+		}
+
+		if !bytes.Equal(serializedHeader, decodedBlockData[:SER_BLOCK_HEADER_SIZE]) {
+			offset := 0
+			length := 0
+			for i := 0; i < SER_BLOCK_HEADER_SIZE; i++ {
+				if serializedHeader[i] != decodedBlockData[i] {
+					if offset == 0 {
+						offset = i
+					}
+					length++
+				}
+			}
+			t.Errorf("Block header failed round-trip serialization:\nwant\n%x\ngot\n%x\nat %d", serializedHeader[offset:offset+length], decodedBlockData[offset:offset+length], offset)
+			break
+		}
+
+		blockHeader := &BlockHeader{
+			rawHeader,
+			nil,
+		}
+		hash := blockHeader.GetBlockHash()
+
+		// This is not necessarily true for anything but our current test cases.
+		for _, b := range hash[28:] {
+			if b != 0 {
+				t.Errorf("Hash lacked trailing zeros")
+			}
 		}
 	}
 }
