@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"io"
 	"log"
 
 	"github.com/pkg/errors"
@@ -16,7 +15,7 @@ const (
 )
 
 // A block header as defined in version 2018.0-beta-29 of the Zcash Protocol Spec.
-type RawBlockHeader struct {
+type rawBlockHeader struct {
 	// The block version number indicates which set of block validation rules
 	// to follow. The current and only defined block version number for Zcash
 	// is 4.
@@ -57,30 +56,39 @@ type RawBlockHeader struct {
 	Solution [EQUIHASH_SIZE]byte
 }
 
-// EquihashSize is a concrete instance of Bitcoin's CompactSize encoding.
+// EquihashSize is a concrete instance of Bitcoin's CompactSize encoding. This
+// representation is a hack allowing us to use Go's binary parsing. In contexts
+// outside of Zcash this could be a variable-length field.
 type EquihashSize struct {
 	SizeTag byte   // always the byte value 253
 	Size    uint16 // always 1344
 }
 
-func readRawBlockHeader(r io.Reader) (*RawBlockHeader, error) {
-	var blockHeader RawBlockHeader
-	err := binary.Read(r, binary.LittleEndian, &blockHeader)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed reading block header")
+func ReadBlockHeader(blockHeader *BlockHeader, data []byte) error {
+	if blockHeader.rawBlockHeader == nil {
+		blockHeader.rawBlockHeader = new(rawBlockHeader)
 	}
-	return &blockHeader, nil
+	return blockHeader.UnmarshalBinary(data)
 }
 
-func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
+func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 	serBytes := make([]byte, 0, SER_BLOCK_HEADER_SIZE)
 	serBuf := bytes.NewBuffer(serBytes)
 	err := binary.Write(serBuf, binary.LittleEndian, hdr)
 	return serBytes[:SER_BLOCK_HEADER_SIZE], err
 }
 
+func (hdr *rawBlockHeader) UnmarshalBinary(data []byte) error {
+	reader := bytes.NewReader(data)
+	err := binary.Read(reader, binary.LittleEndian, hdr)
+	if err != nil {
+		return errors.Wrap(err, "failed parsing block header")
+	}
+	return nil
+}
+
 type BlockHeader struct {
-	*RawBlockHeader
+	*rawBlockHeader
 	cachedBlockHash []byte
 }
 
@@ -101,4 +109,9 @@ func (hdr *BlockHeader) GetBlockHash() []byte {
 
 	hdr.cachedBlockHash = digest[:]
 	return hdr.cachedBlockHash
+}
+
+func (hdr *BlockHeader) GetSerializedSize() int {
+	// TODO: Make this dynamic. Low priority; it's unlikely to change.
+	return SER_BLOCK_HEADER_SIZE
 }

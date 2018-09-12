@@ -27,32 +27,32 @@ func TestBlockHeader(t *testing.T) {
 		}
 
 		// Try to read the header
-		reader := bytes.NewReader(decodedBlockData)
-		rawHeader, err := readRawBlockHeader(reader)
+		blockHeader := &BlockHeader{}
+		err = ReadBlockHeader(blockHeader, decodedBlockData)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
 
 		// Some basic sanity checks
-		if rawHeader.Version != 4 {
+		if blockHeader.Version != 4 {
 			t.Error("Read wrong version in a test block.")
 			break
 		}
 
-		if rawHeader.Time < lastBlockTime {
+		if blockHeader.Time < lastBlockTime {
 			t.Error("Block times not increasing.")
 			break
 		}
-		lastBlockTime = rawHeader.Time
+		lastBlockTime = blockHeader.Time
 
-		if rawHeader.SolutionSize.Size != 1344 {
+		if blockHeader.SolutionSize.Size != 1344 {
 			t.Error("Got wrong Equihash solution size.")
 			break
 		}
 
 		// Re-serialize and check for consistency
-		serializedHeader, err := rawHeader.MarshalBinary()
+		serializedHeader, err := blockHeader.MarshalBinary()
 		if err != nil {
 			t.Errorf("Error serializing header: %v", err)
 			break
@@ -73,10 +73,6 @@ func TestBlockHeader(t *testing.T) {
 			break
 		}
 
-		blockHeader := &BlockHeader{
-			rawHeader,
-			nil,
-		}
 		hash := blockHeader.GetBlockHash()
 
 		// This is not necessarily true for anything but our current test cases.
