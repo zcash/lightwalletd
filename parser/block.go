@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"log"
 
+	"github.com/gtank/ctxd/parser/internal/bytestring"
 	"github.com/pkg/errors"
 )
 
@@ -80,12 +81,37 @@ func (hdr *rawBlockHeader) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+type blockHeaderDecoder struct {
+	in *bytestring.String
+}
+
+func NewBlockHeaderDecoder(in *bytestring.String) Decoder {
+	return &blockHeaderDecoder{in}
+}
+
+func (dec *blockHeaderDecoder) Decode(out Serializable) error {
+	hdr, ok := out.(*BlockHeader)
+	if !ok {
+		return errors.New("unexpected Serializable for BlockHeader decoder")
+	}
+
+	if hdr.rawBlockHeader == nil {
+		hdr.rawBlockHeader = new(rawBlockHeader)
+	}
+
+	err := binary.Read(dec.in, binary.LittleEndian, hdr.rawBlockHeader)
+	if err != nil {
+		return errors.Wrap(err, "parsing block header")
+	}
+	return nil
+}
+
 type BlockHeader struct {
 	*rawBlockHeader
 	cachedHash []byte
 }
 
-func (hdr *BlockHeader) GetBlockHeaderHash() []byte {
+func (hdr *BlockHeader) GetHash() []byte {
 	if hdr.cachedHash != nil {
 		return hdr.cachedHash
 	}
@@ -103,16 +129,3 @@ func (hdr *BlockHeader) GetBlockHeaderHash() []byte {
 	hdr.cachedHash = digest[:]
 	return hdr.cachedHash
 }
-
-func (hdr *BlockHeader) GetSerializedSize() int {
-	// TODO: Make this dynamic. Low priority; it's unlikely to change.
-	return SER_BLOCK_HEADER_SIZE
-}
-
-func ReadBlockHeader(blockHeader *BlockHeader, data []byte) error {
-	if blockHeader.rawBlockHeader == nil {
-		blockHeader.rawBlockHeader = new(rawBlockHeader)
-	}
-	return blockHeader.UnmarshalBinary(data)
-}
-

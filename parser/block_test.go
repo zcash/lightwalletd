@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"os"
 	"testing"
+
+	"github.com/gtank/ctxd/parser/internal/bytestring"
 )
 
 func TestBlockHeader(t *testing.T) {
@@ -26,12 +28,19 @@ func TestBlockHeader(t *testing.T) {
 			continue
 		}
 
-		// Try to read the header
-		blockHeader := &BlockHeader{}
-		err = ReadBlockHeader(blockHeader, decodedBlockData)
+		s := bytestring.String(decodedBlockData)
+		startLength := len(s)
+		dec := NewBlockHeaderDecoder(&s)
+
+		blockHeader := BlockHeader{}
+		err = dec.Decode(&blockHeader)
 		if err != nil {
 			t.Error(err)
 			continue
+		}
+
+		if (startLength - len(s)) != SER_BLOCK_HEADER_SIZE {
+			t.Error("did not advance underlying bytestring")
 		}
 
 		// Some basic sanity checks
@@ -73,7 +82,7 @@ func TestBlockHeader(t *testing.T) {
 			break
 		}
 
-		hash := blockHeader.GetBlockHeaderHash()
+		hash := blockHeader.GetHash()
 
 		// This is not necessarily true for anything but our current test cases.
 		for _, b := range hash[28:] {
