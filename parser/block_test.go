@@ -73,7 +73,7 @@ func TestBlockHeader(t *testing.T) {
 			break
 		}
 
-		hash := blockHeader.GetBlockHash()
+		hash := blockHeader.GetBlockHeaderHash()
 
 		// This is not necessarily true for anything but our current test cases.
 		for _, b := range hash[28:] {

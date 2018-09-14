@@ -64,13 +64,6 @@ type EquihashSize struct {
 	Size    uint16 // always 1344
 }
 
-func ReadBlockHeader(blockHeader *BlockHeader, data []byte) error {
-	if blockHeader.rawBlockHeader == nil {
-		blockHeader.rawBlockHeader = new(rawBlockHeader)
-	}
-	return blockHeader.UnmarshalBinary(data)
-}
-
 func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 	serBytes := make([]byte, 0, SER_BLOCK_HEADER_SIZE)
 	serBuf := bytes.NewBuffer(serBytes)
@@ -89,12 +82,12 @@ func (hdr *rawBlockHeader) UnmarshalBinary(data []byte) error {
 
 type BlockHeader struct {
 	*rawBlockHeader
-	cachedBlockHash []byte
+	cachedHash []byte
 }
 
-func (hdr *BlockHeader) GetBlockHash() []byte {
-	if hdr.cachedBlockHash != nil {
-		return hdr.cachedBlockHash
+func (hdr *BlockHeader) GetBlockHeaderHash() []byte {
+	if hdr.cachedHash != nil {
+		return hdr.cachedHash
 	}
 
 	serializedHeader, err := hdr.MarshalBinary()
@@ -107,11 +100,19 @@ func (hdr *BlockHeader) GetBlockHash() []byte {
 	digest := sha256.Sum256(serializedHeader)
 	digest = sha256.Sum256(digest[:])
 
-	hdr.cachedBlockHash = digest[:]
-	return hdr.cachedBlockHash
+	hdr.cachedHash = digest[:]
+	return hdr.cachedHash
 }
 
 func (hdr *BlockHeader) GetSerializedSize() int {
 	// TODO: Make this dynamic. Low priority; it's unlikely to change.
 	return SER_BLOCK_HEADER_SIZE
 }
+
+func ReadBlockHeader(blockHeader *BlockHeader, data []byte) error {
+	if blockHeader.rawBlockHeader == nil {
+		blockHeader.rawBlockHeader = new(rawBlockHeader)
+	}
+	return blockHeader.UnmarshalBinary(data)
+}
+
