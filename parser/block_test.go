@@ -4,11 +4,55 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/hex"
+	"math/big"
 	"os"
 	"testing"
-
-	"github.com/gtank/ctxd/parser/internal/bytestring"
 )
+
+// https://bitcoin.org/en/developer-reference#target-nbits
+var nbitsTests = []struct {
+	bytes  []byte
+	target string
+}{
+	{
+		[]byte{0x18, 0x1b, 0xc3, 0x30},
+		"1bc330000000000000000000000000000000000000000000",
+	},
+	{
+		[]byte{0x01, 0x00, 0x34, 0x56},
+		"00",
+	},
+	{
+		[]byte{0x01, 0x12, 0x34, 0x56},
+		"12",
+	},
+	{
+		[]byte{0x02, 0x00, 0x80, 00},
+		"80",
+	},
+	{
+		[]byte{0x05, 0x00, 0x92, 0x34},
+		"92340000",
+	},
+	{
+		[]byte{0x04, 0x92, 0x34, 0x56},
+		"-12345600",
+	},
+	{
+		[]byte{0x04, 0x12, 0x34, 0x56},
+		"12345600",
+	},
+}
+
+func TestParseNBits(t *testing.T) {
+	for i, tt := range nbitsTests {
+		target := parseNBits(tt.bytes)
+		expected, _ := new(big.Int).SetString(tt.target, 16)
+		if target.Cmp(expected) != 0 {
+			t.Errorf("NBits parsing failed case %d:\nwant: %x\nhave: %x", i, expected, target)
+		}
+	}
+}
 
 func TestBlockHeader(t *testing.T) {
 	testBlocks, err := os.Open("testdata/blocks")
@@ -22,25 +66,17 @@ func TestBlockHeader(t *testing.T) {
 	scan := bufio.NewScanner(testBlocks)
 	for scan.Scan() {
 		blockDataHex := scan.Text()
-		decodedBlockData, err := hex.DecodeString(blockDataHex)
+		blockData, err := hex.DecodeString(blockDataHex)
 		if err != nil {
 			t.Error(err)
 			continue
 		}
 
-		s := bytestring.String(decodedBlockData)
-		startLength := len(s)
-		dec := NewBlockHeaderDecoder(&s)
-
-		blockHeader := BlockHeader{}
-		err = dec.Decode(&blockHeader)
+		blockHeader := newBlockHeader()
+		_, err = blockHeader.ParseFromSlice(blockData)
 		if err != nil {
 			t.Error(err)
 			continue
-		}
-
-		if (startLength - len(s)) != SER_BLOCK_HEADER_SIZE {
-			t.Error("did not advance underlying bytestring")
 		}
 
 		// Some basic sanity checks
@@ -55,7 +91,7 @@ func TestBlockHeader(t *testing.T) {
 		}
 		lastBlockTime = blockHeader.Time
 
-		if blockHeader.SolutionSize.Size != 1344 {
+		if len(blockHeader.Solution) != EQUIHASH_SIZE {
 			t.Error("Got wrong Equihash solution size.")
 			break
 		}
@@ -67,18 +103,23 @@ func TestBlockHeader(t *testing.T) {
 			break
 		}
 
-		if !bytes.Equal(serializedHeader, decodedBlockData[:SER_BLOCK_HEADER_SIZE]) {
+		if !bytes.Equal(serializedHeader, blockData[:SER_BLOCK_HEADER_SIZE]) {
 			offset := 0
 			length := 0
-			for i := 0; i < SER_BLOCK_HEADER_SIZE; i++ {
-				if serializedHeader[i] != decodedBlockData[i] {
+			for i := 0; i < len(serializedHeader); i++ {
+				if serializedHeader[i] != blockData[i] {
 					if offset == 0 {
 						offset = i
 					}
 					length++
 				}
 			}
-			t.Errorf("Block header failed round-trip serialization:\nwant\n%x\ngot\n%x\nat %d", serializedHeader[offset:offset+length], decodedBlockData[offset:offset+length], offset)
+			t.Errorf(
+				"Block header failed round-trip:\ngot\n%x\nwant\n%x\nfirst diff at %d",
+				serializedHeader[offset:offset+length],
+				blockData[offset:offset+length],
+				offset,
+			)
 			break
 		}
 

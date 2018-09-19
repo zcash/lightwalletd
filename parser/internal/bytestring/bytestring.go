@@ -54,6 +54,17 @@ func (s *String) Skip(n int) bool {
 	return s.read(n) != nil
 }
 
+// ReadByte reads a single byte into out and advances over it. It reports if
+// the read was successful.
+func (s *String) ReadByte(out *byte) bool {
+	v := s.read(1)
+	if v == nil {
+		return false
+	}
+	*out = v[0]
+	return true
+}
+
 // ReadBytes reads n bytes into out and advances over them. It reports if the
 // read was successful.
 func (s *String) ReadBytes(out *[]byte, n int) bool {
@@ -123,6 +134,29 @@ func (s *String) ReadCompactLengthPrefixed(out *String) bool {
 	}
 
 	*out = v
+	return true
+}
+
+// ReadInt32 decodes a little-endian 32-bit value into out, treating it as
+// signed, and advances over it. It reports whether the read was successful.
+func (s *String) ReadInt32(out *int32) bool {
+	var tmp uint32
+	if ok := s.ReadUint32(&tmp); !ok {
+		return false
+	}
+
+	*out = int32(tmp)
+	return true
+}
+
+// ReadUint16 decodes a little-endian, 16-bit value into out and advances over
+// it. It reports whether the read was successful.
+func (s *String) ReadUint16(out *uint16) bool {
+	v := s.read(2)
+	if v == nil {
+		return false
+	}
+	*out = uint16(v[0]) | uint16(v[1])<<8
 	return true
 }
 

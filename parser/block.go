@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"log"
+	"math/big"
 
 	"github.com/gtank/ctxd/parser/internal/bytestring"
 	"github.com/pkg/errors"
@@ -25,18 +26,18 @@ type rawBlockHeader struct {
 	// A SHA-256d hash in internal byte order of the previous block's header. This
 	// ensures no previous block can be changed without also changing this block's
 	// header.
-	HashPrevBlock [32]byte
+	HashPrevBlock []byte
 
 	// A SHA-256d hash in internal byte order. The merkle root is derived from
 	// the hashes of all transactions included in this block, ensuring that
 	// none of those transactions can be modified without modifying the header.
-	HashMerkleRoot [32]byte
+	HashMerkleRoot []byte
 
 	// [Pre-Sapling] A reserved field which should be ignored.
 	// [Sapling onward] The root LEBS2OSP_256(rt) of the Sapling note
 	// commitment tree corresponding to the final Sapling treestate of this
 	// block.
-	HashFinalSaplingRoot [32]byte
+	HashFinalSaplingRoot []byte
 
 	// The block time is a Unix epoch time (UTC) when the miner started hashing
 	// the header (according to the miner).
@@ -44,74 +45,112 @@ type rawBlockHeader struct {
 
 	// An encoded version of the target threshold this block's header hash must
 	// be less than or equal to, in the same nBits format used by Bitcoin.
-	NBits [4]byte
+	NBitsBytes []byte
 
 	// An arbitrary field that miners can change to modify the header hash in
 	// order to produce a hash less than or equal to the target threshold.
-	Nonce [32]byte
+	Nonce []byte
 
-	// The size of an Equihash solution in bytes (always 1344).
-	SolutionSize EquihashSize
-
-	// The Equihash solution.
-	Solution [EQUIHASH_SIZE]byte
+	// The Equihash solution. In the wire format, this is a
+	// CompactSize-prefixed value.
+	Solution []byte
 }
 
-// EquihashSize is a concrete instance of Bitcoin's CompactSize encoding. This
-// representation is a hack allowing us to use Go's binary parsing. In contexts
-// outside of Zcash this could be a variable-length field.
-type EquihashSize struct {
-	SizeTag byte   // always the byte value 253
-	Size    uint16 // always 1344
+type blockHeader struct {
+	*rawBlockHeader
+	cachedHash      []byte
+	targetThreshold *big.Int
 }
 
 func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
-	serBytes := make([]byte, 0, SER_BLOCK_HEADER_SIZE)
-	serBuf := bytes.NewBuffer(serBytes)
-	err := binary.Write(serBuf, binary.LittleEndian, hdr)
-	return serBytes[:SER_BLOCK_HEADER_SIZE], err
+	backing := make([]byte, 0, SER_BLOCK_HEADER_SIZE)
+	buf := bytes.NewBuffer(backing)
+	binary.Write(buf, binary.LittleEndian, hdr.Version)
+	binary.Write(buf, binary.LittleEndian, hdr.HashPrevBlock)
+	binary.Write(buf, binary.LittleEndian, hdr.HashMerkleRoot)
+	binary.Write(buf, binary.LittleEndian, hdr.HashFinalSaplingRoot)
+	binary.Write(buf, binary.LittleEndian, hdr.Time)
+	binary.Write(buf, binary.LittleEndian, hdr.NBitsBytes)
+	binary.Write(buf, binary.LittleEndian, hdr.Nonce)
+	// TODO: write a Builder that knows about CompactSize
+	binary.Write(buf, binary.LittleEndian, byte(253))
+	binary.Write(buf, binary.LittleEndian, uint16(1344))
+	binary.Write(buf, binary.LittleEndian, hdr.Solution)
+	return backing[:SER_BLOCK_HEADER_SIZE], nil
 }
 
-func (hdr *rawBlockHeader) UnmarshalBinary(data []byte) error {
-	reader := bytes.NewReader(data)
-	err := binary.Read(reader, binary.LittleEndian, hdr)
-	if err != nil {
-		return errors.Wrap(err, "failed parsing block header")
+func newBlockHeader() *blockHeader {
+	return &blockHeader{
+		rawBlockHeader: new(rawBlockHeader),
 	}
-	return nil
 }
 
-type blockHeaderDecoder struct {
-	in *bytestring.String
-}
+// ParseFromSlice parses the block header struct from the provided byte slice,
+// advancing over the bytes read. If successful it returns the rest of the
+// slice, otherwise it returns the input slice unaltered along with an error.
+func (hdr *blockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
+	s := bytestring.String(in)
 
-func NewBlockHeaderDecoder(in *bytestring.String) Decoder {
-	return &blockHeaderDecoder{in}
-}
+	// Primary parsing layer: sort the bytes into things
 
-func (dec *blockHeaderDecoder) Decode(out Serializable) error {
-	hdr, ok := out.(*BlockHeader)
-	if !ok {
-		return errors.New("unexpected Serializable for BlockHeader decoder")
+	if ok := s.ReadInt32(&hdr.Version); !ok {
+		return in, errors.New("could not read header version")
 	}
 
-	if hdr.rawBlockHeader == nil {
-		hdr.rawBlockHeader = new(rawBlockHeader)
+	if ok := s.ReadBytes(&hdr.HashPrevBlock, 32); !ok {
+		return in, errors.New("could not read HashPrevBlock")
 	}
 
-	err := binary.Read(dec.in, binary.LittleEndian, hdr.rawBlockHeader)
-	if err != nil {
-		return errors.Wrap(err, "parsing block header")
+	if ok := s.ReadBytes(&hdr.HashMerkleRoot, 32); !ok {
+		return in, errors.New("could not read HashMerkleRoot")
 	}
-	return nil
+
+	if ok := s.ReadBytes(&hdr.HashFinalSaplingRoot, 32); !ok {
+		return in, errors.New("could not read HashFinalSaplingRoot")
+	}
+
+	if ok := s.ReadUint32(&hdr.Time); !ok {
+		return in, errors.New("could not read timestamp")
+	}
+
+	if ok := s.ReadBytes(&hdr.NBitsBytes, 4); !ok {
+		return in, errors.New("could not read NBits bytes")
+	}
+
+	if ok := s.ReadBytes(&hdr.Nonce, 32); !ok {
+		return in, errors.New("could not read Nonce bytes")
+	}
+
+	if ok := s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)); !ok {
+		return in, errors.New("could not read CompactSize-prefixed Equihash solution")
+	}
+
+	// TODO interpret the bytes
+	//hdr.targetThreshold = parseNBits(hdr.NBitsBytes)
+
+	return []byte(s), nil
 }
 
-type BlockHeader struct {
-	*rawBlockHeader
-	cachedHash []byte
+func parseNBits(b []byte) *big.Int {
+	byteLen := int(b[0])
+
+	targetBytes := make([]byte, byteLen)
+	copy(targetBytes, b[1:])
+
+	// If high bit set, return a negative result. This is in the Bitcoin Core
+	// test vectors even though Bitcoin itself will never produce or interpret
+	// a difficulty lower than zero.
+	if b[1]&0x80 != 0 {
+		targetBytes[0] &= 0x7F
+		target := new(big.Int).SetBytes(targetBytes)
+		target.Neg(target)
+		return target
+	}
+
+	return new(big.Int).SetBytes(targetBytes)
 }
 
-func (hdr *BlockHeader) GetHash() []byte {
+func (hdr *blockHeader) GetHash() []byte {
 	if hdr.cachedHash != nil {
 		return hdr.cachedHash
 	}
