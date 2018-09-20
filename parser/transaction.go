@@ -16,8 +16,7 @@ type rawTransaction struct {
 	valueBalance       int64
 	shieldedSpends     []*spend
 	shieldedOutputs    []*output
-	joinSplitsPHGR13   []*phgr13JoinSplit
-	joinSplitsGroth16  []*groth16JoinSplit
+	joinSplits         []*joinSplit
 	joinSplitPubKey    []byte
 	joinSplitSig       []byte
 	bindingSig         []byte
@@ -165,12 +164,86 @@ func (p *output) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-type phgr13JoinSplit struct {
-	// something
+// joinSplit is a JoinSplit description as described in 7.2 of the Zcash
+// protocol spec. Its exact contents differ by transaction version and network
+// upgrade level.
+type joinSplit struct {
+	vpubOld        uint64
+	vpubNew        uint64
+	anchor         []byte    // 32
+	nullifiers     [2][]byte // 64 [N_old][32]byte
+	commitments    [2][]byte // 64 [N_new][32]byte
+	ephemeralKey   []byte    // 32
+	randomSeed     []byte    // 32
+	vmacs          [2][]byte // 64 [N_old][32]byte
+	proofPHGR13    []byte    // 296
+	proofGroth16   []byte    // 192
+	encCiphertexts []byte    // 1202 [N_new][601]byte
+
+	// not actually in the format, but needed for parsing
+	version uint32
 }
 
-type groth16JoinSplit struct {
-	// something
+func (p *JoinSplit) ParseFromSlice(data []byte) ([]byte, error) {
+	s := bytestring.String(data)
+
+	if ok := s.ReadUint64(&p.vpubOld); !ok {
+		return nil, errors.New("could not read vpubOld")
+	}
+
+	if ok := s.ReadUint64(&p.vpubNew); !ok {
+		return nil, errors.New("could not read vpubNew")
+	}
+
+	if ok := s.ReadBytes(&p.anchor, 32); !ok {
+		return nil, errors.New("could not read anchor")
+	}
+
+	for i := 0; i < 2; i++ {
+		if ok := s.ReadBytes(&p.nullifiers[i], 32); !ok {
+			return nil, errors.New("could not read a nullifier")
+		}
+	}
+
+	for i := 0; i < 2; i++ {
+		if ok := s.ReadBytes(&p.commitments[i], 32); !ok {
+			return nil, errors.New("could not read a commitment")
+		}
+	}
+
+	if ok := s.ReadBytes(&p.ephemeralKey, 32); !ok {
+		return nil, errors.New("could not read ephemeralKey")
+	}
+
+	if ok := s.ReadBytes(&p.randomSeed, 32); !ok {
+		return nil, errors.New("could not read randomSeed")
+	}
+
+	for i := 0; i < 2; i++ {
+		if ok := s.ReadBytes(&p.vmacs[i], 32); !ok {
+			return nil, errors.New("could not read a vmac")
+		}
+	}
+
+	if p.version == 2 || p.version == 3 {
+		if ok := s.ReadBytes(&p.proofPHGR13, 296); !ok {
+			return nil, errors.New("could not read PHGR13 proof")
+		}
+	} else if p.version >= 4 {
+		if ok := s.ReadBytes(&p.proofGroth16, 192); !ok {
+			return nil, errors.New("could not read Groth16 proof")
+		}
+	} else {
+		return nil, errors.New("unexpected transaction version")
+	}
+
+	for i := 0; i < 2; i++ {
+		if ok := s.ReadBytes(&p.encCiphertexts[i], 601); !ok {
+			return nil, errors.New("could not read an encCiphertext")
+		}
+	}
+
+	return []byte(s), nil
 }
 
 type transaction struct {
@@ -188,8 +261,10 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	tx.fOverwintered = (header >> 31) == 1
 	tx.version = header & 0x7FFFFFFF
 
-	if ok := s.ReadUint32(&tx.nVersionGroupId); !ok {
-		return nil, errors.New("could not read nVersionGroupId")
+	if tx.version >= 3 {
+		if ok := s.ReadUint32(&tx.nVersionGroupId); !ok {
+			return nil, errors.New("could not read nVersionGroupId")
+		}
 	}
 
 	var txInCount uint64
@@ -201,76 +276,111 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	// TODO: vector. At the moment we're assuming trusted input.
 	// See https://nvd.nist.gov/vuln/detail/CVE-2018-17144 for an example.
 
-	txInputs := make([]*txIn, txInCount)
+	tx.transparentInputs = make([]*txIn, txInCount)
 	for i := 0; i < txInCount; i++ {
 		ti := &txIn{}
 		s, err = ti.ParseFromSlice([]byte(s))
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing transparent input")
 		}
-		txInputs[i] = ti
+		tx.transparentInputs[i] = ti
 	}
-	tx.transparentInputs = txInputs
 
 	var txOutCount uint64
 	if ok := s.ReadCompactSize(&txOutCount); !ok {
 		return nil, errors.New("could not read tx_out_count")
 	}
 
-	txOutputs := make([]*txOut, txOutCount)
+	tx.transparentOutputs = make([]*txOut, txOutCount)
 	for i := 0; i < txOutCount; i++ {
 		to := &txOut{}
 		s, err = to.ParseFromSlice([]byte(s))
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing transparent output")
 		}
-		txOutputs[i] = to
+		tx.transparentOutputs[i] = to
 	}
-	tx.transparentOutputs = txOutputs
 
 	if ok := s.ReadUint32(&tx.nLockTime); !ok {
 		return nil, errors.New("could not read nLockTime")
 	}
 
-	if ok := s.ReadUint32(&tx.nExpiryHeight); !ok {
-		return nil, errors.New("could not read nExpiryHeight")
-	}
-
-	if ok := s.ReadInt64(&tx.valueBalance); !ok {
-		return nil, errors.New("could not read valueBalance")
-	}
-
-	var spendCount uint64
-	if ok := s.ReadCompactSize(&spendCount); !ok {
-		return nil, errors.New("could not read nShieldedSpend")
-	}
-
-	txSpends := make([]*spend, spendCount)
-	for i := 0; i < spendCount; i++ {
-		newSpend := &spend{}
-		s, err = newSpend.ParseFromSlice([]byte(s))
-		if err != nil {
-			return nil, errors.Wrap(err, "while parsing shielded Spend")
+	if tx.version >= 3 {
+		if ok := s.ReadUint32(&tx.nExpiryHeight); !ok {
+			return nil, errors.New("could not read nExpiryHeight")
 		}
-		txSpends[i] = newSpend
-	}
-	tx.shieldedSpends = txSpends
-
-	var outputCount uint64
-	if ok := s.ReadCompactSize(&outputCount); !ok {
-		return nil, errors.New("could not read nShieldedOutput")
 	}
 
-	txOutputs := make([]*output, outputCount)
-	for i := 0; i < outputCount; i++ {
-		newOutput := &output{}
-		s, err = newOutput.ParseFromSlice([]byte(s))
-		if err != nil {
-			return nil, errors.Wrap(err, "while parsing shielded Output")
+	if tx.version >= 4 {
+		if ok := s.ReadInt64(&tx.valueBalance); !ok {
+			return nil, errors.New("could not read valueBalance")
 		}
-		txOutputs[i] = newOutput
+
+		var spendCount uint64
+		if ok := s.ReadCompactSize(&spendCount); !ok {
+			return nil, errors.New("could not read nShieldedSpend")
+		}
+
+		tx.shieldedSpends = make([]*spend, spendCount)
+		for i := 0; i < spendCount; i++ {
+			newSpend := &spend{}
+			s, err = newSpend.ParseFromSlice([]byte(s))
+			if err != nil {
+				return nil, errors.Wrap(err, "while parsing shielded Spend")
+			}
+			tx.shieldedSpends[i] = newSpend
+		}
+
+		var outputCount uint64
+		if ok := s.ReadCompactSize(&outputCount); !ok {
+			return nil, errors.New("could not read nShieldedOutput")
+		}
+
+		tx.shieldedOutputs = make([]*output, outputCount)
+		for i := 0; i < outputCount; i++ {
+			newOutput := &output{}
+			s, err = newOutput.ParseFromSlice([]byte(s))
+			if err != nil {
+				return nil, errors.Wrap(err, "while parsing shielded Output")
+			}
+			tx.shieldedOutputs[i] = newOutput
+		}
 	}
-	tx.shieldedOutputs = txOutputs
+
+	if tx.version >= 2 {
+		var joinSplitCount uint64
+		if ok := s.ReadCompactSize(&joinSplitCount); !ok {
+			return nil, errors.New("could not read nJoinSplit")
+		}
+
+		if joinSplitCount > 0 {
+			tx.joinSplits = make([]*joinSplit, joinSplitCount)
+			for i := 0; i < joinSplitCount; i++ {
+				js := &joinSplit{version: tx.version}
+				s, err = js.ParseFromSlice([]byte(s))
+				if err != nil {
+					return nil, errors.Wrap(err, "while parsing JoinSplit")
+				}
+				tx.joinSplits[i] = js
+			}
+
+			if ok := s.ReadBytes(&tx.joinSplitPubKey, 32); !ok {
+				return nil, errors.New("could not read joinSplitPubKey")
+			}
+
+			if ok := s.ReadBytes(&tx.joinSplitSig, 64); !ok {
+				return nil, errors.New("could not read joinSplitSig")
+			}
+		}
+	}
+
+	if tx.version >= 4 && (spendCount+outputCount > 0) {
+		if ok := s.ReadBytes(&tx.bindingSig, 64); !ok {
+			return nil, errors.New("could not read bindingSig")
+		}
+	}
+
+	return []byte(s), nil
 }
 
 func newTransaction() *transaction {
