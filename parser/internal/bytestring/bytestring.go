@@ -79,7 +79,7 @@ func (s *String) ReadBytes(out *[]byte, n int) bool {
 // ReadCompactSize reads and interprets a Bitcoin-custom compact integer
 // encoding used for length-prefixing and count values. If the values fall
 // outside the expected canonical ranges, it returns false.
-func (s *String) ReadCompactSize(size *uint64) bool {
+func (s *String) ReadCompactSize(size *int) bool {
 	lenBytes := s.read(1)
 	if lenBytes == nil {
 		return false
@@ -116,19 +116,19 @@ func (s *String) ReadCompactSize(size *uint64) bool {
 		return false
 	}
 
-	*size = length
+	*size = int(length)
 	return true
 }
 
 // ReadCompactLengthPrefixed reads data prefixed by a CompactSize-encoded
 // length field into out. It reports whether the read was successful.
 func (s *String) ReadCompactLengthPrefixed(out *String) bool {
-	var length uint64
+	var length int
 	if ok := s.ReadCompactSize(&length); !ok {
 		return false
 	}
 
-	v := s.read(int(length))
+	v := s.read(length)
 	if v == nil {
 		return false
 	}

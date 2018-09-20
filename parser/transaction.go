@@ -267,7 +267,7 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 		}
 	}
 
-	var txInCount uint64
+	var txInCount int
 	if ok := s.ReadCompactSize(&txInCount); !ok {
 		return nil, errors.New("could not read tx_in_count")
 	}
@@ -288,7 +288,7 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 		}
 	}
 
-	var txOutCount uint64
+	var txOutCount int
 	if ok := s.ReadCompactSize(&txOutCount); !ok {
 		return nil, errors.New("could not read tx_out_count")
 	}
@@ -315,12 +315,13 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 		}
 	}
 
+	var spendCount, outputCount int
+
 	if tx.version >= 4 {
 		if ok := s.ReadInt64(&tx.valueBalance); !ok {
 			return nil, errors.New("could not read valueBalance")
 		}
 
-		var spendCount uint64
 		if ok := s.ReadCompactSize(&spendCount); !ok {
 			return nil, errors.New("could not read nShieldedSpend")
 		}
@@ -337,7 +338,6 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 			}
 		}
 
-		var outputCount uint64
 		if ok := s.ReadCompactSize(&outputCount); !ok {
 			return nil, errors.New("could not read nShieldedOutput")
 		}
@@ -356,7 +356,7 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	}
 
 	if tx.version >= 2 {
-		var joinSplitCount uint64
+		var joinSplitCount int
 		if ok := s.ReadCompactSize(&joinSplitCount); !ok {
 			return nil, errors.New("could not read nJoinSplit")
 		}
