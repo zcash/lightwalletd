@@ -276,14 +276,16 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	// TODO: vector. At the moment we're assuming trusted input.
 	// See https://nvd.nist.gov/vuln/detail/CVE-2018-17144 for an example.
 
-	tx.transparentInputs = make([]*txIn, txInCount)
-	for i := 0; i < txInCount; i++ {
-		ti := &txIn{}
-		s, err = ti.ParseFromSlice([]byte(s))
-		if err != nil {
-			return nil, errors.Wrap(err, "while parsing transparent input")
+	if txInCount > 0 {
+		tx.transparentInputs = make([]*txIn, txInCount)
+		for i := 0; i < txInCount; i++ {
+			ti := &txIn{}
+			s, err = ti.ParseFromSlice([]byte(s))
+			if err != nil {
+				return nil, errors.Wrap(err, "while parsing transparent input")
+			}
+			tx.transparentInputs[i] = ti
 		}
-		tx.transparentInputs[i] = ti
 	}
 
 	var txOutCount uint64
@@ -291,14 +293,16 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 		return nil, errors.New("could not read tx_out_count")
 	}
 
-	tx.transparentOutputs = make([]*txOut, txOutCount)
-	for i := 0; i < txOutCount; i++ {
-		to := &txOut{}
-		s, err = to.ParseFromSlice([]byte(s))
-		if err != nil {
-			return nil, errors.Wrap(err, "while parsing transparent output")
+	if txOutCount > 0 {
+		tx.transparentOutputs = make([]*txOut, txOutCount)
+		for i := 0; i < txOutCount; i++ {
+			to := &txOut{}
+			s, err = to.ParseFromSlice([]byte(s))
+			if err != nil {
+				return nil, errors.Wrap(err, "while parsing transparent output")
+			}
+			tx.transparentOutputs[i] = to
 		}
-		tx.transparentOutputs[i] = to
 	}
 
 	if ok := s.ReadUint32(&tx.nLockTime); !ok {
@@ -321,14 +325,16 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 			return nil, errors.New("could not read nShieldedSpend")
 		}
 
-		tx.shieldedSpends = make([]*spend, spendCount)
-		for i := 0; i < spendCount; i++ {
-			newSpend := &spend{}
-			s, err = newSpend.ParseFromSlice([]byte(s))
-			if err != nil {
-				return nil, errors.Wrap(err, "while parsing shielded Spend")
+		if spendCount > 0 {
+			tx.shieldedSpends = make([]*spend, spendCount)
+			for i := 0; i < spendCount; i++ {
+				newSpend := &spend{}
+				s, err = newSpend.ParseFromSlice([]byte(s))
+				if err != nil {
+					return nil, errors.Wrap(err, "while parsing shielded Spend")
+				}
+				tx.shieldedSpends[i] = newSpend
 			}
-			tx.shieldedSpends[i] = newSpend
 		}
 
 		var outputCount uint64
@@ -336,14 +342,16 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 			return nil, errors.New("could not read nShieldedOutput")
 		}
 
-		tx.shieldedOutputs = make([]*output, outputCount)
-		for i := 0; i < outputCount; i++ {
-			newOutput := &output{}
-			s, err = newOutput.ParseFromSlice([]byte(s))
-			if err != nil {
-				return nil, errors.Wrap(err, "while parsing shielded Output")
+		if outputCount > 0 {
+			tx.shieldedOutputs = make([]*output, outputCount)
+			for i := 0; i < outputCount; i++ {
+				newOutput := &output{}
+				s, err = newOutput.ParseFromSlice([]byte(s))
+				if err != nil {
+					return nil, errors.Wrap(err, "while parsing shielded Output")
+				}
+				tx.shieldedOutputs[i] = newOutput
 			}
-			tx.shieldedOutputs[i] = newOutput
 		}
 	}
 
