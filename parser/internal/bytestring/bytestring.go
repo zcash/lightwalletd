@@ -149,6 +149,18 @@ func (s *String) ReadInt32(out *int32) bool {
 	return true
 }
 
+// ReadInt64 decodes a little-endian 64-bit value into out, treating it as
+// signed, and advances over it. It reports whether the read was successful.
+func (s *String) ReadInt64(out *int64) bool {
+	var tmp uint64
+	if ok := s.ReadUint64(&tmp); !ok {
+		return false
+	}
+
+	*out = int64(tmp)
+	return true
+}
+
 // ReadUint16 decodes a little-endian, 16-bit value into out and advances over
 // it. It reports whether the read was successful.
 func (s *String) ReadUint16(out *uint16) bool {
