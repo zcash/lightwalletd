@@ -125,7 +125,7 @@ func (hdr *blockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 		return in, errors.New("could not read CompactSize-prefixed Equihash solution")
 	}
 
-	// TODO interpret the bytes
+	// TODO: interpret the bytes
 	//hdr.targetThreshold = parseNBits(hdr.NBitsBytes)
 
 	return []byte(s), nil
