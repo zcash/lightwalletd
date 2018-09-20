@@ -178,13 +178,13 @@ type joinSplit struct {
 	vmacs          [2][]byte // 64 [N_old][32]byte
 	proofPHGR13    []byte    // 296
 	proofGroth16   []byte    // 192
-	encCiphertexts []byte    // 1202 [N_new][601]byte
+	encCiphertexts [2][]byte // 1202 [N_new][601]byte
 
 	// not actually in the format, but needed for parsing
 	version uint32
 }
 
-func (p *JoinSplit) ParseFromSlice(data []byte) ([]byte, error) {
+func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
 	if ok := s.ReadUint64(&p.vpubOld); !ok {
@@ -252,6 +252,9 @@ type transaction struct {
 
 func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
+
+	// declare here to prevent shadowing problems in cryptobyte assignments
+	var err error
 
 	var header uint32
 	if ok := s.ReadUint32(&header); !ok {
