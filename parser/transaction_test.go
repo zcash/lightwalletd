@@ -29,16 +29,14 @@ type joinSplitTestVector struct {
 }
 
 // https://github.com/zcash/zips/blob/master/zip-0143.rst
-// raw is currently unused, but will be useful in the future for fuzzing.
 var zip143tests = []struct {
-	raw, header, nVersionGroupId, nLockTime, nExpiryHeight string
-	vin, vout                                              [][]string
-	vJoinSplits                                            []joinSplitTestVector
-	joinSplitPubKey, joinSplitSig                          string
+	header, nVersionGroupId, nLockTime, nExpiryHeight string
+	vin, vout                                         [][]string
+	vJoinSplits                                       []joinSplitTestVector
+	joinSplitPubKey, joinSplitSig                     string
 }{
 	{
 		// Test vector 1
-		raw:             "030000807082c40300028f739811893e0000095200ac6551ac636565b1a45a0805750200025151481cdd86b3cc431800",
 		header:          "03000080",
 		nVersionGroupId: "7082c403",
 		nLockTime:       "481cdd86",
