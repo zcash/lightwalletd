@@ -51,7 +51,7 @@ var zip143tests = []struct {
 	},
 	{
 		// Test vector 2
-		//raw: "we have some raw data for this tx, which this comment is too small to contain"
+		//raw: "we have some raw data for this tx, which this comment is too small to contain",
 		header:          "03000080",
 		nVersionGroupId: "7082c403",
 		nLockTime:       "97b0e4e4",
@@ -92,7 +92,7 @@ var zip143tests = []struct {
 		},
 
 		joinSplitPubKey: "5e669c4242da565938f417bf43ce7b2b30b1cd4018388e1a910f0fc41fb0877a",
-		// This joinSplitSig is invalid random data.
+		// This joinSplitSig is (intentionally) invalid random data.
 		joinSplitSig: "5925e466819d375b0a912d4fe843b76ef6f223f0f7c894f38f7ab780dfd75f669c8c06cffa43eb47565a50e3b1fa45ad61ce9a1c4727b7aaa53562f523e73952",
 	},
 }
@@ -188,8 +188,159 @@ func TestSproutTransactionParser(t *testing.T) {
 		}
 
 		// JoinSplits
+		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+			continue
+		}
 
+		testJSPubKey, _ := hex.DecodeString(tt.joinSplitPubKey)
+		if !bytes.Equal(testJSPubKey, tx.joinSplitPubKey) {
+			t.Errorf("Test %d: jsPubKey mismatch %x %x", i, testJSPubKey, tx.joinSplitPubKey)
+			continue
+		}
+
+		testJSSig, _ := hex.DecodeString(tt.joinSplitSig)
+		if !bytes.Equal(testJSSig, tx.joinSplitSig) {
+			t.Errorf("Test %d: jsSig mismatch %x %x", i, testJSSig, tx.joinSplitSig)
+			continue
+		}
 	}
+}
+
+func subTestJoinSplits(testJoinSplits []joinSplitTestVector, txJoinSplits []*joinSplit, t *testing.T, caseNum int) bool {
+	if testJoinSplits == nil && txJoinSplits != nil {
+		t.Errorf("Test %d: non-zero joinSplits when expected empty vector", caseNum)
+		return false
+	}
+	if len(testJoinSplits) != len(txJoinSplits) {
+		t.Errorf("Test %d: joinSplit vector lengths mismatch", caseNum)
+		return false
+	}
+
+	success := true
+
+JoinSplitLoop:
+	for idx, test := range testJoinSplits {
+		tx := txJoinSplits[idx]
+
+		if test.vpubOld != tx.vpubOld {
+			t.Errorf("Test %d js %d: vpubOld %d %d", caseNum, idx, test.vpubOld, tx.vpubOld)
+			success = false
+			continue
+		}
+		if test.vpubNew != tx.vpubNew {
+			t.Errorf("Test %d js %d: vpubNew %d %d", caseNum, idx, test.vpubNew, tx.vpubNew)
+			success = false
+			continue
+		}
+
+		anchor, _ := hex.DecodeString(test.anchor)
+		if !bytes.Equal(anchor, tx.anchor) {
+			t.Errorf("Test %d js %d: anchor %x %x", caseNum, idx, anchor, tx.anchor)
+			success = false
+			continue
+		}
+
+		if len(test.nullifiers) != len(tx.nullifiers) {
+			t.Errorf("Test %d js %d: nf len mismatch %d %d", caseNum, idx, len(test.nullifiers), len(tx.nullifiers))
+			success = false
+			continue
+		}
+
+		for j := 0; j < len(test.nullifiers); j++ {
+			nf, _ := hex.DecodeString(test.nullifiers[j])
+			if !bytes.Equal(nf, tx.nullifiers[j]) {
+				t.Errorf("Test %d js %d: nf mismatch %x %x", caseNum, idx, nf, tx.nullifiers[j])
+				success = false
+				continue JoinSplitLoop
+			}
+		}
+
+		if len(test.commitments) != len(tx.commitments) {
+			t.Errorf("Test %d js %d: cm len mismatch %d %d", caseNum, idx, len(test.commitments), len(tx.commitments))
+			success = false
+			continue
+		}
+
+		for j := 0; j < len(test.commitments); j++ {
+			cm, _ := hex.DecodeString(test.commitments[j])
+			if !bytes.Equal(cm, tx.commitments[j]) {
+				t.Errorf("Test %d js %d: commit mismatch %x %x", caseNum, idx, cm, tx.commitments[j])
+				success = false
+				continue JoinSplitLoop
+			}
+		}
+
+		ephemeralKey, _ := hex.DecodeString(test.ephemeralKey)
+		if !bytes.Equal(ephemeralKey, tx.ephemeralKey) {
+			t.Errorf("Test %d js %d: ephemeralKey %x %x", caseNum, idx, ephemeralKey, tx.ephemeralKey)
+			success = false
+			continue
+		}
+
+		randomSeed, _ := hex.DecodeString(test.randomSeed)
+		if !bytes.Equal(randomSeed, tx.randomSeed) {
+			t.Errorf("Test %d js %d: randomSeed %x %x", caseNum, idx, randomSeed, tx.randomSeed)
+			success = false
+			continue
+		}
+
+		if len(test.vmacs) != len(tx.vmacs) {
+			t.Errorf("Test %d js %d: mac len mismatch %d %d", caseNum, idx, len(test.vmacs), len(tx.vmacs))
+			success = false
+			continue
+		}
+
+		for j := 0; j < len(test.vmacs); j++ {
+			mac, _ := hex.DecodeString(test.vmacs[j])
+			if !bytes.Equal(mac, tx.vmacs[j]) {
+				t.Errorf("Test %d js %d: mac mismatch %x %x", caseNum, idx, mac, tx.vmacs[j])
+				success = false
+				continue JoinSplitLoop
+			}
+		}
+
+		// This should not be possible.
+		if tx.proofPHGR13 != nil && tx.proofGroth16 != nil {
+			t.Errorf("Test %d js %d: parsed tx had both PHGR and Groth proofs defined", caseNum, idx)
+			success = false
+			continue
+		}
+
+		if test.proofPHGR13 != "" {
+			zkproof, _ := hex.DecodeString(test.proofPHGR13)
+			if !bytes.Equal(zkproof, tx.proofPHGR13) {
+				t.Errorf("Test %d js %d: zkproof %x %x", caseNum, idx, zkproof, tx.proofPHGR13)
+				success = false
+				continue
+			}
+		}
+
+		if test.proofGroth16 != "" {
+			zkproof, _ := hex.DecodeString(test.proofGroth16)
+			if !bytes.Equal(zkproof, tx.proofGroth16) {
+				t.Errorf("Test %d js %d: zkproof %x %x", caseNum, idx, zkproof, tx.proofGroth16)
+				success = false
+				continue
+			}
+		}
+
+		if len(test.encCiphertexts) != len(tx.encCiphertexts) {
+			t.Errorf("Test %d js %d: enc len mismatch %d %d", caseNum, idx, len(test.encCiphertexts), len(tx.encCiphertexts))
+			success = false
+			continue
+		}
+
+		for j := 0; j < len(test.encCiphertexts); j++ {
+			ct, _ := hex.DecodeString(test.encCiphertexts[j])
+			if !bytes.Equal(ct, tx.encCiphertexts[j]) {
+				t.Errorf("Test %d js %d: ct mismatch %x %x", caseNum, idx, ct, tx.encCiphertexts[j])
+				success = false
+				continue JoinSplitLoop
+			}
+		}
+	}
+
+	return success
 }
 
 func subTestTransparentInputs(testInputs [][]string, txInputs []*txIn, t *testing.T, caseNum int) bool {
