@@ -1,9 +1,12 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"testing"
+
+	"github.com/gtank/ctxd/parser/internal/bytestring"
 )
 
 // https://github.com/zcash/zips/blob/master/zip-0143.rst
@@ -91,15 +94,77 @@ func TestSproutTransactionParser(t *testing.T) {
 
 		// 4201cfb1cd8dbf69b8250c18ef41294ca97993db546c1fe01f7e9c8e36d6a5e2 9d4e30a7 03ac6a00 98421c69
 		for idx, ti := range tt.vin {
-			prevTxHash, _ := hex.DecodeString(ti[0])
-			prevTxIndexBytes, _ := hex.DecodeString(ti[1])
-			prevTxIndex := le.Uint32(prevTxIndexBytes)
-			scriptSig, _ := hex.DecodeString(ti[2])
-			seqNumBytes, _ := hex.DecodeString(ti[3])
-			seqNum := le.Uint32(seqNumBytes)
+			txInput := tx.transparentInputs[idx]
 
-			if !bytes.Equal(prevTxHash, tx.transparentInputs[idx][0]) {
+			testPrevTxHash, _ := hex.DecodeString(ti[0])
+			if eq := bytes.Equal(testPrevTxHash, txInput.PrevTxHash); !eq {
+				t.Errorf("Test %d tin %d: prevhash mismatch %x %x", i, idx, testPrevTxHash, txInput.PrevTxHash)
+				continue
+			}
 
+			testPrevTxOutIndexBytes, _ := hex.DecodeString(ti[1])
+			testPrevTxOutIndex := le.Uint32(testPrevTxOutIndexBytes)
+			if testPrevTxOutIndex != txInput.PrevTxOutIndex {
+				t.Errorf("Test %d tin %d: prevout index mismatch %d %d", i, idx, testPrevTxOutIndex, txInput.PrevTxOutIndex)
+				continue
+			}
+
+			// Decode scriptSig and correctly consume own CompactSize field
+			testScriptSig, _ := hex.DecodeString(ti[2])
+			ok := (*bytestring.String)(&testScriptSig).ReadCompactLengthPrefixed((*bytestring.String)(&testScriptSig))
+			if !ok {
+				t.Errorf("Test %d, tin %d: couldn't strip size from script", i, idx)
+				continue
+			}
+
+			if eq := bytes.Equal(testScriptSig, txInput.ScriptSig); !eq {
+				t.Errorf("Test %d tin %d: scriptsig mismatch %x %x", i, idx, testScriptSig, txInput.ScriptSig)
+				continue
+			}
+
+			testSeqNumBytes, _ := hex.DecodeString(ti[3])
+			testSeqNum := le.Uint32(testSeqNumBytes)
+			if testSeqNum != txInput.SequenceNumber {
+				t.Errorf("Test %d tin %d: seq mismatch %d %d", i, idx, testSeqNum, txInput.SequenceNumber)
+				continue
+			}
+
+		}
+
+		if tt.vout == nil && tx.transparentOutputs != nil {
+			t.Errorf("Test %d: non-zero vout when expected zero", i)
+			continue
+		}
+
+		if len(tt.vout) != len(tx.transparentOutputs) {
+			t.Errorf("Test %d: vout have mismatched lengths", i)
+			continue
+		}
+
+		for idx, testOutput := range tt.vout {
+			txOutput := tx.transparentOutputs[idx]
+
+			// Parse tx out value from test
+			testValueBytes, _ := hex.DecodeString(testOutput[0])
+			testValue := le.Uint64(testValueBytes)
+
+			if testValue != txOutput.Value {
+				t.Errorf("Test %d, tout %d: value mismatch %d %d", i, idx, testValue, txOutput.Value)
+				continue
+			}
+
+			// Parse script from test
+			testScript, _ := hex.DecodeString(testOutput[1])
+			// Correctly consume own CompactSize field
+			ok := (*bytestring.String)(&testScript).ReadCompactLengthPrefixed((*bytestring.String)(&testScript))
+			if !ok {
+				t.Errorf("Test %d, tout %d: couldn't strip size from script", i, idx)
+				continue
+			}
+
+			if !bytes.Equal(testScript, txOutput.Script) {
+				t.Errorf("Test %d, tout %d: script mismatch %x %x", i, idx, testScript, txOutput.Script)
+				continue
 			}
 		}
 	}
