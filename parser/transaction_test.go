@@ -447,3 +447,7 @@ func subTestTransparentOutputs(testOutputs [][]string, txOutputs []*txOut, t *te
 	}
 	return success
 }
+
+func TestSaplingTransactionParser(t *testing.T) {
+	// TODO: test Sapling transaction parsing; ZIP243
+}
