@@ -28,13 +28,15 @@ type joinSplitTestVector struct {
 	encCiphertexts []string // 1202 [N_new][601]byte
 }
 
-// https://github.com/zcash/zips/blob/master/zip-0143.rst
-var zip143tests = []struct {
+type zip143test struct {
 	header, nVersionGroupId, nLockTime, nExpiryHeight string
 	vin, vout                                         [][]string
 	vJoinSplits                                       []joinSplitTestVector
 	joinSplitPubKey, joinSplitSig                     string
-}{
+}
+
+// https://github.com/zcash/zips/blob/master/zip-0143.rst
+var zip143tests = []zip143test{
 	{
 		// Test vector 1
 		header:          "03000080",
@@ -165,38 +167,8 @@ func TestSproutTransactionParser(t *testing.T) {
 			continue
 		}
 
-		le := binary.LittleEndian
-
 		// Transaction metadata
-
-		headerBytes, _ := hex.DecodeString(tt.header)
-		header := le.Uint32(headerBytes)
-		if (header >> 31) == 1 != tx.fOverwintered {
-			t.Errorf("Test %d: unexpected fOverwintered", i)
-		}
-		if (header & 0x7FFFFFFF) != tx.version {
-			t.Errorf("Test %d: unexpected tx version", i)
-			continue
-		}
-
-		versionGroupBytes, _ := hex.DecodeString(tt.nVersionGroupId)
-		versionGroup := le.Uint32(versionGroupBytes)
-		if versionGroup != tx.nVersionGroupId {
-			t.Errorf("Test %d: unexpected versionGroupId", i)
-			continue
-		}
-
-		lockTimeBytes, _ := hex.DecodeString(tt.nLockTime)
-		lockTime := le.Uint32(lockTimeBytes)
-		if lockTime != tx.nLockTime {
-			t.Errorf("Test %d: unexpected nLockTime", i)
-			continue
-		}
-
-		expiryHeightBytes, _ := hex.DecodeString(tt.nExpiryHeight)
-		expiryHeight := le.Uint32(expiryHeightBytes)
-		if expiryHeight != tx.nExpiryHeight {
-			t.Errorf("Test %d: unexpected nExpiryHeight", i)
+		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
 			continue
 		}
 
@@ -226,6 +198,42 @@ func TestSproutTransactionParser(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func subTestCommonBlockMeta(tt *zip143test, tx *transaction, t *testing.T, caseNum int) bool {
+	headerBytes, _ := hex.DecodeString(tt.header)
+	header := binary.LittleEndian.Uint32(headerBytes)
+	if (header >> 31) == 1 != tx.fOverwintered {
+		t.Errorf("Test %d: unexpected fOverwintered", caseNum)
+		return false
+	}
+	if (header & 0x7FFFFFFF) != tx.version {
+		t.Errorf("Test %d: unexpected tx version", caseNum)
+		return false
+	}
+
+	versionGroupBytes, _ := hex.DecodeString(tt.nVersionGroupId)
+	versionGroup := binary.LittleEndian.Uint32(versionGroupBytes)
+	if versionGroup != tx.nVersionGroupId {
+		t.Errorf("Test %d: unexpected versionGroupId", caseNum)
+		return false
+	}
+
+	lockTimeBytes, _ := hex.DecodeString(tt.nLockTime)
+	lockTime := binary.LittleEndian.Uint32(lockTimeBytes)
+	if lockTime != tx.nLockTime {
+		t.Errorf("Test %d: unexpected nLockTime", caseNum)
+		return false
+	}
+
+	expiryHeightBytes, _ := hex.DecodeString(tt.nExpiryHeight)
+	expiryHeight := binary.LittleEndian.Uint32(expiryHeightBytes)
+	if expiryHeight != tx.nExpiryHeight {
+		t.Errorf("Test %d: unexpected nExpiryHeight", caseNum)
+		return false
+	}
+
+	return true
 }
 
 func subTestJoinSplits(testJoinSplits []joinSplitTestVector, txJoinSplits []*joinSplit, t *testing.T, caseNum int) bool {
