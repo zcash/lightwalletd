@@ -28,15 +28,40 @@ type joinSplitTestVector struct {
 	encCiphertexts []string // 1202 [N_new][601]byte
 }
 
-type zip143test struct {
+type spendTestVector struct {
+	cv           string // 32
+	anchor       string // 32
+	nullifier    string // 32
+	rk           string // 32
+	zkproof      string // 192
+	spendAuthSig string // 64
+}
+
+type outputTestVector struct {
+	cv            string // 32
+	cmu           string // 32
+	ephemeralKey  string // 32
+	encCiphertext string // 580
+	outCiphertext string // 80
+	zkproof       string // 192
+}
+
+type txTestVector struct {
+	// Sprout and Sapling
 	header, nVersionGroupId, nLockTime, nExpiryHeight string
 	vin, vout                                         [][]string
 	vJoinSplits                                       []joinSplitTestVector
 	joinSplitPubKey, joinSplitSig                     string
+
+	// Sapling-only
+	valueBalance string // encoded int64
+	spends       []spendTestVector
+	outputs      []outputTestVector
+	bindingSig   string
 }
 
 // https://github.com/zcash/zips/blob/master/zip-0143.rst
-var zip143tests = []zip143test{
+var zip143tests = []txTestVector{
 	{
 		// Test vector 1
 		header:          "03000080",
@@ -200,7 +225,7 @@ func TestSproutTransactionParser(t *testing.T) {
 	}
 }
 
-func subTestCommonBlockMeta(tt *zip143test, tx *transaction, t *testing.T, caseNum int) bool {
+func subTestCommonBlockMeta(tt *txTestVector, tx *transaction, t *testing.T, caseNum int) bool {
 	headerBytes, _ := hex.DecodeString(tt.header)
 	header := binary.LittleEndian.Uint32(headerBytes)
 	if (header >> 31) == 1 != tx.fOverwintered {
@@ -478,35 +503,9 @@ func subTestTransparentOutputs(testOutputs [][]string, txOutputs []*txOut, t *te
 	return success
 }
 
-type spendTestVector struct {
-	cv           string // 32
-	anchor       string // 32
-	nullifier    string // 32
-	rk           string // 32
-	zkproof      string // 192
-	spendAuthSig string // 64
-}
-
-type outputTestVector struct {
-	cv            string // 32
-	cmu           string // 32
-	ephemeralKey  string // 32
-	encCiphertext string // 580
-	outCiphertext string // 80
-	zkproof       string // 192
-}
-
 // https://github.com/zcash/zips/blob/master/zip-0243.rst
-var zip243tests = []struct {
-	header, nVersionGroupId, nLockTime, nExpiryHeight string
-	vin, vout                                         [][]string
-	valueBalance                                      string // encoded int64
-	spends                                            []spendTestVector
-	outputs                                           []outputTestVector
-	vJoinSplits                                       []joinSplitTestVector
-	joinSplitPubKey, joinSplitSig                     string
-	bindingSig                                        string
-}{
+var zip243tests = []txTestVector{
+	// Test vector 1
 	{
 		header:          "04000080",
 		nVersionGroupId: "85202f89",
@@ -608,8 +607,251 @@ var zip243tests = []struct {
 		joinSplitSig:    "469b0e272494e5df54f568656cb9c8818d92b72b8bc34db7bb3112487e746eefe4e808bbb287d99bf07d00dabededc5e5f074ffeae0cba7da3a516c173be1c51",
 		bindingSig:      "3323e119f635e8209a074b216b7023fadc2d25949c90037e71e3e550726d210a2c688342e52440635e9cc14afe10102621a9c9accb782e9e4a5fa87f0a956f5b",
 	},
+	// Test vector 2
+	{
+		header:          "04000080",
+		nVersionGroupId: "85202f89",
+		vin: [][]string{
+			{"56e551406a7ee8355656a21e43e38ce129fdadb759eddfa08f00fc8e567cef93", "c6792d01", "0763656300ac63ac", "8df04245"},
+			{"1a33590d3e8cf49b2627218f0c292fa66ada945fa55bb23548e33a83a562957a", "3149a993", "086a5352516a65006a", "78d97ce4"},
+		},
+		vout: [][]string{
+			{"e91cb65a63b70100", "09516a6a656aac636565"},
+			{"5cc7c9aae5bd0300", "02636a"},
+		},
+		nLockTime:     "675cb83e",
+		nExpiryHeight: "43e29c17",
+		valueBalance:  "44b8b5b99ce30500",
+		spends: []spendTestVector{
+			{
+				cv:           "b0f5b874a6ecabe6c56ee58b67d02f5d47db8cc3458435d5088d69b2240c28f3",
+				anchor:       "71c012c415d2382a6eebc8b3db07ea1cbf28288daaa91538de4552eeeef72c24",
+				nullifier:    "c85d83db20efad48be8996fb1bff591efff360fe1199056c56e5feec61a7b8b9",
+				rk:           "f699d6012c2849232f329fef95c7af370098ffe4918e0ca1df47f275867b739e",
+				zkproof:      "0a514d3209325e217045927b479c1ce2e5d54f25488cad1513e3f44a21266cfd841633327dee6cf810fbf7393e317d9e53d1be1d5ae7839b66b943b9ed18f2c530e975422332c3439cce49a29f2a336a4851263c5e9bd13d731109e844b7f8c392a5c1dcaa2ae5f50ff63fab9765e016702c35a67cd7364d3fab552fb349e35c15c50250453fd18f7b855992632e2c76c0fbf1ef963ea80e3223de3277bc559251725829ec03f213ba8955cab2822ff21a9b0a4904d668fcd77224bde3dd01f6",
+				spendAuthSig: "ffc4828f6b64230b35c6a049873494276ea1d7ed5e92cb4f90ba83a9e49601b194042f2900d99d312d7b70508cf176066d154dbe96ef9d4367e4c840e4a17b5e",
+			},
+			{
+
+				cv:           "26bca7fdd7cc43201c56f468fadc42cff0d81a966417ad8f097ebf3b25879e55",
+				anchor:       "c23e34da91c816d8d1790dfe34bdce040db1727af24d59ef78d3f4aac2b59822",
+				nullifier:    "d6f12f24fd364496b3be0871ca3dd9625348a614b59bde45885649bae36de34d",
+				rk:           "ef8fcec85343475d976ae1e9b27829ce2ac5efd0b399a8b448be6504294ee6b3",
+				zkproof:      "c1c6a5342d7c01ae9d8ad3070c2b1a91573af5e0c5e4cbbf4acdc6b54c9272200d9970250c17c1036f06085c41858ed3a0c48150bc697e4a695fef335f7ad07e1a46dc767ff822db70e6669080b9816b2232c81a4c66cc586abfe1eaa8ca6cf41fc3c3e6c7b886fb6dac9f4822b4fc6fff9d0513d61a21c80a377671d135a668a0ae2bb934c82c4142da69d12ca7de9a7df706400ec79878d868e17e8f71ea31495af819a016cc419e07c501aa8309b2e6c85b79b2763733a37bbc0420d42537",
+				spendAuthSig: "b871b4294a65d3e055ff718dd9dc8c75e7e5b2efe442637371b7c48f6ee99e3ea38a4b0f2f67fc2b908cda657eae754e037e262e9a9f9bd7ec4267ed8e96930e",
+			},
+			{
+				cv:           "eb89a85980f97d7faaed78d8f38beb624b774c73a46ced614be219b3d94873b6",
+				anchor:       "0df7fc90b579abf62037975edd6aacc442190a0ba55b15f81f86bade794ace2a",
+				nullifier:    "9d9a816baf728a955b960b7701fa626687dc3c9cba646337b53e29816e9482dd",
+				rk:           "f5578a8768aae477fce410ac2d5de6095861c111d7feb3e6bb4fbb5a54955495",
+				zkproof:      "972798350a253f05f66c2ecfcbc0ed43f5ec2e6d8dba15a51254d97b1821107c07dd9a16ef8406f943e282b95d4b362530c913d6ba421df6027de5af1e4745d5868106954be6c1962780a2941072e95131b1679df0637625042c37d48ffb152e5ebc185c8a2b7d4385f1c95af937df78dfd8757fab434968b0b57c66574468f160b447ac8221e5060676a842a1c6b7172dd3340f764070ab1fe091c5c74c95a5dc043390723a4c127da14cdde1dc2675a62340b3e6afd0522a31de26e7d1ec3a",
+				spendAuthSig: "9c8a091ffdc75b7ecfdc7c12995a5e37ce3488bd29f8629d68f696492448dd526697476dc061346ebe3f677217ff9c60efce943af28dfd3f9e59692598a6047c",
+			},
+		},
+		outputs:         nil,
+		vJoinSplits:     nil,
+		joinSplitPubKey: "",
+		joinSplitSig:    "",
+		bindingSig:      "c01400f1ab5730eac0ae8d5843d5051c376240172af218d7a1ecfe65b4f75100638983c14de4974755dade8018c9b8f4543fb095961513e67c61dbc59c607f9b",
+	},
 }
 
 func TestSaplingTransactionParser(t *testing.T) {
-	// TODO: test Sapling transaction parsing; ZIP243
+	testData, err := os.Open("testdata/zip243_raw_tx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testData.Close()
+
+	// Parse the raw transactions file
+	rawTxData := make([][]byte, len(zip243tests))
+	scan := bufio.NewScanner(testData)
+	count := 0
+	for scan.Scan() {
+		dataLine := scan.Text()
+		// Skip the comments
+		if strings.HasPrefix(dataLine, "#") {
+			continue
+		}
+
+		txData, err := hex.DecodeString(dataLine)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		rawTxData[count] = txData
+		count++
+	}
+
+	for i, tt := range zip243tests {
+		tx := newTransaction()
+
+		rest, err := tx.ParseFromSlice(rawTxData[i])
+		if err != nil {
+			t.Errorf("Test %d: %v", i, err)
+			continue
+		}
+
+		if len(rest) != 0 {
+			t.Errorf("Test %d: did not consume entire buffer", i)
+			continue
+		}
+
+		// Transaction metadata
+		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+			continue
+		}
+
+		// Transparent inputs and outputs
+		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+			continue
+		}
+		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+			continue
+		}
+
+		// JoinSplits
+		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+			continue
+		}
+
+		testJSPubKey, _ := hex.DecodeString(tt.joinSplitPubKey)
+		if !bytes.Equal(testJSPubKey, tx.joinSplitPubKey) {
+			t.Errorf("Test %d: jsPubKey mismatch %x %x", i, testJSPubKey, tx.joinSplitPubKey)
+			continue
+		}
+
+		testJSSig, _ := hex.DecodeString(tt.joinSplitSig)
+		if !bytes.Equal(testJSSig, tx.joinSplitSig) {
+			t.Errorf("Test %d: jsSig mismatch %x %x", i, testJSSig, tx.joinSplitSig)
+			continue
+		}
+
+		// Begin Sapling-specific tests
+		testValueBalanceBytes, _ := hex.DecodeString(tt.valueBalance)
+		testValueBalance := int64(binary.LittleEndian.Uint64(testValueBalanceBytes))
+		if testValueBalance != tx.valueBalance {
+			t.Errorf("Test %d: valueBalance mismatch %d %d", i, testValueBalance, tx.valueBalance)
+			continue
+		}
+
+		if ok := subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i); !ok {
+			continue
+		}
+
+		if ok := subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i); !ok {
+			continue
+		}
+
+		testBinding, _ := hex.DecodeString(tt.bindingSig)
+		if !bytes.Equal(testBinding, tx.bindingSig) {
+			t.Errorf("Test %d: bindingSig %x %x", i, testBinding, tx.bindingSig)
+			continue
+		}
+	}
+}
+
+func subTestShieldedSpends(testSpends []spendTestVector, txSpends []*spend, t *testing.T, caseNum int) bool {
+	if testSpends == nil && txSpends != nil {
+		t.Errorf("Test %d: non-zero Spends when expected empty vector", caseNum)
+		return false
+	}
+	if len(testSpends) != len(txSpends) {
+		t.Errorf("Test %d: Spend vector lengths mismatch", caseNum)
+		return false
+	}
+
+	success := true
+	for j, tt := range testSpends {
+		tx := txSpends[j]
+
+		testCV, _ := hex.DecodeString(tt.cv)
+		if !bytes.Equal(testCV, tx.cv) {
+			t.Errorf("Test %d spend %d: cv %x %x", caseNum, j, testCV, tx.cv)
+			success = false
+			continue
+		}
+		testAnchor, _ := hex.DecodeString(tt.anchor)
+		if !bytes.Equal(testAnchor, tx.anchor) {
+			t.Errorf("Test %d spend %d: anchor %x %x", caseNum, j, testAnchor, tx.anchor)
+			success = false
+			continue
+		}
+		testNullifier, _ := hex.DecodeString(tt.nullifier)
+		if !bytes.Equal(testNullifier, tx.nullifier) {
+			t.Errorf("Test %d spend %d: nullifier %x %x", caseNum, j, testNullifier, tx.nullifier)
+			success = false
+			continue
+		}
+		testrk, _ := hex.DecodeString(tt.rk)
+		if !bytes.Equal(testrk, tx.rk) {
+			t.Errorf("Test %d spend %d: rk %x %x", caseNum, j, testrk, tx.rk)
+			success = false
+			continue
+		}
+		testzkproof, _ := hex.DecodeString(tt.zkproof)
+		if !bytes.Equal(testzkproof, tx.zkproof) {
+			t.Errorf("Test %d spend %d: zkproof %x %x", caseNum, j, testzkproof, tx.zkproof)
+			success = false
+			continue
+		}
+		testspendAuthSig, _ := hex.DecodeString(tt.spendAuthSig)
+		if !bytes.Equal(testspendAuthSig, tx.spendAuthSig) {
+			t.Errorf("Test %d spend %d: spendAuthSig %x %x", caseNum, j, testspendAuthSig, tx.spendAuthSig)
+			success = false
+			continue
+		}
+	}
+
+	return success
+}
+
+func subTestShieldedOutputs(testOutputs []outputTestVector, txOutputs []*output, t *testing.T, caseNum int) bool {
+	if testOutputs == nil && txOutputs != nil {
+		t.Errorf("Test %d: non-zero Outputs when expected empty vector", caseNum)
+		return false
+	}
+	if len(testOutputs) != len(txOutputs) {
+		t.Errorf("Test %d: Output vector lengths mismatch", caseNum)
+		return false
+	}
+
+	success := true
+	for j, tt := range testOutputs {
+		tx := txOutputs[j]
+
+		testCV, _ := hex.DecodeString(tt.cv)
+		if !bytes.Equal(testCV, tx.cv) {
+			t.Errorf("Test %d output %d: cv %x %x", caseNum, j, testCV, tx.cv)
+			success = false
+			continue
+		}
+		testcmu, _ := hex.DecodeString(tt.cmu)
+		if !bytes.Equal(testcmu, tx.cmu) {
+			t.Errorf("Test %d output %d: cmu %x %x", caseNum, j, testcmu, tx.cmu)
+			success = false
+			continue
+		}
+		testEphemeralKey, _ := hex.DecodeString(tt.ephemeralKey)
+		if !bytes.Equal(testEphemeralKey, tx.ephemeralKey) {
+			t.Errorf("Test %d output %d: ephemeralKey %x %x", caseNum, j, testEphemeralKey, tx.ephemeralKey)
+			success = false
+			continue
+		}
+		testencCiphertext, _ := hex.DecodeString(tt.encCiphertext)
+		if !bytes.Equal(testencCiphertext, tx.encCiphertext) {
+			t.Errorf("Test %d output %d: encCiphertext %x %x", caseNum, j, testencCiphertext, tx.encCiphertext)
+			success = false
+			continue
+		}
+		testzkproof, _ := hex.DecodeString(tt.zkproof)
+		if !bytes.Equal(testzkproof, tx.zkproof) {
+			t.Errorf("Test %d output %d: zkproof %x %x", caseNum, j, testzkproof, tx.zkproof)
+			success = false
+			continue
+		}
+	}
+
+	return success
 }
