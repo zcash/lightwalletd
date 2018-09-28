@@ -179,7 +179,7 @@ func TestSproutTransactionParser(t *testing.T) {
 	}
 
 	for i, tt := range zip143tests {
-		tx := newTransaction()
+		tx := NewTransaction()
 
 		rest, err := tx.ParseFromSlice(rawTxData[i])
 		if err != nil {
@@ -685,7 +685,7 @@ func TestSaplingTransactionParser(t *testing.T) {
 	}
 
 	for i, tt := range zip243tests {
-		tx := newTransaction()
+		tx := NewTransaction()
 
 		rest, err := tx.ParseFromSlice(rawTxData[i])
 		if err != nil {

@@ -72,7 +72,7 @@ func TestBlockHeader(t *testing.T) {
 			continue
 		}
 
-		blockHeader := newBlockHeader()
+		blockHeader := NewBlockHeader()
 		_, err = blockHeader.ParseFromSlice(blockData)
 		if err != nil {
 			t.Error(err)

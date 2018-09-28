@@ -79,7 +79,7 @@ func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 	return backing[:SER_BLOCK_HEADER_SIZE], nil
 }
 
-func newBlockHeader() *blockHeader {
+func NewBlockHeader() *blockHeader {
 	return &blockHeader{
 		rawBlockHeader: new(rawBlockHeader),
 	}

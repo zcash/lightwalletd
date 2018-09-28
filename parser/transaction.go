@@ -394,7 +394,7 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func newTransaction() *transaction {
+func NewTransaction() *transaction {
 	return &transaction{
 		rawTransaction: new(rawTransaction),
 	}
