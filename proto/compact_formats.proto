@@ -1,0 +1,74 @@
+syntax = "proto3";
+package proto;
+
+// Remember that proto3 fields are all optional.
+
+// A BlockFilter message contains identifiers to select a block: either a
+// height or a hash.
+message BlockFilter {
+     uint64 blockHeight = 1;
+     bytes blockHash = 2;
+}
+
+message RangeFilter {
+    BlockFilter start = 1;
+    BlockFilter end = 2;
+}
+
+// A TxFilter contains the information needed to identify a particular
+// transaction: either a block and an index, or a direct transaction hash.
+message TxFilter {
+     BlockFilter blockID = 1;
+     uint64 txIndex = 2;
+     bytes txHash = 3;
+}
+
+
+// CompactBlock is a packaging of ONLY the data from a block that's needed to:
+//   1. Detect a payment to your shielded Sapling address
+//   2. Detect a spend of your shielded Sapling notes
+//   3. Update your witnesses to generate new Sapling spend proofs.
+message CompactBlock {
+    BlockFilter blockID = 1;
+
+    repeated CompactTx vtx = 3;
+}
+
+message CompactTx {
+    // Index and hash will allow the receiver to call out to chain
+    // explorers or other data structures to retrieve more information
+    // about this transaction.
+    uint64 index = 1;
+    bytes hash = 2;
+
+    repeated CompactSpend spends = 3;
+    repeated CompactOutput outputs = 4;
+}
+
+message CompactSpend {
+    bytes nf = 1;
+}
+
+message CompactOutput {
+    bytes cmu = 1;
+    bytes epk = 2;
+    bytes ciphertext = 3;
+}
+
+// An opaque blob of full transaction data, for fetching anything that is not
+// in the compact format (e.g. the memo field).
+message FullTransaction {
+    TxFilter txID = 1;
+    bytes data = 2;
+}
+
+// Empty placeholder.
+// Someday we may want to specify e.g. a particular chain fork.
+message ChainSpec {}
+
+service CompactTxStreamer {
+    rpc GetLatestBlock(ChainSpec) returns (BlockFilter) {}
+    rpc GetBlock(BlockFilter) returns (CompactBlock) {}
+    rpc GetBlockRange(RangeFilter) returns (stream CompactBlock) {}
+    rpc GetTransaction(TxFilter) returns (FullTransaction) {}
+}
