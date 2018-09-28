@@ -30,7 +30,6 @@ message TxFilter {
 //   3. Update your witnesses to generate new Sapling spend proofs.
 message CompactBlock {
     BlockFilter blockID = 1;
-
     repeated CompactTx vtx = 3;
 }
 

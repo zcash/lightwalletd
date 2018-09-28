@@ -1,3 +1,3 @@
 package proto
 
-//go:generate protoc --go_out=. compact_formats.proto
+//go:generate protoc -I . ./compact_formats.proto --go_out=plugins=grpc:.

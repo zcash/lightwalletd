@@ -7,6 +7,11 @@ import proto "github.com/golang/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
+import (
+	context "golang.org/x/net/context"
+	grpc "google.golang.org/grpc"
+)
+
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
 var _ = fmt.Errorf
@@ -32,7 +37,7 @@ func (m *BlockFilter) Reset()         { *m = BlockFilter{} }
 func (m *BlockFilter) String() string { return proto.CompactTextString(m) }
 func (*BlockFilter) ProtoMessage()    {}
 func (*BlockFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{0}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{0}
 }
 func (m *BlockFilter) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BlockFilter.Unmarshal(m, b)
@@ -78,7 +83,7 @@ func (m *RangeFilter) Reset()         { *m = RangeFilter{} }
 func (m *RangeFilter) String() string { return proto.CompactTextString(m) }
 func (*RangeFilter) ProtoMessage()    {}
 func (*RangeFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{1}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{1}
 }
 func (m *RangeFilter) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RangeFilter.Unmarshal(m, b)
@@ -127,7 +132,7 @@ func (m *TxFilter) Reset()         { *m = TxFilter{} }
 func (m *TxFilter) String() string { return proto.CompactTextString(m) }
 func (*TxFilter) ProtoMessage()    {}
 func (*TxFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{2}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{2}
 }
 func (m *TxFilter) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TxFilter.Unmarshal(m, b)
@@ -184,7 +189,7 @@ func (m *CompactBlock) Reset()         { *m = CompactBlock{} }
 func (m *CompactBlock) String() string { return proto.CompactTextString(m) }
 func (*CompactBlock) ProtoMessage()    {}
 func (*CompactBlock) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{3}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{3}
 }
 func (m *CompactBlock) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactBlock.Unmarshal(m, b)
@@ -235,7 +240,7 @@ func (m *CompactTx) Reset()         { *m = CompactTx{} }
 func (m *CompactTx) String() string { return proto.CompactTextString(m) }
 func (*CompactTx) ProtoMessage()    {}
 func (*CompactTx) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{4}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{4}
 }
 func (m *CompactTx) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactTx.Unmarshal(m, b)
@@ -294,7 +299,7 @@ func (m *CompactSpend) Reset()         { *m = CompactSpend{} }
 func (m *CompactSpend) String() string { return proto.CompactTextString(m) }
 func (*CompactSpend) ProtoMessage()    {}
 func (*CompactSpend) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{5}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{5}
 }
 func (m *CompactSpend) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactSpend.Unmarshal(m, b)
@@ -334,7 +339,7 @@ func (m *CompactOutput) Reset()         { *m = CompactOutput{} }
 func (m *CompactOutput) String() string { return proto.CompactTextString(m) }
 func (*CompactOutput) ProtoMessage()    {}
 func (*CompactOutput) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{6}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{6}
 }
 func (m *CompactOutput) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactOutput.Unmarshal(m, b)
@@ -389,7 +394,7 @@ func (m *FullTransaction) Reset()         { *m = FullTransaction{} }
 func (m *FullTransaction) String() string { return proto.CompactTextString(m) }
 func (*FullTransaction) ProtoMessage()    {}
 func (*FullTransaction) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{7}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{7}
 }
 func (m *FullTransaction) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_FullTransaction.Unmarshal(m, b)
@@ -435,7 +440,7 @@ func (m *ChainSpec) Reset()         { *m = ChainSpec{} }
 func (m *ChainSpec) String() string { return proto.CompactTextString(m) }
 func (*ChainSpec) ProtoMessage()    {}
 func (*ChainSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_0da157b93a4fa3be, []int{8}
+	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{8}
 }
 func (m *ChainSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ChainSpec.Unmarshal(m, b)
@@ -467,11 +472,210 @@ func init() {
 	proto.RegisterType((*ChainSpec)(nil), "proto.ChainSpec")
 }
 
-func init() {
-	proto.RegisterFile("compact_formats.proto", fileDescriptor_compact_formats_0da157b93a4fa3be)
+// Reference imports to suppress errors if they are not otherwise used.
+var _ context.Context
+var _ grpc.ClientConn
+
+// This is a compile-time assertion to ensure that this generated file
+// is compatible with the grpc package it is being compiled against.
+const _ = grpc.SupportPackageIsVersion4
+
+// CompactTxStreamerClient is the client API for CompactTxStreamer service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+type CompactTxStreamerClient interface {
+	GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockFilter, error)
+	GetBlock(ctx context.Context, in *BlockFilter, opts ...grpc.CallOption) (*CompactBlock, error)
+	GetBlockRange(ctx context.Context, in *RangeFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error)
+	GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*FullTransaction, error)
 }
 
-var fileDescriptor_compact_formats_0da157b93a4fa3be = []byte{
+type compactTxStreamerClient struct {
+	cc *grpc.ClientConn
+}
+
+func NewCompactTxStreamerClient(cc *grpc.ClientConn) CompactTxStreamerClient {
+	return &compactTxStreamerClient{cc}
+}
+
+func (c *compactTxStreamerClient) GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockFilter, error) {
+	out := new(BlockFilter)
+	err := c.cc.Invoke(ctx, "/proto.CompactTxStreamer/GetLatestBlock", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *compactTxStreamerClient) GetBlock(ctx context.Context, in *BlockFilter, opts ...grpc.CallOption) (*CompactBlock, error) {
+	out := new(CompactBlock)
+	err := c.cc.Invoke(ctx, "/proto.CompactTxStreamer/GetBlock", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *compactTxStreamerClient) GetBlockRange(ctx context.Context, in *RangeFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[0], "/proto.CompactTxStreamer/GetBlockRange", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &compactTxStreamerGetBlockRangeClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CompactTxStreamer_GetBlockRangeClient interface {
+	Recv() (*CompactBlock, error)
+	grpc.ClientStream
+}
+
+type compactTxStreamerGetBlockRangeClient struct {
+	grpc.ClientStream
+}
+
+func (x *compactTxStreamerGetBlockRangeClient) Recv() (*CompactBlock, error) {
+	m := new(CompactBlock)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *compactTxStreamerClient) GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*FullTransaction, error) {
+	out := new(FullTransaction)
+	err := c.cc.Invoke(ctx, "/proto.CompactTxStreamer/GetTransaction", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CompactTxStreamerServer is the server API for CompactTxStreamer service.
+type CompactTxStreamerServer interface {
+	GetLatestBlock(context.Context, *ChainSpec) (*BlockFilter, error)
+	GetBlock(context.Context, *BlockFilter) (*CompactBlock, error)
+	GetBlockRange(*RangeFilter, CompactTxStreamer_GetBlockRangeServer) error
+	GetTransaction(context.Context, *TxFilter) (*FullTransaction, error)
+}
+
+func RegisterCompactTxStreamerServer(s *grpc.Server, srv CompactTxStreamerServer) {
+	s.RegisterService(&_CompactTxStreamer_serviceDesc, srv)
+}
+
+func _CompactTxStreamer_GetLatestBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ChainSpec)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetLatestBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.CompactTxStreamer/GetLatestBlock",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetLatestBlock(ctx, req.(*ChainSpec))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CompactTxStreamer_GetBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockFilter)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetBlock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.CompactTxStreamer/GetBlock",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetBlock(ctx, req.(*BlockFilter))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CompactTxStreamer_GetBlockRange_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RangeFilter)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CompactTxStreamerServer).GetBlockRange(m, &compactTxStreamerGetBlockRangeServer{stream})
+}
+
+type CompactTxStreamer_GetBlockRangeServer interface {
+	Send(*CompactBlock) error
+	grpc.ServerStream
+}
+
+type compactTxStreamerGetBlockRangeServer struct {
+	grpc.ServerStream
+}
+
+func (x *compactTxStreamerGetBlockRangeServer) Send(m *CompactBlock) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _CompactTxStreamer_GetTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TxFilter)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetTransaction(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/proto.CompactTxStreamer/GetTransaction",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetTransaction(ctx, req.(*TxFilter))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+var _CompactTxStreamer_serviceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.CompactTxStreamer",
+	HandlerType: (*CompactTxStreamerServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetLatestBlock",
+			Handler:    _CompactTxStreamer_GetLatestBlock_Handler,
+		},
+		{
+			MethodName: "GetBlock",
+			Handler:    _CompactTxStreamer_GetBlock_Handler,
+		},
+		{
+			MethodName: "GetTransaction",
+			Handler:    _CompactTxStreamer_GetTransaction_Handler,
+		},
+	},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetBlockRange",
+			Handler:       _CompactTxStreamer_GetBlockRange_Handler,
+			ServerStreams: true,
+		},
+	},
+	Metadata: "compact_formats.proto",
+}
+
+func init() {
+	proto.RegisterFile("compact_formats.proto", fileDescriptor_compact_formats_e086cc6bfb553869)
+}
+
+var fileDescriptor_compact_formats_e086cc6bfb553869 = []byte{
 	// 485 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x53, 0x5d, 0x8b, 0xd3, 0x50,
 	0x10, 0x6d, 0x9a, 0xb4, 0xdd, 0x4e, 0xba, 0x1f, 0x8e, 0xeb, 0x12, 0x8a, 0x2c, 0xe5, 0xea, 0x43,
