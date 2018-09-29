@@ -16,6 +16,14 @@ func NewBlock() *block {
 	return &block{}
 }
 
+func (b *block) GetVersion() int {
+	return int(b.hdr.Version)
+}
+
+func (b *block) GetTxCount() int {
+	return len(b.vtx)
+}
+
 func (b *block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	hdr := NewBlockHeader()
 	data, err = hdr.ParseFromSlice(data)
