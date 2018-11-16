@@ -150,6 +150,7 @@ func parseNBits(b []byte) *big.Int {
 	return new(big.Int).SetBytes(targetBytes)
 }
 
+// GetHash returns the bytes of a block hash in big-endian order.
 func (hdr *blockHeader) GetHash() []byte {
 	if hdr.cachedHash != nil {
 		return hdr.cachedHash
@@ -164,6 +165,12 @@ func (hdr *blockHeader) GetHash() []byte {
 	// SHA256d
 	digest := sha256.Sum256(serializedHeader)
 	digest = sha256.Sum256(digest[:])
+
+	// Reverse byte order
+	for i := 0; i < len(digest)/2; i++ {
+		j := len(digest) - 1 - i
+		digest[i], digest[j] = digest[j], digest[i]
+	}
 
 	hdr.cachedHash = digest[:]
 	return hdr.cachedHash

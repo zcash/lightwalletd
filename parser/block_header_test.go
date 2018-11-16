@@ -126,9 +126,9 @@ func TestBlockHeader(t *testing.T) {
 		hash := blockHeader.GetHash()
 
 		// This is not necessarily true for anything but our current test cases.
-		for _, b := range hash[28:] {
+		for _, b := range hash[:4] {
 			if b != 0 {
-				t.Errorf("Hash lacked trailing zeros")
+				t.Errorf("Hash lacked leading zeros: %x", hash)
 			}
 		}
 	}
