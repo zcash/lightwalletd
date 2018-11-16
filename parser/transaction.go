@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"crypto/sha256"
+
 	"github.com/gtank/ctxd/parser/internal/bytestring"
 	"github.com/pkg/errors"
 )
@@ -248,6 +250,29 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 
 type transaction struct {
 	*rawTransaction
+	rawBytes []byte
+	txId     []byte
+}
+
+func (tx *transaction) GetHash() []byte {
+	if tx.txId != nil {
+		return tx.txId
+	}
+
+	// SHA256d
+	digest := sha256.Sum256(tx.rawBytes)
+	digest = sha256.Sum256(digest[:])
+
+	// Reverse byte order
+	for i := 0; i < len(digest)/2; i++ {
+		j := len(digest) - 1 - i
+		digest[i], digest[j] = digest[j], digest[i]
+	}
+
+	tx.txId = digest[:]
+	return tx.txId
+}
+
 }
 
 func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
@@ -390,6 +415,10 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 			return nil, errors.New("could not read bindingSig")
 		}
 	}
+
+	// TODO: implement rawBytes with MarshalBinary() instead
+	txLen := len(data) - len(s)
+	tx.rawBytes = data[:txLen]
 
 	return []byte(s), nil
 }
