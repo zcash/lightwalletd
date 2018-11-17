@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gtank/ctxd/parser/internal/bytestring"
+	"github.com/gtank/ctxd/proto"
 	"github.com/pkg/errors"
 )
 
@@ -22,6 +23,16 @@ func (b *block) GetVersion() int {
 
 func (b *block) GetTxCount() int {
 	return len(b.vtx)
+}
+
+// GetHash returns the block hash in big-endian display order.
+func (b *block) GetHash() []byte {
+	return b.hdr.GetHash()
+}
+
+// getEncodableHash returns the block hash in little-endian wire order.
+func (b *block) getEncodableHash() []byte {
+	return b.hdr.getEncodableHash()
 }
 
 // GetHeight() extracts the block height from the coinbase transaction. See
@@ -44,6 +55,20 @@ func (b *block) GetHeight() int {
 		blockHeight = blockHeight | uint32(heightBytes[i])
 	}
 	return int(blockHeight)
+}
+
+func (b *block) ToCompact() *proto.CompactBlock {
+	compactBlock := &proto.CompactBlock{
+		BlockID: &proto.BlockFilter{
+			BlockHeight: uint64(b.GetHeight()),
+			BlockHash:   b.getEncodableHash(),
+		},
+	}
+	compactBlock.Vtx = make([]*proto.CompactTx, len(b.vtx))
+	for idx, tx := range b.vtx {
+		compactBlock.Vtx[idx] = tx.ToCompact(idx)
+	}
+	return compactBlock
 }
 
 func (b *block) ParseFromSlice(data []byte) (rest []byte, err error) {

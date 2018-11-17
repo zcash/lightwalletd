@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/gtank/ctxd/parser/internal/bytestring"
+	"github.com/gtank/ctxd/proto"
 	"github.com/pkg/errors"
 )
 
@@ -125,6 +126,12 @@ func (p *spend) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
+func (p *spend) ToCompact() *proto.CompactSpend {
+	return &proto.CompactSpend{
+		Nf: p.nullifier,
+	}
+}
+
 // output is a Sapling Output Description as described in section 7.4 of the
 // Zcash protocol spec. Total size is 948.
 type output struct {
@@ -164,6 +171,14 @@ func (p *output) ParseFromSlice(data []byte) ([]byte, error) {
 	}
 
 	return []byte(s), nil
+}
+
+func (p *output) ToCompact() *proto.CompactOutput {
+	return &proto.CompactOutput{
+		Cmu:        p.cmu,
+		Epk:        p.ephemeralKey,
+		Ciphertext: p.encCiphertext[:52],
+	}
 }
 
 // joinSplit is a JoinSplit description as described in 7.2 of the Zcash
@@ -254,6 +269,7 @@ type transaction struct {
 	txId     []byte
 }
 
+// GetHash returns the transaction hash in big-endian display order.
 func (tx *transaction) GetHash() []byte {
 	if tx.txId != nil {
 		return tx.txId
@@ -273,6 +289,27 @@ func (tx *transaction) GetHash() []byte {
 	return tx.txId
 }
 
+// getEncodableHash returns the transaction hash in little-endian wire format order.
+func (tx *transaction) getEncodableHash() []byte {
+	digest := sha256.Sum256(tx.rawBytes)
+	digest = sha256.Sum256(digest[:])
+	return digest[:]
+}
+
+func (tx *transaction) ToCompact(index int) *proto.CompactTx {
+	ctx := &proto.CompactTx{
+		Index:   uint64(index), // index is contextual
+		Hash:    tx.getEncodableHash(),
+		Spends:  make([]*proto.CompactSpend, len(tx.shieldedSpends)),
+		Outputs: make([]*proto.CompactOutput, len(tx.shieldedOutputs)),
+	}
+	for i, spend := range tx.shieldedSpends {
+		ctx.Spends[i] = spend.ToCompact()
+	}
+	for i, output := range tx.shieldedOutputs {
+		ctx.Outputs[i] = output.ToCompact()
+	}
+	return ctx
 }
 
 func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {

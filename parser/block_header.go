@@ -175,3 +175,19 @@ func (hdr *blockHeader) GetHash() []byte {
 	hdr.cachedHash = digest[:]
 	return hdr.cachedHash
 }
+
+// getEncodableHash returns the bytes of a block hash in little-endian wire order.
+func (hdr *blockHeader) getEncodableHash() []byte {
+	serializedHeader, err := hdr.MarshalBinary()
+
+	if err != nil {
+		log.Fatalf("error marshaling block header: %v", err)
+		return nil
+	}
+
+	// SHA256d
+	digest := sha256.Sum256(serializedHeader)
+	digest = sha256.Sum256(digest[:])
+
+	return digest[:]
+}

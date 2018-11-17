@@ -3,11 +3,16 @@ package parser
 import (
 	"bufio"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"testing"
 
 	"github.com/pkg/errors"
+
+	protobuf "github.com/golang/protobuf/proto"
 )
 
 func TestBlockParser(t *testing.T) {
@@ -39,4 +44,55 @@ func TestBlockParser(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestCompactBlocks(t *testing.T) {
+	type compactTest struct {
+		BlockHeight int    `json:"block"`
+		BlockHash   string `json:"hash"`
+		Full        string `json:"full"`
+		Compact     string `json:"compact"`
+	}
+	var compactTests []compactTest
+
+	blockJSON, err := ioutil.ReadFile("testdata/compact_blocks.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(blockJSON, &compactTests)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, test := range compactTests {
+		blockData, _ := hex.DecodeString(test.Full)
+		block := NewBlock()
+		blockData, err = block.ParseFromSlice(blockData)
+		if err != nil {
+			t.Error(errors.Wrap(err, fmt.Sprintf("parsing testnet block %d", test.BlockHeight)))
+			continue
+		}
+		if block.GetHeight() != test.BlockHeight {
+			t.Errorf("incorrect block height in testnet block %d", test.BlockHeight)
+			continue
+		}
+		if hex.EncodeToString(block.GetHash()) != test.BlockHash {
+			t.Errorf("incorrect block hash in testnet block %x", test.BlockHash)
+			continue
+		}
+
+		compact := block.ToCompact()
+		marshaled, err := protobuf.Marshal(compact)
+		if err != nil {
+			t.Errorf("could not marshal compact testnet block %d", test.BlockHeight)
+			continue
+		}
+		encodedCompact := hex.EncodeToString(marshaled)
+		if encodedCompact != test.Compact {
+			t.Errorf("wrong data for compact testnet block %d\nhave: %s\nwant: %s\n", test.BlockHeight, encodedCompact, test.Compact)
+			continue
+		}
+	}
+
 }
