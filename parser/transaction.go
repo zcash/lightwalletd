@@ -296,6 +296,10 @@ func (tx *transaction) getEncodableHash() []byte {
 	return digest[:]
 }
 
+func (tx *transaction) HasSaplingTransactions() bool {
+	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
+}
+
 func (tx *transaction) ToCompact(index int) *proto.CompactTx {
 	ctx := &proto.CompactTx{
 		Index:   uint64(index), // index is contextual

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"testing"
 
@@ -57,12 +56,12 @@ func TestCompactBlocks(t *testing.T) {
 
 	blockJSON, err := ioutil.ReadFile("testdata/compact_blocks.json")
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	err = json.Unmarshal(blockJSON, &compactTests)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	for _, test := range compactTests {

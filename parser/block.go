@@ -35,6 +35,15 @@ func (b *block) getEncodableHash() []byte {
 	return b.hdr.getEncodableHash()
 }
 
+func (b *block) HasSaplingTransactions() bool {
+	for _, tx := range b.vtx {
+		if tx.HasSaplingTransactions() {
+			return true
+		}
+	}
+	return false
+}
+
 // GetHeight() extracts the block height from the coinbase transaction. See
 // BIP34. Returns block height on success, or -1 on error.
 func (b *block) GetHeight() int {
