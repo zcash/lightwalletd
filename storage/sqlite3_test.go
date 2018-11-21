@@ -2,13 +2,10 @@ package storage
 
 import (
 	"database/sql"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
-	"os"
 	"testing"
 
 	protobuf "github.com/golang/protobuf/proto"
@@ -16,24 +13,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 )
-
-func TestMain(m *testing.M) {
-	conn, err := sql.Open("sqlite3", "testdata/blocks.db")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = createBlockTable(conn)
-	if err != nil {
-		conn.Close()
-		log.Fatal(err)
-	}
-
-	ret := m.Run()
-	conn.Close()
-	//os.Remove("testdata/blocks.db")
-	os.Exit(ret)
-}
 
 func TestFillDB(t *testing.T) {
 	type compactTest struct {
@@ -54,11 +33,15 @@ func TestFillDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	conn, err := sql.Open("sqlite3", "testdata/blocks.db")
+	conn, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer conn.Close()
+	err = createBlockTable(conn)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, test := range compactTests {
 		blockData, _ := hex.DecodeString(test.Full)
@@ -73,13 +56,23 @@ func TestFillDB(t *testing.T) {
 		hash := hex.EncodeToString(block.GetHash())
 		hasSapling := block.HasSaplingTransactions()
 		marshaled, _ := protobuf.Marshal(block.ToCompact())
-		compactB64 := base64.RawStdEncoding.EncodeToString(marshaled)
 
 		insertBlock := "INSERT INTO blocks (height, hash, has_sapling_tx, compact_encoding) values (?, ?, ?, ?)"
-		_, err := conn.Exec(insertBlock, height, hash, hasSapling, compactB64)
+		_, err := conn.Exec(insertBlock, height, hash, hasSapling, marshaled)
 		if err != nil {
 			t.Error(errors.Wrap(err, fmt.Sprintf("storing compact block %d", height)))
 			continue
 		}
+	}
+
+	var count int
+	countBlocks := "SELECT count(*) FROM blocks"
+	conn.QueryRow(countBlocks).Scan(&count)
+	if err != nil {
+		t.Error(errors.Wrap(err, fmt.Sprintf("counting compact blocks")))
+	}
+
+	if count != len(compactTests) {
+		t.Errorf("Wrong row count, want %d got %d", len(compactTests), count)
 	}
 }
