@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func TestFillDB(t *testing.T) {
+func TestSqliteStorage(t *testing.T) {
 	type compactTest struct {
 		BlockHeight int    `json:"block"`
 		BlockHash   string `json:"hash"`
@@ -38,7 +38,8 @@ func TestFillDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
-	err = createBlockTable(conn)
+
+	err = createTables(conn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,24 +56,65 @@ func TestFillDB(t *testing.T) {
 		height := block.GetHeight()
 		hash := hex.EncodeToString(block.GetHash())
 		hasSapling := block.HasSaplingTransactions()
-		marshaled, _ := protobuf.Marshal(block.ToCompact())
+		protoBlock := block.ToCompact()
+		version := 1
+		marshaled, _ := protobuf.Marshal(protoBlock)
 
-		insertBlock := "INSERT INTO blocks (height, hash, has_sapling_tx, compact_encoding) values (?, ?, ?, ?)"
-		_, err := conn.Exec(insertBlock, height, hash, hasSapling, marshaled)
+		err = StoreBlock(conn, height, hash, hasSapling, version, marshaled)
 		if err != nil {
-			t.Error(errors.Wrap(err, fmt.Sprintf("storing compact block %d", height)))
+			t.Error(err)
 			continue
 		}
 	}
 
 	var count int
 	countBlocks := "SELECT count(*) FROM blocks"
-	conn.QueryRow(countBlocks).Scan(&count)
+	err = conn.QueryRow(countBlocks).Scan(&count)
 	if err != nil {
 		t.Error(errors.Wrap(err, fmt.Sprintf("counting compact blocks")))
 	}
 
 	if count != len(compactTests) {
 		t.Errorf("Wrong row count, want %d got %d", len(compactTests), count)
+	}
+
+	blockHeight, err := CurrentHeight(conn)
+	if err != nil {
+		t.Error(errors.Wrap(err, fmt.Sprintf("checking current block height")))
+	}
+
+	lastBlockTest := compactTests[len(compactTests)-1]
+	if blockHeight != lastBlockTest.BlockHeight {
+		t.Errorf("Wrong block height, got: %d", blockHeight)
+	}
+
+	retBlock, err := GetBlock(conn, blockHeight)
+	if err != nil {
+		t.Error(errors.Wrap(err, "retrieving stored block"))
+	}
+
+	if int(retBlock.BlockID.BlockHeight) != lastBlockTest.BlockHeight {
+		t.Error("incorrect retrieval")
+	}
+
+	blockRange, err := GetBlockRange(conn, 289460, 289465)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(blockRange) != 6 {
+		t.Error("failed to retrieve full range")
+	}
+
+	blockRange, err = GetBlockRange(conn, 289462, 289465)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(blockRange) != 4 {
+		t.Error("failed to retrieve partial range")
+	}
+
+	blockRange, err = GetBlockRange(conn, 1337, 1338)
+	if err != ErrBadRange {
+		t.Error("Somehow retrieved nonexistent blocks!")
 	}
 }
