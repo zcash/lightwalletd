@@ -1,6 +1,8 @@
 syntax = "proto3";
 package proto;
 
+import "compact_formats.proto";
+
 // A BlockID message contains identifiers to select a block: a height or a
 // hash. If the hash is present it takes precedence.
 message BlockID {
@@ -24,12 +26,8 @@ message TxFilter {
      bytes hash = 3;
 }
 
-message FullTransaction {
-    TxFilter txID = 1;
-    bytes data = 2;
-}
-
-message SentTransaction {
+// RawTransaction contains the complete transaction data.
+message RawTransaction {
     bytes data = 1;
 }
 
@@ -45,6 +43,6 @@ service CompactTxStreamer {
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
     rpc GetBlock(BlockID) returns (CompactBlock) {}
     rpc GetBlockRange(BlockRange) returns (stream CompactBlock) {}
-    rpc GetTransaction(TxFilter) returns (FullTransaction) {}
+    rpc GetTransaction(TxFilter) returns (RawTransaction) {}
     rpc SendTransaction(RawTransaction) returns (SendResponse) {}
 }
