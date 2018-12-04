@@ -3,13 +3,10 @@
 
 package proto
 
-import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
-import math "math"
-
 import (
-	context "golang.org/x/net/context"
-	grpc "google.golang.org/grpc"
+	fmt "fmt"
+	proto "github.com/golang/protobuf/proto"
+	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -21,165 +18,19 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
-
-// A BlockFilter message contains identifiers to select a block: either a
-// height or a hash.
-type BlockFilter struct {
-	BlockHeight          uint64   `protobuf:"varint,1,opt,name=blockHeight,proto3" json:"blockHeight,omitempty"`
-	BlockHash            []byte   `protobuf:"bytes,2,opt,name=blockHash,proto3" json:"blockHash,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *BlockFilter) Reset()         { *m = BlockFilter{} }
-func (m *BlockFilter) String() string { return proto.CompactTextString(m) }
-func (*BlockFilter) ProtoMessage()    {}
-func (*BlockFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{0}
-}
-func (m *BlockFilter) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_BlockFilter.Unmarshal(m, b)
-}
-func (m *BlockFilter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_BlockFilter.Marshal(b, m, deterministic)
-}
-func (dst *BlockFilter) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BlockFilter.Merge(dst, src)
-}
-func (m *BlockFilter) XXX_Size() int {
-	return xxx_messageInfo_BlockFilter.Size(m)
-}
-func (m *BlockFilter) XXX_DiscardUnknown() {
-	xxx_messageInfo_BlockFilter.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_BlockFilter proto.InternalMessageInfo
-
-func (m *BlockFilter) GetBlockHeight() uint64 {
-	if m != nil {
-		return m.BlockHeight
-	}
-	return 0
-}
-
-func (m *BlockFilter) GetBlockHash() []byte {
-	if m != nil {
-		return m.BlockHash
-	}
-	return nil
-}
-
-type RangeFilter struct {
-	Start                *BlockFilter `protobuf:"bytes,1,opt,name=start,proto3" json:"start,omitempty"`
-	End                  *BlockFilter `protobuf:"bytes,2,opt,name=end,proto3" json:"end,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
-	XXX_unrecognized     []byte       `json:"-"`
-	XXX_sizecache        int32        `json:"-"`
-}
-
-func (m *RangeFilter) Reset()         { *m = RangeFilter{} }
-func (m *RangeFilter) String() string { return proto.CompactTextString(m) }
-func (*RangeFilter) ProtoMessage()    {}
-func (*RangeFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{1}
-}
-func (m *RangeFilter) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RangeFilter.Unmarshal(m, b)
-}
-func (m *RangeFilter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RangeFilter.Marshal(b, m, deterministic)
-}
-func (dst *RangeFilter) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RangeFilter.Merge(dst, src)
-}
-func (m *RangeFilter) XXX_Size() int {
-	return xxx_messageInfo_RangeFilter.Size(m)
-}
-func (m *RangeFilter) XXX_DiscardUnknown() {
-	xxx_messageInfo_RangeFilter.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RangeFilter proto.InternalMessageInfo
-
-func (m *RangeFilter) GetStart() *BlockFilter {
-	if m != nil {
-		return m.Start
-	}
-	return nil
-}
-
-func (m *RangeFilter) GetEnd() *BlockFilter {
-	if m != nil {
-		return m.End
-	}
-	return nil
-}
-
-// A TxFilter contains the information needed to identify a particular
-// transaction: either a block and an index, or a direct transaction hash.
-type TxFilter struct {
-	BlockID              *BlockFilter `protobuf:"bytes,1,opt,name=blockID,proto3" json:"blockID,omitempty"`
-	TxIndex              uint64       `protobuf:"varint,2,opt,name=txIndex,proto3" json:"txIndex,omitempty"`
-	TxHash               []byte       `protobuf:"bytes,3,opt,name=txHash,proto3" json:"txHash,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
-	XXX_unrecognized     []byte       `json:"-"`
-	XXX_sizecache        int32        `json:"-"`
-}
-
-func (m *TxFilter) Reset()         { *m = TxFilter{} }
-func (m *TxFilter) String() string { return proto.CompactTextString(m) }
-func (*TxFilter) ProtoMessage()    {}
-func (*TxFilter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{2}
-}
-func (m *TxFilter) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_TxFilter.Unmarshal(m, b)
-}
-func (m *TxFilter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_TxFilter.Marshal(b, m, deterministic)
-}
-func (dst *TxFilter) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TxFilter.Merge(dst, src)
-}
-func (m *TxFilter) XXX_Size() int {
-	return xxx_messageInfo_TxFilter.Size(m)
-}
-func (m *TxFilter) XXX_DiscardUnknown() {
-	xxx_messageInfo_TxFilter.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_TxFilter proto.InternalMessageInfo
-
-func (m *TxFilter) GetBlockID() *BlockFilter {
-	if m != nil {
-		return m.BlockID
-	}
-	return nil
-}
-
-func (m *TxFilter) GetTxIndex() uint64 {
-	if m != nil {
-		return m.TxIndex
-	}
-	return 0
-}
-
-func (m *TxFilter) GetTxHash() []byte {
-	if m != nil {
-		return m.TxHash
-	}
-	return nil
-}
+const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
 
 // CompactBlock is a packaging of ONLY the data from a block that's needed to:
 //   1. Detect a payment to your shielded Sapling address
 //   2. Detect a spend of your shielded Sapling notes
 //   3. Update your witnesses to generate new Sapling spend proofs.
 type CompactBlock struct {
-	BlockID              *BlockFilter `protobuf:"bytes,1,opt,name=blockID,proto3" json:"blockID,omitempty"`
-	Vtx                  []*CompactTx `protobuf:"bytes,3,rep,name=vtx,proto3" json:"vtx,omitempty"`
+	ProtoVersion         uint32       `protobuf:"varint,1,opt,name=protoVersion,proto3" json:"protoVersion,omitempty"`
+	Height               uint64       `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
+	Hash                 []byte       `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
+	Time                 uint32       `protobuf:"varint,4,opt,name=time,proto3" json:"time,omitempty"`
+	Header               []byte       `protobuf:"bytes,5,opt,name=header,proto3" json:"header,omitempty"`
+	Vtx                  []*CompactTx `protobuf:"bytes,6,rep,name=vtx,proto3" json:"vtx,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}     `json:"-"`
 	XXX_unrecognized     []byte       `json:"-"`
 	XXX_sizecache        int32        `json:"-"`
@@ -189,16 +40,17 @@ func (m *CompactBlock) Reset()         { *m = CompactBlock{} }
 func (m *CompactBlock) String() string { return proto.CompactTextString(m) }
 func (*CompactBlock) ProtoMessage()    {}
 func (*CompactBlock) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{3}
+	return fileDescriptor_dce29fee3ee34899, []int{0}
 }
+
 func (m *CompactBlock) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactBlock.Unmarshal(m, b)
 }
 func (m *CompactBlock) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactBlock.Marshal(b, m, deterministic)
 }
-func (dst *CompactBlock) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactBlock.Merge(dst, src)
+func (m *CompactBlock) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactBlock.Merge(m, src)
 }
 func (m *CompactBlock) XXX_Size() int {
 	return xxx_messageInfo_CompactBlock.Size(m)
@@ -209,9 +61,37 @@ func (m *CompactBlock) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_CompactBlock proto.InternalMessageInfo
 
-func (m *CompactBlock) GetBlockID() *BlockFilter {
+func (m *CompactBlock) GetProtoVersion() uint32 {
 	if m != nil {
-		return m.BlockID
+		return m.ProtoVersion
+	}
+	return 0
+}
+
+func (m *CompactBlock) GetHeight() uint64 {
+	if m != nil {
+		return m.Height
+	}
+	return 0
+}
+
+func (m *CompactBlock) GetHash() []byte {
+	if m != nil {
+		return m.Hash
+	}
+	return nil
+}
+
+func (m *CompactBlock) GetTime() uint32 {
+	if m != nil {
+		return m.Time
+	}
+	return 0
+}
+
+func (m *CompactBlock) GetHeader() []byte {
+	if m != nil {
+		return m.Header
 	}
 	return nil
 }
@@ -227,10 +107,16 @@ type CompactTx struct {
 	// Index and hash will allow the receiver to call out to chain
 	// explorers or other data structures to retrieve more information
 	// about this transaction.
-	Index                uint64           `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
-	Hash                 []byte           `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
-	Spends               []*CompactSpend  `protobuf:"bytes,3,rep,name=spends,proto3" json:"spends,omitempty"`
-	Outputs              []*CompactOutput `protobuf:"bytes,4,rep,name=outputs,proto3" json:"outputs,omitempty"`
+	Index uint64 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	Hash  []byte `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
+	// The transaction fee: present if server can provide. In the case of a
+	// stateless server and a transaction with transparent inputs, this will be
+	// unset because the calculation requires reference to prior transactions.
+	// in a pure-Sapling context, the fee will be calculable as:
+	//    valueBalance + (sum(vPubNew) - sum(vPubOld) - sum(tOut))
+	Fee                  uint32           `protobuf:"varint,3,opt,name=fee,proto3" json:"fee,omitempty"`
+	Spends               []*CompactSpend  `protobuf:"bytes,4,rep,name=spends,proto3" json:"spends,omitempty"`
+	Outputs              []*CompactOutput `protobuf:"bytes,5,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
 	XXX_unrecognized     []byte           `json:"-"`
 	XXX_sizecache        int32            `json:"-"`
@@ -240,16 +126,17 @@ func (m *CompactTx) Reset()         { *m = CompactTx{} }
 func (m *CompactTx) String() string { return proto.CompactTextString(m) }
 func (*CompactTx) ProtoMessage()    {}
 func (*CompactTx) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{4}
+	return fileDescriptor_dce29fee3ee34899, []int{1}
 }
+
 func (m *CompactTx) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactTx.Unmarshal(m, b)
 }
 func (m *CompactTx) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactTx.Marshal(b, m, deterministic)
 }
-func (dst *CompactTx) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactTx.Merge(dst, src)
+func (m *CompactTx) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactTx.Merge(m, src)
 }
 func (m *CompactTx) XXX_Size() int {
 	return xxx_messageInfo_CompactTx.Size(m)
@@ -272,6 +159,13 @@ func (m *CompactTx) GetHash() []byte {
 		return m.Hash
 	}
 	return nil
+}
+
+func (m *CompactTx) GetFee() uint32 {
+	if m != nil {
+		return m.Fee
+	}
+	return 0
 }
 
 func (m *CompactTx) GetSpends() []*CompactSpend {
@@ -299,16 +193,17 @@ func (m *CompactSpend) Reset()         { *m = CompactSpend{} }
 func (m *CompactSpend) String() string { return proto.CompactTextString(m) }
 func (*CompactSpend) ProtoMessage()    {}
 func (*CompactSpend) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{5}
+	return fileDescriptor_dce29fee3ee34899, []int{2}
 }
+
 func (m *CompactSpend) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactSpend.Unmarshal(m, b)
 }
 func (m *CompactSpend) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactSpend.Marshal(b, m, deterministic)
 }
-func (dst *CompactSpend) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactSpend.Merge(dst, src)
+func (m *CompactSpend) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactSpend.Merge(m, src)
 }
 func (m *CompactSpend) XXX_Size() int {
 	return xxx_messageInfo_CompactSpend.Size(m)
@@ -339,16 +234,17 @@ func (m *CompactOutput) Reset()         { *m = CompactOutput{} }
 func (m *CompactOutput) String() string { return proto.CompactTextString(m) }
 func (*CompactOutput) ProtoMessage()    {}
 func (*CompactOutput) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{6}
+	return fileDescriptor_dce29fee3ee34899, []int{3}
 }
+
 func (m *CompactOutput) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactOutput.Unmarshal(m, b)
 }
 func (m *CompactOutput) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactOutput.Marshal(b, m, deterministic)
 }
-func (dst *CompactOutput) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CompactOutput.Merge(dst, src)
+func (m *CompactOutput) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CompactOutput.Merge(m, src)
 }
 func (m *CompactOutput) XXX_Size() int {
 	return xxx_messageInfo_CompactOutput.Size(m)
@@ -380,332 +276,34 @@ func (m *CompactOutput) GetCiphertext() []byte {
 	return nil
 }
 
-// An opaque blob of full transaction data, for fetching anything that is not
-// in the compact format (e.g. the memo field).
-type FullTransaction struct {
-	TxID                 *TxFilter `protobuf:"bytes,1,opt,name=txID,proto3" json:"txID,omitempty"`
-	Data                 []byte    `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}  `json:"-"`
-	XXX_unrecognized     []byte    `json:"-"`
-	XXX_sizecache        int32     `json:"-"`
-}
-
-func (m *FullTransaction) Reset()         { *m = FullTransaction{} }
-func (m *FullTransaction) String() string { return proto.CompactTextString(m) }
-func (*FullTransaction) ProtoMessage()    {}
-func (*FullTransaction) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{7}
-}
-func (m *FullTransaction) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_FullTransaction.Unmarshal(m, b)
-}
-func (m *FullTransaction) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_FullTransaction.Marshal(b, m, deterministic)
-}
-func (dst *FullTransaction) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_FullTransaction.Merge(dst, src)
-}
-func (m *FullTransaction) XXX_Size() int {
-	return xxx_messageInfo_FullTransaction.Size(m)
-}
-func (m *FullTransaction) XXX_DiscardUnknown() {
-	xxx_messageInfo_FullTransaction.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_FullTransaction proto.InternalMessageInfo
-
-func (m *FullTransaction) GetTxID() *TxFilter {
-	if m != nil {
-		return m.TxID
-	}
-	return nil
-}
-
-func (m *FullTransaction) GetData() []byte {
-	if m != nil {
-		return m.Data
-	}
-	return nil
-}
-
-// Empty placeholder.
-// Someday we may want to specify e.g. a particular chain fork.
-type ChainSpec struct {
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *ChainSpec) Reset()         { *m = ChainSpec{} }
-func (m *ChainSpec) String() string { return proto.CompactTextString(m) }
-func (*ChainSpec) ProtoMessage()    {}
-func (*ChainSpec) Descriptor() ([]byte, []int) {
-	return fileDescriptor_compact_formats_e086cc6bfb553869, []int{8}
-}
-func (m *ChainSpec) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_ChainSpec.Unmarshal(m, b)
-}
-func (m *ChainSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_ChainSpec.Marshal(b, m, deterministic)
-}
-func (dst *ChainSpec) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ChainSpec.Merge(dst, src)
-}
-func (m *ChainSpec) XXX_Size() int {
-	return xxx_messageInfo_ChainSpec.Size(m)
-}
-func (m *ChainSpec) XXX_DiscardUnknown() {
-	xxx_messageInfo_ChainSpec.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_ChainSpec proto.InternalMessageInfo
-
 func init() {
-	proto.RegisterType((*BlockFilter)(nil), "proto.BlockFilter")
-	proto.RegisterType((*RangeFilter)(nil), "proto.RangeFilter")
-	proto.RegisterType((*TxFilter)(nil), "proto.TxFilter")
 	proto.RegisterType((*CompactBlock)(nil), "proto.CompactBlock")
 	proto.RegisterType((*CompactTx)(nil), "proto.CompactTx")
 	proto.RegisterType((*CompactSpend)(nil), "proto.CompactSpend")
 	proto.RegisterType((*CompactOutput)(nil), "proto.CompactOutput")
-	proto.RegisterType((*FullTransaction)(nil), "proto.FullTransaction")
-	proto.RegisterType((*ChainSpec)(nil), "proto.ChainSpec")
 }
 
-// Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConn
+func init() { proto.RegisterFile("compact_formats.proto", fileDescriptor_dce29fee3ee34899) }
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
-
-// CompactTxStreamerClient is the client API for CompactTxStreamer service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
-type CompactTxStreamerClient interface {
-	GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockFilter, error)
-	GetBlock(ctx context.Context, in *BlockFilter, opts ...grpc.CallOption) (*CompactBlock, error)
-	GetBlockRange(ctx context.Context, in *RangeFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error)
-	GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*FullTransaction, error)
-}
-
-type compactTxStreamerClient struct {
-	cc *grpc.ClientConn
-}
-
-func NewCompactTxStreamerClient(cc *grpc.ClientConn) CompactTxStreamerClient {
-	return &compactTxStreamerClient{cc}
-}
-
-func (c *compactTxStreamerClient) GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockFilter, error) {
-	out := new(BlockFilter)
-	err := c.cc.Invoke(ctx, "/proto.CompactTxStreamer/GetLatestBlock", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *compactTxStreamerClient) GetBlock(ctx context.Context, in *BlockFilter, opts ...grpc.CallOption) (*CompactBlock, error) {
-	out := new(CompactBlock)
-	err := c.cc.Invoke(ctx, "/proto.CompactTxStreamer/GetBlock", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *compactTxStreamerClient) GetBlockRange(ctx context.Context, in *RangeFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[0], "/proto.CompactTxStreamer/GetBlockRange", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &compactTxStreamerGetBlockRangeClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type CompactTxStreamer_GetBlockRangeClient interface {
-	Recv() (*CompactBlock, error)
-	grpc.ClientStream
-}
-
-type compactTxStreamerGetBlockRangeClient struct {
-	grpc.ClientStream
-}
-
-func (x *compactTxStreamerGetBlockRangeClient) Recv() (*CompactBlock, error) {
-	m := new(CompactBlock)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *compactTxStreamerClient) GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*FullTransaction, error) {
-	out := new(FullTransaction)
-	err := c.cc.Invoke(ctx, "/proto.CompactTxStreamer/GetTransaction", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// CompactTxStreamerServer is the server API for CompactTxStreamer service.
-type CompactTxStreamerServer interface {
-	GetLatestBlock(context.Context, *ChainSpec) (*BlockFilter, error)
-	GetBlock(context.Context, *BlockFilter) (*CompactBlock, error)
-	GetBlockRange(*RangeFilter, CompactTxStreamer_GetBlockRangeServer) error
-	GetTransaction(context.Context, *TxFilter) (*FullTransaction, error)
-}
-
-func RegisterCompactTxStreamerServer(s *grpc.Server, srv CompactTxStreamerServer) {
-	s.RegisterService(&_CompactTxStreamer_serviceDesc, srv)
-}
-
-func _CompactTxStreamer_GetLatestBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChainSpec)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CompactTxStreamerServer).GetLatestBlock(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.CompactTxStreamer/GetLatestBlock",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CompactTxStreamerServer).GetLatestBlock(ctx, req.(*ChainSpec))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _CompactTxStreamer_GetBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(BlockFilter)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CompactTxStreamerServer).GetBlock(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.CompactTxStreamer/GetBlock",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CompactTxStreamerServer).GetBlock(ctx, req.(*BlockFilter))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _CompactTxStreamer_GetBlockRange_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(RangeFilter)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(CompactTxStreamerServer).GetBlockRange(m, &compactTxStreamerGetBlockRangeServer{stream})
-}
-
-type CompactTxStreamer_GetBlockRangeServer interface {
-	Send(*CompactBlock) error
-	grpc.ServerStream
-}
-
-type compactTxStreamerGetBlockRangeServer struct {
-	grpc.ServerStream
-}
-
-func (x *compactTxStreamerGetBlockRangeServer) Send(m *CompactBlock) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func _CompactTxStreamer_GetTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TxFilter)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(CompactTxStreamerServer).GetTransaction(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.CompactTxStreamer/GetTransaction",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(CompactTxStreamerServer).GetTransaction(ctx, req.(*TxFilter))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-var _CompactTxStreamer_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.CompactTxStreamer",
-	HandlerType: (*CompactTxStreamerServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "GetLatestBlock",
-			Handler:    _CompactTxStreamer_GetLatestBlock_Handler,
-		},
-		{
-			MethodName: "GetBlock",
-			Handler:    _CompactTxStreamer_GetBlock_Handler,
-		},
-		{
-			MethodName: "GetTransaction",
-			Handler:    _CompactTxStreamer_GetTransaction_Handler,
-		},
-	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "GetBlockRange",
-			Handler:       _CompactTxStreamer_GetBlockRange_Handler,
-			ServerStreams: true,
-		},
-	},
-	Metadata: "compact_formats.proto",
-}
-
-func init() {
-	proto.RegisterFile("compact_formats.proto", fileDescriptor_compact_formats_e086cc6bfb553869)
-}
-
-var fileDescriptor_compact_formats_e086cc6bfb553869 = []byte{
-	// 485 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x53, 0x5d, 0x8b, 0xd3, 0x50,
-	0x10, 0x6d, 0x9a, 0xb4, 0xdd, 0x4e, 0xba, 0x1f, 0x8e, 0xeb, 0x12, 0x8a, 0x2c, 0xe5, 0xea, 0x43,
-	0x41, 0x29, 0x52, 0x11, 0x04, 0x7d, 0x72, 0x65, 0xd7, 0x15, 0x45, 0xb8, 0xed, 0xab, 0xe8, 0xdd,
-	0xf4, 0x76, 0x13, 0xb7, 0x4d, 0x42, 0x32, 0x95, 0xfc, 0x0e, 0xff, 0xb0, 0x92, 0xc9, 0x4d, 0x36,
-	0x2d, 0x55, 0xf0, 0x29, 0x33, 0x73, 0xce, 0x9c, 0x99, 0x7b, 0x86, 0xc0, 0x23, 0x3f, 0x5e, 0x27,
-	0xca, 0xa7, 0x6f, 0xcb, 0x38, 0x5d, 0x2b, 0xca, 0x26, 0x49, 0x1a, 0x53, 0x8c, 0x1d, 0xfe, 0x88,
-	0xcf, 0xe0, 0xbe, 0x5b, 0xc5, 0xfe, 0xdd, 0x65, 0xb8, 0x22, 0x9d, 0xe2, 0x08, 0xdc, 0x9b, 0x22,
-	0xfd, 0xa0, 0xc3, 0xdb, 0x80, 0x3c, 0x6b, 0x64, 0x8d, 0x1d, 0xd9, 0x2c, 0xe1, 0x63, 0xe8, 0x97,
-	0xa9, 0xca, 0x02, 0xaf, 0x3d, 0xb2, 0xc6, 0x03, 0x79, 0x5f, 0x10, 0x5f, 0xc1, 0x95, 0x2a, 0xba,
-	0xd5, 0x46, 0x6e, 0x0c, 0x9d, 0x8c, 0x54, 0x5a, 0x0a, 0xb9, 0x53, 0x2c, 0x67, 0x4f, 0x1a, 0x13,
-	0x65, 0x49, 0xc0, 0xa7, 0x60, 0xeb, 0x68, 0xc1, 0x82, 0xfb, 0x79, 0x05, 0x2c, 0x7e, 0xc0, 0xc1,
-	0x3c, 0x37, 0xda, 0xcf, 0xa1, 0xc7, 0x73, 0xaf, 0xdf, 0xff, 0x43, 0xbd, 0xa2, 0xa0, 0x07, 0x3d,
-	0xca, 0xaf, 0xa3, 0x85, 0xce, 0x79, 0x86, 0x23, 0xab, 0x14, 0xcf, 0xa0, 0x4b, 0x39, 0xbf, 0xc6,
-	0xe6, 0xd7, 0x98, 0x4c, 0x7c, 0x87, 0xc1, 0x45, 0xe9, 0x1c, 0x0b, 0xfe, 0xe7, 0x3c, 0x01, 0xf6,
-	0x4f, 0xca, 0x3d, 0x7b, 0x64, 0x8f, 0xdd, 0xe9, 0x89, 0x61, 0x1a, 0xbd, 0x79, 0x2e, 0x0b, 0x50,
-	0xfc, 0xb2, 0xa0, 0x5f, 0x97, 0xf0, 0x14, 0x3a, 0x21, 0xef, 0x57, 0x9a, 0x5e, 0x26, 0x88, 0xe0,
-	0x04, 0xf7, 0x4e, 0x73, 0x8c, 0xcf, 0xa0, 0x9b, 0x25, 0x3a, 0x5a, 0x64, 0x46, 0xfe, 0xe1, 0xb6,
-	0xfc, 0xac, 0xc0, 0xa4, 0xa1, 0xe0, 0x04, 0x7a, 0xf1, 0x86, 0x92, 0x0d, 0x65, 0x9e, 0xc3, 0xec,
-	0xd3, 0x6d, 0xf6, 0x17, 0x06, 0x65, 0x45, 0x12, 0xe7, 0xf5, 0xb3, 0x59, 0x07, 0x8f, 0xa0, 0x1d,
-	0x2d, 0x79, 0xa7, 0x81, 0x6c, 0x47, 0x4b, 0x31, 0x83, 0xc3, 0xad, 0x4e, 0x3c, 0x01, 0xdb, 0x5f,
-	0x6f, 0x0c, 0xa3, 0x08, 0x8b, 0x8a, 0x4e, 0xee, 0xcc, 0xca, 0x45, 0x88, 0xe7, 0x00, 0x7e, 0x98,
-	0x04, 0x3a, 0x25, 0x9d, 0x93, 0xf1, 0xb9, 0x51, 0x11, 0x1f, 0xe1, 0xf8, 0x72, 0xb3, 0x5a, 0xcd,
-	0x53, 0x15, 0x65, 0xca, 0xa7, 0x30, 0x8e, 0xf0, 0x09, 0x38, 0x94, 0xd7, 0x5e, 0x1f, 0x9b, 0xa5,
-	0xab, 0xeb, 0x4b, 0x06, 0x0b, 0x77, 0x16, 0x8a, 0x54, 0xe5, 0x4e, 0x11, 0x0b, 0x17, 0xfa, 0x17,
-	0x81, 0x0a, 0xa3, 0x59, 0xa2, 0xfd, 0xe9, 0x6f, 0x0b, 0x1e, 0xd4, 0x16, 0xcf, 0x28, 0xd5, 0x6a,
-	0xad, 0x53, 0x7c, 0x0d, 0x47, 0x57, 0x9a, 0x3e, 0x29, 0xd2, 0x99, 0x39, 0x6e, 0x7d, 0xa1, 0xaa,
-	0x73, 0xb8, 0xe7, 0xba, 0xa2, 0x85, 0xaf, 0xe0, 0xe0, 0x4a, 0x9b, 0x9e, 0x3d, 0x8c, 0xe1, 0xce,
-	0x29, 0x18, 0x12, 0x2d, 0x7c, 0x0b, 0x87, 0x55, 0x1b, 0xff, 0x1e, 0x75, 0x6f, 0xe3, 0x67, 0xf9,
-	0x4b, 0xef, 0x0b, 0x0b, 0xdf, 0xf0, 0xba, 0x4d, 0x73, 0x76, 0xed, 0x18, 0x9e, 0x99, 0xc2, 0x8e,
-	0x8b, 0xa2, 0x75, 0xd3, 0x65, 0xe0, 0xe5, 0x9f, 0x00, 0x00, 0x00, 0xff, 0xff, 0x28, 0x7b, 0xec,
-	0x5c, 0x07, 0x04, 0x00, 0x00,
+var fileDescriptor_dce29fee3ee34899 = []byte{
+	// 299 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x54, 0x90, 0xcd, 0x4e, 0x84, 0x30,
+	0x14, 0x85, 0x53, 0xfe, 0x8c, 0x57, 0xc6, 0x4c, 0xea, 0x68, 0xba, 0x9a, 0x90, 0xae, 0x48, 0x4c,
+	0x66, 0xa1, 0x6f, 0xa0, 0x0f, 0x60, 0xd2, 0x31, 0x6e, 0x0d, 0x42, 0x11, 0x32, 0x42, 0x1b, 0x5a,
+	0x0c, 0x0f, 0xe4, 0xda, 0x67, 0x34, 0xbd, 0x54, 0x32, 0xac, 0x38, 0xf7, 0x9c, 0xd3, 0xf6, 0xe3,
+	0xc2, 0x6d, 0xa9, 0x3a, 0x5d, 0x94, 0xf6, 0xbd, 0x56, 0x43, 0x57, 0x58, 0x73, 0xd0, 0x83, 0xb2,
+	0x8a, 0xc6, 0xf8, 0xe1, 0xbf, 0x04, 0xd2, 0xe7, 0xb9, 0xf0, 0xf4, 0xa5, 0xca, 0x13, 0xe5, 0x90,
+	0x62, 0xf2, 0x26, 0x07, 0xd3, 0xaa, 0x9e, 0x91, 0x8c, 0xe4, 0x1b, 0xb1, 0xf2, 0xe8, 0x1d, 0x24,
+	0x8d, 0x6c, 0x3f, 0x1b, 0xcb, 0x82, 0x8c, 0xe4, 0x91, 0xf0, 0x13, 0xa5, 0x10, 0x35, 0x85, 0x69,
+	0x58, 0x98, 0x91, 0x3c, 0x15, 0xa8, 0x9d, 0x67, 0xdb, 0x4e, 0xb2, 0x08, 0xef, 0x41, 0x3d, 0x9f,
+	0x2f, 0x2a, 0x39, 0xb0, 0x18, 0x9b, 0x7e, 0xa2, 0x1c, 0xc2, 0x6f, 0x3b, 0xb1, 0x24, 0x0b, 0xf3,
+	0xab, 0x87, 0xed, 0x0c, 0x7a, 0xf0, 0x74, 0xaf, 0x93, 0x70, 0x21, 0xff, 0x21, 0x70, 0xb9, 0x58,
+	0x74, 0x07, 0x71, 0xdb, 0x57, 0x72, 0x42, 0xcc, 0x48, 0xcc, 0xc3, 0xc2, 0x11, 0x9c, 0x71, 0x6c,
+	0x21, 0xac, 0xa5, 0x44, 0xb4, 0x8d, 0x70, 0x92, 0xde, 0x43, 0x62, 0xb4, 0xec, 0x2b, 0xc3, 0x22,
+	0x7c, 0xf0, 0x66, 0xfd, 0xe0, 0xd1, 0x65, 0xc2, 0x57, 0xe8, 0x01, 0x2e, 0xd4, 0x68, 0xf5, 0x68,
+	0x0d, 0x8b, 0xb1, 0xbd, 0x5b, 0xb7, 0x5f, 0x30, 0x14, 0xff, 0x25, 0xbe, 0x5f, 0xd6, 0x8a, 0xf7,
+	0xd0, 0x6b, 0x08, 0xfa, 0x1a, 0x29, 0x53, 0x11, 0xf4, 0x35, 0x3f, 0xc2, 0x66, 0x75, 0xd2, 0xf1,
+	0x95, 0xdd, 0xe8, 0x1b, 0x4e, 0x3a, 0x47, 0xea, 0x93, 0xff, 0x09, 0x27, 0xe9, 0x1e, 0xa0, 0x6c,
+	0x75, 0x23, 0x07, 0x2b, 0x27, 0xeb, 0xb7, 0x7c, 0xe6, 0x7c, 0x24, 0x88, 0xf4, 0xf8, 0x17, 0x00,
+	0x00, 0xff, 0xff, 0xce, 0xfe, 0x90, 0x6d, 0xf3, 0x01, 0x00, 0x00,
 }
