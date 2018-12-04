@@ -54,7 +54,7 @@ func TestSqliteStorage(t *testing.T) {
 		}
 
 		height := block.GetHeight()
-		hash := hex.EncodeToString(block.GetHash())
+		hash := hex.EncodeToString(block.GetDisplayHash())
 		hasSapling := block.HasSaplingTransactions()
 		protoBlock := block.ToCompact()
 		version := 1
@@ -93,7 +93,7 @@ func TestSqliteStorage(t *testing.T) {
 		t.Error(errors.Wrap(err, "retrieving stored block"))
 	}
 
-	if int(retBlock.BlockID.BlockHeight) != lastBlockTest.BlockHeight {
+	if int(retBlock.Height) != lastBlockTest.BlockHeight {
 		t.Error("incorrect retrieval")
 	}
 

@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	protobuf "github.com/golang/protobuf/proto"
-	"github.com/gtank/ctxd/proto"
+	"github.com/golang/protobuf/proto"
+	"github.com/gtank/ctxd/rpc"
 	"github.com/pkg/errors"
 )
 
@@ -74,20 +74,20 @@ func SetCurrentHeight(conn *sql.DB, height int) error {
 	return nil
 }
 
-func GetBlock(conn *sql.DB, height int) (*proto.CompactBlock, error) {
+func GetBlock(conn *sql.DB, height int) (*rpc.CompactBlock, error) {
 	var blockBytes []byte // avoid a copy with *RawBytes
 	query := "SELECT compact_encoding from blocks WHERE height = ?"
 	err := conn.QueryRow(query, height).Scan(&blockBytes)
 	if err != nil {
 		return nil, err
 	}
-	compactBlock := &proto.CompactBlock{}
-	err = protobuf.Unmarshal(blockBytes, compactBlock)
+	compactBlock := &rpc.CompactBlock{}
+	err = proto.Unmarshal(blockBytes, compactBlock)
 	return compactBlock, err
 }
 
 // [start, end]
-func GetBlockRange(conn *sql.DB, start, end int) ([]*proto.CompactBlock, error) {
+func GetBlockRange(conn *sql.DB, start, end int) ([]*rpc.CompactBlock, error) {
 	// TODO sanity check range bounds
 	query := "SELECT compact_encoding from blocks WHERE (height BETWEEN ? AND ?)"
 	result, err := conn.Query(query, start, end)
@@ -96,15 +96,15 @@ func GetBlockRange(conn *sql.DB, start, end int) ([]*proto.CompactBlock, error) 
 	}
 	defer result.Close()
 
-	compactBlocks := make([]*proto.CompactBlock, 0, (end-start)+1)
+	compactBlocks := make([]*rpc.CompactBlock, 0, (end-start)+1)
 	for result.Next() {
 		var blockBytes []byte // avoid a copy with *RawBytes
 		err = result.Scan(&blockBytes)
 		if err != nil {
 			return nil, err
 		}
-		newBlock := &proto.CompactBlock{}
-		err = protobuf.Unmarshal(blockBytes, newBlock)
+		newBlock := &rpc.CompactBlock{}
+		err = proto.Unmarshal(blockBytes, newBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -122,15 +122,15 @@ func GetBlockRange(conn *sql.DB, start, end int) ([]*proto.CompactBlock, error) 
 	return compactBlocks, nil
 }
 
-func GetBlockByHash(conn *sql.DB, hash string) (*proto.CompactBlock, error) {
+func GetBlockByHash(conn *sql.DB, hash string) (*rpc.CompactBlock, error) {
 	var blockBytes []byte // avoid a copy with *RawBytes
 	query := "SELECT compact_encoding from blocks WHERE hash = ?"
 	err := conn.QueryRow(query, hash).Scan(&blockBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("getting block with hash %s", hash))
 	}
-	compactBlock := &proto.CompactBlock{}
-	err = protobuf.Unmarshal(blockBytes, compactBlock)
+	compactBlock := &rpc.CompactBlock{}
+	err = proto.Unmarshal(blockBytes, compactBlock)
 	return compactBlock, err
 }
 

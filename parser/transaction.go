@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/gtank/ctxd/parser/internal/bytestring"
-	"github.com/gtank/ctxd/proto"
+	"github.com/gtank/ctxd/rpc"
 	"github.com/pkg/errors"
 )
 
@@ -126,8 +126,8 @@ func (p *spend) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (p *spend) ToCompact() *proto.CompactSpend {
-	return &proto.CompactSpend{
+func (p *spend) ToCompact() *rpc.CompactSpend {
+	return &rpc.CompactSpend{
 		Nf: p.nullifier,
 	}
 }
@@ -173,8 +173,8 @@ func (p *output) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (p *output) ToCompact() *proto.CompactOutput {
-	return &proto.CompactOutput{
+func (p *output) ToCompact() *rpc.CompactOutput {
+	return &rpc.CompactOutput{
 		Cmu:        p.cmu,
 		Epk:        p.ephemeralKey,
 		Ciphertext: p.encCiphertext[:52],
@@ -269,8 +269,8 @@ type transaction struct {
 	txId     []byte
 }
 
-// GetHash returns the transaction hash in big-endian display order.
-func (tx *transaction) GetHash() []byte {
+// GetDisplayHash returns the transaction hash in big-endian display order.
+func (tx *transaction) GetDisplayHash() []byte {
 	if tx.txId != nil {
 		return tx.txId
 	}
@@ -300,12 +300,13 @@ func (tx *transaction) HasSaplingTransactions() bool {
 	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
 }
 
-func (tx *transaction) ToCompact(index int) *proto.CompactTx {
-	ctx := &proto.CompactTx{
-		Index:   uint64(index), // index is contextual
-		Hash:    tx.getEncodableHash(),
-		Spends:  make([]*proto.CompactSpend, len(tx.shieldedSpends)),
-		Outputs: make([]*proto.CompactOutput, len(tx.shieldedOutputs)),
+func (tx *transaction) ToCompact(index int) *rpc.CompactTx {
+	ctx := &rpc.CompactTx{
+		Index: uint64(index), // index is contextual
+		Hash:  tx.getEncodableHash(),
+		//Fee:     0, // TODO: calculate fees
+		Spends:  make([]*rpc.CompactSpend, len(tx.shieldedSpends)),
+		Outputs: make([]*rpc.CompactOutput, len(tx.shieldedOutputs)),
 	}
 	for i, spend := range tx.shieldedSpends {
 		ctx.Spends[i] = spend.ToCompact()

@@ -76,7 +76,7 @@ func TestCompactBlocks(t *testing.T) {
 			t.Errorf("incorrect block height in testnet block %d", test.BlockHeight)
 			continue
 		}
-		if hex.EncodeToString(block.GetHash()) != test.BlockHash {
+		if hex.EncodeToString(block.GetDisplayHash()) != test.BlockHash {
 			t.Errorf("incorrect block hash in testnet block %x", test.BlockHash)
 			continue
 		}
@@ -90,7 +90,7 @@ func TestCompactBlocks(t *testing.T) {
 		encodedCompact := hex.EncodeToString(marshaled)
 		if encodedCompact != test.Compact {
 			t.Errorf("wrong data for compact testnet block %d\nhave: %s\nwant: %s\n", test.BlockHeight, encodedCompact, test.Compact)
-			continue
+			break
 		}
 	}
 

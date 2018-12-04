@@ -150,8 +150,8 @@ func parseNBits(b []byte) *big.Int {
 	return new(big.Int).SetBytes(targetBytes)
 }
 
-// GetHash returns the bytes of a block hash in big-endian order.
-func (hdr *blockHeader) GetHash() []byte {
+// GetDisplayHash returns the bytes of a block hash in big-endian order.
+func (hdr *blockHeader) GetDisplayHash() []byte {
 	if hdr.cachedHash != nil {
 		return hdr.cachedHash
 	}

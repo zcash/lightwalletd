@@ -123,7 +123,7 @@ func TestBlockHeader(t *testing.T) {
 			break
 		}
 
-		hash := blockHeader.GetHash()
+		hash := blockHeader.GetDisplayHash()
 
 		// This is not necessarily true for anything but our current test cases.
 		for _, b := range hash[:4] {

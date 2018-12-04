@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/gtank/ctxd/parser/internal/bytestring"
-	"github.com/gtank/ctxd/proto"
+	"github.com/gtank/ctxd/rpc"
 	"github.com/pkg/errors"
 )
 
@@ -25,10 +25,12 @@ func (b *block) GetTxCount() int {
 	return len(b.vtx)
 }
 
-// GetHash returns the block hash in big-endian display order.
-func (b *block) GetHash() []byte {
-	return b.hdr.GetHash()
+// GetDisplayHash returns the block hash in big-endian display order.
+func (b *block) GetDisplayHash() []byte {
+	return b.hdr.GetDisplayHash()
 }
+
+// TODO: encode hash endianness in a type?
 
 // getEncodableHash returns the block hash in little-endian wire order.
 func (b *block) getEncodableHash() []byte {
@@ -66,14 +68,14 @@ func (b *block) GetHeight() int {
 	return int(blockHeight)
 }
 
-func (b *block) ToCompact() *proto.CompactBlock {
-	compactBlock := &proto.CompactBlock{
-		BlockID: &proto.BlockFilter{
-			BlockHeight: uint64(b.GetHeight()),
-			BlockHash:   b.getEncodableHash(),
-		},
+func (b *block) ToCompact() *rpc.CompactBlock {
+	compactBlock := &rpc.CompactBlock{
+		//TODO ProtoVersion: 1,
+		Height: uint64(b.GetHeight()),
+		Hash:   b.getEncodableHash(),
+		//TODO Time:   b.hdr.Time,
 	}
-	compactBlock.Vtx = make([]*proto.CompactTx, len(b.vtx))
+	compactBlock.Vtx = make([]*rpc.CompactTx, len(b.vtx))
 	for idx, tx := range b.vtx {
 		compactBlock.Vtx[idx] = tx.ToCompact(idx)
 	}
