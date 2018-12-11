@@ -18,7 +18,7 @@ var (
 )
 
 // the service type
-type sqlStreamer struct {
+type SqlStreamer struct {
 	db *sql.DB
 }
 
@@ -34,10 +34,14 @@ func NewSQLiteStreamer(dbPath string) (rpc.CompactTxStreamerServer, error) {
 		return nil, err
 	}
 
-	return &sqlStreamer{db}, nil
+	return &SqlStreamer{db}, nil
 }
 
-func (s *sqlStreamer) GetLatestBlock(ctx context.Context, placeholder *rpc.ChainSpec) (*rpc.BlockID, error) {
+func (s *SqlStreamer) GracefulStop() error {
+	return s.db.Close()
+}
+
+func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *rpc.ChainSpec) (*rpc.BlockID, error) {
 	// the ChainSpec type is an empty placeholder
 	height, err := storage.GetCurrentHeight(ctx, s.db)
 	if err != nil {
@@ -47,7 +51,7 @@ func (s *sqlStreamer) GetLatestBlock(ctx context.Context, placeholder *rpc.Chain
 	return &rpc.BlockID{Height: uint64(height)}, nil
 }
 
-func (s *sqlStreamer) GetBlock(ctx context.Context, id *rpc.BlockID) (*rpc.CompactBlock, error) {
+func (s *SqlStreamer) GetBlock(ctx context.Context, id *rpc.BlockID) (*rpc.CompactBlock, error) {
 	if id.Height == 0 && id.Hash == nil {
 		return nil, ErrUnspecified
 	}
@@ -66,13 +70,13 @@ func (s *sqlStreamer) GetBlock(ctx context.Context, id *rpc.BlockID) (*rpc.Compa
 	return nil, ErrUnspecified
 }
 
-func (s *sqlStreamer) GetBlockRange(*rpc.BlockRange, rpc.CompactTxStreamer_GetBlockRangeServer) error {
+func (s *SqlStreamer) GetBlockRange(*rpc.BlockRange, rpc.CompactTxStreamer_GetBlockRangeServer) error {
 	return ErrNoImpl
 }
 
-func (s *sqlStreamer) GetTransaction(context.Context, *rpc.TxFilter) (*rpc.RawTransaction, error) {
+func (s *SqlStreamer) GetTransaction(context.Context, *rpc.TxFilter) (*rpc.RawTransaction, error) {
 	return nil, ErrNoImpl
 }
-func (s *sqlStreamer) SendTransaction(context.Context, *rpc.RawTransaction) (*rpc.SendResponse, error) {
+func (s *SqlStreamer) SendTransaction(context.Context, *rpc.RawTransaction) (*rpc.SendResponse, error) {
 	return nil, ErrNoImpl
 }

@@ -88,6 +88,7 @@ func main() {
 			"error":   err,
 		}).Fatal("couldn't create SQL streamer")
 	}
+	defer service.(*frontend.SqlStreamer).GracefulStop()
 
 	// Register service
 	rpc.RegisterCompactTxStreamerServer(server, service)
