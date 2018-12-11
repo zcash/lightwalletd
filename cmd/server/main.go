@@ -1,18 +1,14 @@
 package main
 
 import (
-	"context"
-	"database/sql"
-	"errors"
 	"flag"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/gtank/ctxd/frontend"
 	"github.com/gtank/ctxd/rpc"
-	"github.com/gtank/ctxd/storage"
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -22,13 +18,9 @@ import (
 var log *logrus.Entry
 var logger = logrus.New()
 
-var (
-	ErrNoImpl = errors.New("not yet implemented")
-)
-
 func init() {
 	logger.SetFormatter(&logrus.TextFormatter{
-		//DisableColors: true,
+		//DisableColors:          true,
 		FullTimestamp:          true,
 		DisableLevelTruncation: true,
 	})
@@ -36,7 +28,6 @@ func init() {
 	log = logger.WithFields(logrus.Fields{
 		"app": "frontend-grpc",
 	})
-
 }
 
 type Options struct {
@@ -76,12 +67,12 @@ func main() {
 			log.WithFields(logrus.Fields{
 				"cert_file": opts.tlsCertPath,
 				"key_path":  opts.tlsKeyPath,
-				"error":     err.Error(),
+				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = grpc.NewServer(grpc.Creds(transportCreds))
+		server = grpc.NewServer(grpc.Creds(transportCreds), frontend.LoggingInterceptor())
 	} else {
-		server = grpc.NewServer()
+		server = grpc.NewServer(frontend.LoggingInterceptor())
 	}
 
 	// Enable reflection for debugging
@@ -90,11 +81,11 @@ func main() {
 	}
 
 	// Compact transaction service initialization
-	service, err := NewSQLiteStreamer(opts.dbPath)
+	service, err := frontend.NewSQLiteStreamer(opts.dbPath)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"db_path": opts.dbPath,
-			"error":   err.Error(),
+			"error":   err,
 		}).Fatal("couldn't create SQL streamer")
 	}
 
@@ -106,7 +97,7 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"bind_addr": opts.bindAddr,
-			"error":     err.Error(),
+			"error":     err,
 		}).Fatal("couldn't create listener")
 	}
 
@@ -126,54 +117,7 @@ func main() {
 	err = server.Serve(listener)
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"error": err.Error(),
+			"error": err,
 		}).Fatal("gRPC server exited")
 	}
-}
-
-// the service type
-type sqlStreamer struct {
-	db *sql.DB
-}
-
-func NewSQLiteStreamer(dbPath string) (rpc.CompactTxStreamerServer, error) {
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		return nil, err
-	}
-
-	// Creates our tables if they don't already exist.
-	err = storage.CreateTables(db)
-	if err != nil {
-		return nil, err
-	}
-
-	return &sqlStreamer{db}, nil
-}
-
-func (s *sqlStreamer) GetLatestBlock(ctx context.Context, placeholder *rpc.ChainSpec) (*rpc.BlockID, error) {
-	// the ChainSpec type is an empty placeholder
-	height, err := storage.GetCurrentHeight(ctx, s.db)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"error":   err.Error(),
-			"context": ctx,
-		}).Error("GetLatestBlock call failed")
-		return nil, err
-	}
-	// TODO: also return block hashes here
-	return &rpc.BlockID{Height: uint64(height)}, nil
-}
-
-func (s *sqlStreamer) GetBlock(context.Context, *rpc.BlockID) (*rpc.CompactBlock, error) {
-	return nil, ErrNoImpl
-}
-func (s *sqlStreamer) GetBlockRange(*rpc.BlockRange, rpc.CompactTxStreamer_GetBlockRangeServer) error {
-	return ErrNoImpl
-}
-func (s *sqlStreamer) GetTransaction(context.Context, *rpc.TxFilter) (*rpc.RawTransaction, error) {
-	return nil, ErrNoImpl
-}
-func (s *sqlStreamer) SendTransaction(context.Context, *rpc.RawTransaction) (*rpc.SendResponse, error) {
-	return nil, ErrNoImpl
 }

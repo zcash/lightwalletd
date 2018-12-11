@@ -40,10 +40,10 @@ func CreateTables(conn *sql.DB) error {
 	return err
 }
 
-func GetCurrentHeight(ctx context.Context, conn *sql.DB) (int, error) {
+func GetCurrentHeight(ctx context.Context, db *sql.DB) (int, error) {
 	var height int
 	query := "SELECT current_height FROM state WHERE rowid = 1"
-	err := conn.QueryRowContext(ctx, query).Scan(&height)
+	err := db.QueryRowContext(ctx, query).Scan(&height)
 	return height, err
 }
 
@@ -75,12 +75,24 @@ func SetCurrentHeight(conn *sql.DB, height int) error {
 	return nil
 }
 
-func GetBlock(ctx context.Context, conn *sql.DB, height int) (*rpc.CompactBlock, error) {
+func GetBlock(ctx context.Context, db *sql.DB, height int) (*rpc.CompactBlock, error) {
 	var blockBytes []byte // avoid a copy with *RawBytes
 	query := "SELECT compact_encoding from blocks WHERE height = ?"
-	err := conn.QueryRow(query, height).Scan(&blockBytes)
+	err := db.QueryRowContext(ctx, query, height).Scan(&blockBytes)
 	if err != nil {
 		return nil, err
+	}
+	compactBlock := &rpc.CompactBlock{}
+	err = proto.Unmarshal(blockBytes, compactBlock)
+	return compactBlock, err
+}
+
+func GetBlockByHash(ctx context.Context, db *sql.DB, hash string) (*rpc.CompactBlock, error) {
+	var blockBytes []byte // avoid a copy with *RawBytes
+	query := "SELECT compact_encoding from blocks WHERE hash = ?"
+	err := db.QueryRowContext(ctx, query, hash).Scan(&blockBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("getting block with hash %s", hash))
 	}
 	compactBlock := &rpc.CompactBlock{}
 	err = proto.Unmarshal(blockBytes, compactBlock)
@@ -121,18 +133,6 @@ func GetBlockRange(conn *sql.DB, start, end int) ([]*rpc.CompactBlock, error) {
 		return nil, ErrBadRange
 	}
 	return compactBlocks, nil
-}
-
-func GetBlockByHash(conn *sql.DB, hash string) (*rpc.CompactBlock, error) {
-	var blockBytes []byte // avoid a copy with *RawBytes
-	query := "SELECT compact_encoding from blocks WHERE hash = ?"
-	err := conn.QueryRow(query, hash).Scan(&blockBytes)
-	if err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("getting block with hash %s", hash))
-	}
-	compactBlock := &rpc.CompactBlock{}
-	err = proto.Unmarshal(blockBytes, compactBlock)
-	return compactBlock, err
 }
 
 func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, version int, encoded []byte) error {
