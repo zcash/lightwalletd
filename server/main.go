@@ -19,18 +19,24 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-var (
-	log = logrus.New()
+var log *logrus.Entry
+var logger = logrus.New()
 
+var (
 	ErrNoImpl = errors.New("not yet implemented")
 )
 
 func init() {
-	log.SetFormatter(&logrus.TextFormatter{
+	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors: true,
 		FullTimestamp:          true,
 		DisableLevelTruncation: true,
 	})
+
+	log = logger.WithFields(logrus.Fields{
+		"app": "frontend-grpc",
+	})
+
 }
 
 type Options struct {
@@ -59,7 +65,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.SetLevel(logrus.Level(opts.logLevel))
+	logger.SetLevel(logrus.Level(opts.logLevel))
 
 	// gRPC initialization
 	var server *grpc.Server
@@ -114,6 +120,8 @@ func main() {
 		}).Info("caught signal, stopping gRPC server")
 		server.GracefulStop()
 	}()
+
+	log.Infof("Starting gRPC server on %s", opts.bindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
