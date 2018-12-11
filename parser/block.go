@@ -75,10 +75,15 @@ func (b *block) ToCompact() *rpc.CompactBlock {
 		Hash:   b.GetEncodableHash(),
 		//TODO Time:   b.hdr.Time,
 	}
-	compactBlock.Vtx = make([]*rpc.CompactTx, len(b.vtx))
+
+	// Only Sapling transactions have a meaningful compact encoding
+	saplingTxns := make([]*rpc.CompactTx, 0, len(b.vtx))
 	for idx, tx := range b.vtx {
-		compactBlock.Vtx[idx] = tx.ToCompact(idx)
+		if tx.HasSaplingTransactions() {
+			saplingTxns = append(saplingTxns, tx.ToCompact(idx))
+		}
 	}
+	compactBlock.Vtx = saplingTxns
 	return compactBlock
 }
 
