@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -39,7 +40,7 @@ func TestSqliteStorage(t *testing.T) {
 	}
 	defer conn.Close()
 
-	err = createTables(conn)
+	err = CreateTables(conn)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +79,7 @@ func TestSqliteStorage(t *testing.T) {
 		t.Errorf("Wrong row count, want %d got %d", len(compactTests), count)
 	}
 
-	blockHeight, err := CurrentHeight(conn)
+	blockHeight, err := GetCurrentHeight(context.Background(), conn)
 	if err != nil {
 		t.Error(errors.Wrap(err, fmt.Sprintf("checking current block height")))
 	}
@@ -88,7 +89,7 @@ func TestSqliteStorage(t *testing.T) {
 		t.Errorf("Wrong block height, got: %d", blockHeight)
 	}
 
-	retBlock, err := GetBlock(conn, blockHeight)
+	retBlock, err := GetBlock(context.Background(), conn, blockHeight)
 	if err != nil {
 		t.Error(errors.Wrap(err, "retrieving stored block"))
 	}

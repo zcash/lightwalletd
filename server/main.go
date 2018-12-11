@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"flag"
@@ -10,9 +11,12 @@ import (
 	"syscall"
 
 	"github.com/gtank/ctxd/rpc"
+	"github.com/gtank/ctxd/storage"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -41,13 +45,13 @@ type Options struct {
 func main() {
 	opts := &Options{}
 	flag.StringVar(&opts.bindAddr, "bind-addr", "127.0.0.1:9067", "the address to listen on")
-	flag.StringVar(&opts.dbPath, "db-path", "", "the location of a sqlite database file")
+	flag.StringVar(&opts.dbPath, "db-path", "", "the path to a sqlite database file")
 	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate (optional)")
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	// TODO prod logging flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	// TODO prod metrics
-	// TODO support config from file
+	// TODO support config from file and env vars
 	flag.Parse()
 
 	if opts.dbPath == "" {
@@ -72,6 +76,11 @@ func main() {
 		server = grpc.NewServer(grpc.Creds(transportCreds))
 	} else {
 		server = grpc.NewServer()
+	}
+
+	// Enable reflection for debugging
+	if opts.logLevel >= uint64(logrus.WarnLevel) {
+		reflection.Register(server)
 	}
 
 	// Compact transaction service initialization
@@ -110,7 +119,7 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err.Error(),
-		}).Fatal("gRPC server failed")
+		}).Fatal("gRPC server exited")
 	}
 }
 
@@ -120,5 +129,43 @@ type sqlStreamer struct {
 }
 
 func NewSQLiteStreamer(dbPath string) (rpc.CompactTxStreamerServer, error) {
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Creates our tables if they don't already exist.
+	err = storage.CreateTables(db)
+	if err != nil {
+		return nil, err
+	}
+
+	return &sqlStreamer{db}, nil
+}
+
+func (s *sqlStreamer) GetLatestBlock(ctx context.Context, placeholder *rpc.ChainSpec) (*rpc.BlockID, error) {
+	// the ChainSpec type is an empty placeholder
+	height, err := storage.GetCurrentHeight(ctx, s.db)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"error":   err.Error(),
+			"context": ctx,
+		}).Error("GetLatestBlock call failed")
+		return nil, err
+	}
+	// TODO: also return block hashes here
+	return &rpc.BlockID{Height: uint64(height)}, nil
+}
+
+func (s *sqlStreamer) GetBlock(context.Context, *rpc.BlockID) (*rpc.CompactBlock, error) {
+	return nil, ErrNoImpl
+}
+func (s *sqlStreamer) GetBlockRange(*rpc.BlockRange, rpc.CompactTxStreamer_GetBlockRangeServer) error {
+	return ErrNoImpl
+}
+func (s *sqlStreamer) GetTransaction(context.Context, *rpc.TxFilter) (*rpc.RawTransaction, error) {
+	return nil, ErrNoImpl
+}
+func (s *sqlStreamer) SendTransaction(context.Context, *rpc.RawTransaction) (*rpc.SendResponse, error) {
 	return nil, ErrNoImpl
 }

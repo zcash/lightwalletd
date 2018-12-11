@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -13,7 +14,7 @@ var (
 	ErrBadRange = errors.New("no blocks in specified range")
 )
 
-func createTables(conn *sql.DB) error {
+func CreateTables(conn *sql.DB) error {
 	stateTable := `
 		CREATE TABLE IF NOT EXISTS state (
 			current_height INTEGER,
@@ -39,10 +40,10 @@ func createTables(conn *sql.DB) error {
 	return err
 }
 
-func CurrentHeight(conn *sql.DB) (int, error) {
+func GetCurrentHeight(ctx context.Context, conn *sql.DB) (int, error) {
 	var height int
 	query := "SELECT current_height FROM state WHERE rowid = 1"
-	err := conn.QueryRow(query).Scan(&height)
+	err := conn.QueryRowContext(ctx, query).Scan(&height)
 	return height, err
 }
 
@@ -74,7 +75,7 @@ func SetCurrentHeight(conn *sql.DB, height int) error {
 	return nil
 }
 
-func GetBlock(conn *sql.DB, height int) (*rpc.CompactBlock, error) {
+func GetBlock(ctx context.Context, conn *sql.DB, height int) (*rpc.CompactBlock, error) {
 	var blockBytes []byte // avoid a copy with *RawBytes
 	query := "SELECT compact_encoding from blocks WHERE height = ?"
 	err := conn.QueryRow(query, height).Scan(&blockBytes)
@@ -141,7 +142,7 @@ func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, version int
 		return errors.Wrap(err, fmt.Sprintf("storing compact block %d", height))
 	}
 
-	currentHeight, err := CurrentHeight(conn)
+	currentHeight, err := GetCurrentHeight(context.Background(), conn)
 	if err != nil || height > currentHeight {
 		err = SetCurrentHeight(conn, height)
 	}
