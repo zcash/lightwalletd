@@ -32,7 +32,6 @@ func CreateTables(conn *sql.DB) error {
 			height INTEGER PRIMARY KEY,
 			hash TEXT,
 			has_sapling_tx BOOL,
-			encoding_version INTEGER,
 			compact_encoding BLOB
 		);
 	`
@@ -135,9 +134,9 @@ func GetBlockRange(conn *sql.DB, start, end int) ([]*rpc.CompactBlock, error) {
 	return compactBlocks, nil
 }
 
-func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, version int, encoded []byte) error {
-	insertBlock := "INSERT INTO blocks (height, hash, has_sapling_tx, encoding_version, compact_encoding) values (?, ?, ?, ?, ?)"
-	_, err := conn.Exec(insertBlock, height, hash, sapling, version, encoded)
+func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
+	insertBlock := "INSERT INTO blocks (height, hash, has_sapling_tx, compact_encoding) values (?, ?, ?, ?)"
+	_, err := conn.Exec(insertBlock, height, hash, sapling, encoded)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("storing compact block %d", height))
 	}

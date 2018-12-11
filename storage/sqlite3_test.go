@@ -58,10 +58,9 @@ func TestSqliteStorage(t *testing.T) {
 		hash := hex.EncodeToString(block.GetEncodableHash())
 		hasSapling := block.HasSaplingTransactions()
 		protoBlock := block.ToCompact()
-		version := 1
 		marshaled, _ := protobuf.Marshal(protoBlock)
 
-		err = StoreBlock(conn, height, hash, hasSapling, version, marshaled)
+		err = StoreBlock(conn, height, hash, hasSapling, marshaled)
 		if err != nil {
 			t.Error(err)
 			continue
