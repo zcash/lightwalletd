@@ -52,7 +52,7 @@ func main() {
 
 	if opts.logPath != "" {
 		// instead write parsable logs for logstash/splunk/etc
-		output, err := os.Open(opts.logPath)
+		output, err := os.OpenFile(opts.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"error": err,

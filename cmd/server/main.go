@@ -1,18 +1,22 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
-	"github.com/gtank/ctxd/frontend"
-	"github.com/gtank/ctxd/rpc"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
+
+	"github.com/gtank/ctxd/frontend"
+	"github.com/gtank/ctxd/rpc"
 )
 
 var log *logrus.Entry
@@ -28,6 +32,44 @@ func init() {
 	log = logger.WithFields(logrus.Fields{
 		"app": "frontend-grpc",
 	})
+}
+
+func LoggingInterceptor() grpc.ServerOption {
+	return grpc.UnaryInterceptor(logInterceptor)
+}
+
+func logInterceptor(
+	ctx context.Context,
+	req interface{},
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	reqLog := loggerFromContext(ctx)
+	start := time.Now()
+
+	resp, err := handler(ctx, req)
+
+	entry := reqLog.WithFields(logrus.Fields{
+		"method":   info.FullMethod,
+		"duration": time.Since(start),
+		"error":    err,
+	})
+
+	if err != nil {
+		entry.Error("call failed")
+	} else {
+		entry.Info("method called")
+	}
+
+	return resp, err
+}
+
+func loggerFromContext(ctx context.Context) *logrus.Entry {
+	// TODO: anonymize the addresses. cryptopan?
+	if peerInfo, ok := peer.FromContext(ctx); ok {
+		return log.WithFields(logrus.Fields{"peer_addr": peerInfo.Addr})
+	}
+	return log.WithFields(logrus.Fields{"peer_addr": "unknown"})
 }
 
 type Options struct {
@@ -46,7 +88,7 @@ func main() {
 	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate (optional)")
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
-	// TODO prod logging flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
+	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
@@ -54,6 +96,20 @@ func main() {
 	if opts.dbPath == "" {
 		flag.Usage()
 		os.Exit(1)
+	}
+
+	if opts.logPath != "" {
+		// instead write parsable logs for logstash/splunk/etc
+		output, err := os.OpenFile(opts.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"error": err,
+				"path":  opts.logPath,
+			}).Fatal("couldn't open log file")
+		}
+		defer output.Close()
+		logger.SetOutput(output)
+		logger.SetFormatter(&logrus.JSONFormatter{})
 	}
 
 	logger.SetLevel(logrus.Level(opts.logLevel))
@@ -70,9 +126,9 @@ func main() {
 				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = grpc.NewServer(grpc.Creds(transportCreds), frontend.LoggingInterceptor())
+		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 	} else {
-		server = grpc.NewServer(frontend.LoggingInterceptor())
+		server = grpc.NewServer(LoggingInterceptor())
 	}
 
 	// Enable reflection for debugging
