@@ -289,8 +289,8 @@ func (tx *transaction) GetDisplayHash() []byte {
 	return tx.txId
 }
 
-// getEncodableHash returns the transaction hash in little-endian wire format order.
-func (tx *transaction) getEncodableHash() []byte {
+// GetEncodableHash returns the transaction hash in little-endian wire format order.
+func (tx *transaction) GetEncodableHash() []byte {
 	digest := sha256.Sum256(tx.rawBytes)
 	digest = sha256.Sum256(digest[:])
 	return digest[:]
@@ -303,7 +303,7 @@ func (tx *transaction) HasSaplingTransactions() bool {
 func (tx *transaction) ToCompact(index int) *rpc.CompactTx {
 	ctx := &rpc.CompactTx{
 		Index: uint64(index), // index is contextual
-		Hash:  tx.getEncodableHash(),
+		Hash:  tx.GetEncodableHash(),
 		//Fee:     0, // TODO: calculate fees
 		Spends:  make([]*rpc.CompactSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*rpc.CompactOutput, len(tx.shieldedOutputs)),

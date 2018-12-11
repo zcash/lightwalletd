@@ -176,8 +176,8 @@ func (hdr *blockHeader) GetDisplayHash() []byte {
 	return hdr.cachedHash
 }
 
-// getEncodableHash returns the bytes of a block hash in little-endian wire order.
-func (hdr *blockHeader) getEncodableHash() []byte {
+// GetEncodableHash returns the bytes of a block hash in little-endian wire order.
+func (hdr *blockHeader) GetEncodableHash() []byte {
 	serializedHeader, err := hdr.MarshalBinary()
 
 	if err != nil {

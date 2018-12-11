@@ -55,7 +55,7 @@ func TestSqliteStorage(t *testing.T) {
 		}
 
 		height := block.GetHeight()
-		hash := hex.EncodeToString(block.GetDisplayHash())
+		hash := hex.EncodeToString(block.GetEncodableHash())
 		hasSapling := block.HasSaplingTransactions()
 		protoBlock := block.ToCompact()
 		version := 1

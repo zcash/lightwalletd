@@ -32,9 +32,9 @@ func (b *block) GetDisplayHash() []byte {
 
 // TODO: encode hash endianness in a type?
 
-// getEncodableHash returns the block hash in little-endian wire order.
-func (b *block) getEncodableHash() []byte {
-	return b.hdr.getEncodableHash()
+// GetEncodableHash returns the block hash in little-endian wire order.
+func (b *block) GetEncodableHash() []byte {
+	return b.hdr.GetEncodableHash()
 }
 
 func (b *block) HasSaplingTransactions() bool {
@@ -72,7 +72,7 @@ func (b *block) ToCompact() *rpc.CompactBlock {
 	compactBlock := &rpc.CompactBlock{
 		//TODO ProtoVersion: 1,
 		Height: uint64(b.GetHeight()),
-		Hash:   b.getEncodableHash(),
+		Hash:   b.GetEncodableHash(),
 		//TODO Time:   b.hdr.Time,
 	}
 	compactBlock.Vtx = make([]*rpc.CompactTx, len(b.vtx))
