@@ -83,35 +83,36 @@ func GetBlockByHash(ctx context.Context, db *sql.DB, hash string) ([]byte, error
 	return blockBytes, err
 }
 
-// [start, end]
-func GetBlockRange(conn *sql.DB, start, end int) ([][]byte, error) {
-	// TODO sanity check range bounds
-	query := "SELECT compact_encoding from blocks WHERE (height BETWEEN ? AND ?)"
-	result, err := conn.Query(query, start, end)
+// [start, end] inclusive
+func GetBlockRange(ctx context.Context, db *sql.DB, blocks chan<- []byte, errors chan<- error, start, end int) {
+	// TODO sanity check ranges, rate limit?
+	numBlocks := (end - start) + 1
+	query := "SELECT height, compact_encoding from blocks WHERE (height BETWEEN ? AND ?)"
+	result, err := db.QueryContext(ctx, query, start, end)
 	if err != nil {
-		return nil, err
+		errors <- err
+		return
 	}
 	defer result.Close()
 
-	compactBlocks := make([][]byte, 0, (end-start)+1)
+	// My assumption here is that if the context is cancelled then result.Next() will fail.
+
+	var blockBytes []byte // avoid a copy with *RawBytes
 	for result.Next() {
-		var blockBytes []byte // avoid a copy with *RawBytes
 		err = result.Scan(&blockBytes)
 		if err != nil {
-			return nil, err
+			errors <- err
+			return
 		}
-		compactBlocks = append(compactBlocks, blockBytes)
+		blocks <- blockBytes
 	}
 
-	err = result.Err()
-	if err != nil {
-		return nil, err
+	if err := result.Err(); err != nil {
+		errors <- err
 	}
 
-	if len(compactBlocks) == 0 {
-		return nil, ErrBadRange
-	}
-	return compactBlocks, nil
+	// done
+	errors <- nil
 }
 
 func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
