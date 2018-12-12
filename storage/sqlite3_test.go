@@ -9,10 +9,12 @@ import (
 	"io/ioutil"
 	"testing"
 
-	protobuf "github.com/golang/protobuf/proto"
-	"github.com/gtank/ctxd/parser"
+	"github.com/golang/protobuf/proto"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
+
+	"github.com/gtank/ctxd/parser"
+	"github.com/gtank/ctxd/rpc"
 )
 
 func TestSqliteStorage(t *testing.T) {
@@ -58,7 +60,7 @@ func TestSqliteStorage(t *testing.T) {
 		hash := hex.EncodeToString(block.GetEncodableHash())
 		hasSapling := block.HasSaplingTransactions()
 		protoBlock := block.ToCompact()
-		marshaled, _ := protobuf.Marshal(protoBlock)
+		marshaled, _ := proto.Marshal(protoBlock)
 
 		err = StoreBlock(conn, height, hash, hasSapling, marshaled)
 		if err != nil {
@@ -92,8 +94,13 @@ func TestSqliteStorage(t *testing.T) {
 	if err != nil {
 		t.Error(errors.Wrap(err, "retrieving stored block"))
 	}
+	cblock := &rpc.CompactBlock{}
+	err = proto.Unmarshal(retBlock, cblock)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	if int(retBlock.Height) != lastBlockTest.BlockHeight {
+	if int(cblock.Height) != lastBlockTest.BlockHeight {
 		t.Error("incorrect retrieval")
 	}
 
