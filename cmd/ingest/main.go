@@ -205,14 +205,14 @@ func handleBlock(db *sql.DB, sequence int, blockData []byte) {
 		"block_hash":    blockHash,
 		"block_version": block.GetVersion(),
 		"tx_count":      block.GetTxCount(),
-		"has_sapling":   block.HasSaplingTransactions(),
+		"sapling":       block.HasSaplingTransactions(),
 		"error":         err,
 	})
 
 	if err != nil {
-		entry.Error("error storing block")
+		entry.Error("new block")
 	} else {
-		entry.Info("received new block")
+		entry.Info("new block")
 	}
 
 	for index, tx := range block.Transactions() {
@@ -229,11 +229,12 @@ func handleBlock(db *sql.DB, sequence int, blockData []byte) {
 			"block_height": block.GetHeight(),
 			"block_hash":   blockHash,
 			"tx_index":     index,
-			"has_sapling":  tx.HasSaplingTransactions(),
+			"tx_size":      len(tx.Bytes()),
+			"sapling":      tx.HasSaplingTransactions(),
 			"error":        err,
 		})
 		if err != nil {
-			entry.Error("error storing tx")
+			entry.Error("storing tx")
 		} else {
 			entry.Debug("storing tx")
 		}

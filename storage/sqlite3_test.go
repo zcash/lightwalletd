@@ -98,16 +98,17 @@ func TestSqliteStorage(t *testing.T) {
 		}
 
 		lastBlockTest := compactTests[len(compactTests)-1]
+
 		if blockHeight != lastBlockTest.BlockHeight {
 			t.Errorf("Wrong block height, got: %d", blockHeight)
 		}
 
-		retBlock, err := GetBlock(ctx, db, blockHeight)
+		storedBlock, err := GetBlock(ctx, db, blockHeight)
 		if err != nil {
 			t.Error(errors.Wrap(err, "retrieving stored block"))
 		}
 		cblock := &rpc.CompactBlock{}
-		err = proto.Unmarshal(retBlock, cblock)
+		err = proto.Unmarshal(storedBlock, cblock)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,6 +195,41 @@ func TestSqliteStorage(t *testing.T) {
 		if count > 0 {
 			t.Errorf("got some blocks that shouldn't be there")
 		}
+	}
+
+	// Transaction storage
+	{
+		blockData, _ := hex.DecodeString(compactTests[0].Full)
+		block := parser.NewBlock()
+		_, _ = block.ParseFromSlice(blockData)
+		tx := block.Transactions()[0]
+
+		blockHash := hex.EncodeToString(block.GetEncodableHash())
+		txHash := hex.EncodeToString(tx.GetEncodableHash())
+		err = StoreTransaction(
+			db,
+			block.GetHeight(),
+			blockHash,
+			0,
+			txHash,
+			tx.Bytes(),
+		)
+
+		if err != nil {
+			t.Error(err)
+		}
+
+		var storedBytes []byte
+		getTx := "SELECT tx_bytes FROM transactions WHERE tx_hash = ?"
+		err = db.QueryRow(getTx, txHash).Scan(&storedBytes)
+		if err != nil {
+			t.Error(errors.Wrap(err, fmt.Sprintf("error getting a full transaction")))
+		}
+
+		if len(storedBytes) != len(tx.Bytes()) {
+			t.Errorf("Wrong tx size, want %d got %d", len(tx.Bytes()), storedBytes)
+		}
 
 	}
+
 }

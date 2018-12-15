@@ -27,9 +27,9 @@ func CreateTables(conn *sql.DB) error {
 
 	blockTable := `
 		CREATE TABLE IF NOT EXISTS blocks (
-			height INTEGER PRIMARY KEY,
-			hash TEXT,
-			has_sapling_tx BOOL,
+			block_height INTEGER PRIMARY KEY,
+			block_hash TEXT,
+			sapling BOOL,
 			compact_encoding BLOB
 		);
 	`
@@ -65,7 +65,7 @@ func GetCurrentHeight(ctx context.Context, db *sql.DB) (int, error) {
 
 func GetBlock(ctx context.Context, db *sql.DB, height int) ([]byte, error) {
 	var blockBytes []byte // avoid a copy with *RawBytes
-	query := "SELECT compact_encoding from blocks WHERE height = ?"
+	query := "SELECT compact_encoding from blocks WHERE block_height = ?"
 	err := db.QueryRowContext(ctx, query, height).Scan(&blockBytes)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func GetBlock(ctx context.Context, db *sql.DB, height int) ([]byte, error) {
 
 func GetBlockByHash(ctx context.Context, db *sql.DB, hash string) ([]byte, error) {
 	var blockBytes []byte // avoid a copy with *RawBytes
-	query := "SELECT compact_encoding from blocks WHERE hash = ?"
+	query := "SELECT compact_encoding from blocks WHERE block_hash = ?"
 	err := db.QueryRowContext(ctx, query, hash).Scan(&blockBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("getting block with hash %s", hash))
@@ -92,7 +92,7 @@ func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errO
 		return
 	}
 
-	query := "SELECT compact_encoding from blocks WHERE (height BETWEEN ? AND ?)"
+	query := "SELECT compact_encoding from blocks WHERE (block_height BETWEEN ? AND ?)"
 	result, err := db.QueryContext(ctx, query, start, end)
 	if err != nil {
 		errOut <- err
@@ -122,7 +122,7 @@ func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errO
 }
 
 func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
-	insertBlock := "INSERT INTO blocks (height, hash, has_sapling_tx, compact_encoding) values (?, ?, ?, ?)"
+	insertBlock := "INSERT INTO blocks (block_height, block_hash, sapling, compact_encoding) values (?, ?, ?, ?)"
 	_, err := conn.Exec(insertBlock, height, hash, sapling, encoded)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("storing compact block %d", height))
@@ -130,13 +130,14 @@ func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []b
 
 	currentHeight, err := GetCurrentHeight(context.Background(), conn)
 	if err != nil || height > currentHeight {
+		// TODO database transactions!
 		err = SetCurrentHeight(conn, height)
 	}
 	return err
 }
 
 func SetCurrentHeight(conn *sql.DB, height int) error {
-	update := "UPDATE state SET current_height=?, timestamp=CURRENT_TIMESTAMP WHERE rowid = 1"
+	update := "UPDATE state SET current_height=? WHERE rowid = 1"
 	result, err := conn.Exec(update, height)
 	if err != nil {
 		return errors.Wrap(err, "updating state row")
