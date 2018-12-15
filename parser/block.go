@@ -11,10 +11,11 @@ import (
 type block struct {
 	hdr    *blockHeader
 	vtx    []*Transaction
+	height int
 }
 
 func NewBlock() *block {
-	return &block{}
+	return &block{height: -1}
 }
 
 func (b *block) GetVersion() int {
@@ -54,6 +55,9 @@ func (b *block) HasSaplingTransactions() bool {
 // GetHeight() extracts the block height from the coinbase transaction. See
 // BIP34. Returns block height on success, or -1 on error.
 func (b *block) GetHeight() int {
+	if b.height != -1 {
+		return b.height
+	}
 	coinbaseScript := bytestring.String(b.vtx[0].transparentInputs[0].ScriptSig)
 	var heightByte byte
 	if ok := coinbaseScript.ReadByte(&heightByte); !ok {
@@ -70,6 +74,7 @@ func (b *block) GetHeight() int {
 		blockHeight <<= 8
 		blockHeight = blockHeight | uint32(heightBytes[i])
 	}
+	b.height = int(blockHeight)
 	return int(blockHeight)
 }
 
