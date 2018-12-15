@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"time"
 
+	"github.com/golang/protobuf/proto"
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/gtank/ctxd/rpc"
@@ -77,22 +79,28 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *rpc.BlockID) (*rpc.Compa
 }
 
 func (s *SqlStreamer) GetBlockRange(span *rpc.BlockRange, resp rpc.CompactTxStreamer_GetBlockRangeServer) error {
-	blocks := make(chan []byte)
-	errors := make(chan error)
-	done := make(chan bool)
+	blockChan := make(chan []byte)
+	errChan := make(chan error)
 
-	timeout := resp.Context().WithTimeout(1 * time.Second)
-	go GetBlockRange(timeout, s.db, blocks, errors, done, span.Start, span.End)
+	// TODO configure or stress-test this timeout
+	timeout, cancel := context.WithTimeout(resp.Context(), 1*time.Second)
+	defer cancel()
+	go storage.GetBlockRange(timeout,
+		s.db,
+		blockChan,
+		errChan,
+		int(span.Start.Height),
+		int(span.End.Height),
+	)
 
 	for {
 		select {
-		case <-timeout.Done():
-			return timeout.Err()
-		case err := <-errors:
+		case err := <-errChan:
+			// this will also catch context.DeadlineExceeded from the timeout
 			return err
-		case blockBytes := <-blocks:
+		case blockBytes := <-blockChan:
 			cBlock := &rpc.CompactBlock{}
-			err = proto.Unmarshal(blockBytes, cBlock)
+			err := proto.Unmarshal(blockBytes, cBlock)
 			if err != nil {
 				return err // TODO really need better logging in this whole service
 			}

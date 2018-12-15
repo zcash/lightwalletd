@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	ErrBadRange = errors.New("no blocks in specified range")
+	ErrLotsOfBlocks = errors.New("requested >10k blocks at once")
 )
 
 func CreateTables(conn *sql.DB) error {
@@ -84,35 +84,41 @@ func GetBlockByHash(ctx context.Context, db *sql.DB, hash string) ([]byte, error
 }
 
 // [start, end] inclusive
-func GetBlockRange(ctx context.Context, db *sql.DB, blocks chan<- []byte, errors chan<- error, start, end int) {
-	// TODO sanity check ranges, rate limit?
+func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errOut chan<- error, start, end int) {
+	// TODO sanity check ranges, this limit, etc
 	numBlocks := (end - start) + 1
-	query := "SELECT height, compact_encoding from blocks WHERE (height BETWEEN ? AND ?)"
+	if numBlocks > 10000 {
+		errOut <- ErrLotsOfBlocks
+		return
+	}
+
+	query := "SELECT compact_encoding from blocks WHERE (height BETWEEN ? AND ?)"
 	result, err := db.QueryContext(ctx, query, start, end)
 	if err != nil {
-		errors <- err
+		errOut <- err
 		return
 	}
 	defer result.Close()
 
 	// My assumption here is that if the context is cancelled then result.Next() will fail.
 
-	var blockBytes []byte // avoid a copy with *RawBytes
+	var blockBytes []byte
 	for result.Next() {
 		err = result.Scan(&blockBytes)
 		if err != nil {
-			errors <- err
+			errOut <- err
 			return
 		}
-		blocks <- blockBytes
+		blockOut <- blockBytes
 	}
 
 	if err := result.Err(); err != nil {
-		errors <- err
+		errOut <- err
+		return
 	}
 
 	// done
-	errors <- nil
+	errOut <- nil
 }
 
 func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
