@@ -17,26 +17,22 @@ import (
 	"github.com/gtank/ctxd/rpc"
 )
 
-func TestSqliteStorage(t *testing.T) {
-	type compactTest struct {
-		BlockHeight int    `json:"block"`
-		BlockHash   string `json:"hash"`
-		Full        string `json:"full"`
-		Compact     string `json:"compact"`
-	}
-	var compactTests []compactTest
+type compactTest struct {
+	BlockHeight int    `json:"block"`
+	BlockHash   string `json:"hash"`
+	Full        string `json:"full"`
+	Compact     string `json:"compact"`
+}
 
-	blockJSON, err := ioutil.ReadFile("testdata/compact_blocks.json")
+var compactTests []compactTest
+
+func TestSqliteStorage(t *testing.T) {
+	blockJSON, err := ioutil.ReadFile("../testdata/compact_blocks.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	err = json.Unmarshal(blockJSON, &compactTests)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	conn, err := sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}

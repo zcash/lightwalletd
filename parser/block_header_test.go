@@ -55,7 +55,7 @@ func TestParseNBits(t *testing.T) {
 }
 
 func TestBlockHeader(t *testing.T) {
-	testBlocks, err := os.Open("testdata/blocks")
+	testBlocks, err := os.Open("../testdata/blocks")
 	if err != nil {
 		t.Fatal(err)
 	}

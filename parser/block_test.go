@@ -15,7 +15,7 @@ import (
 )
 
 func TestBlockParser(t *testing.T) {
-	testBlocks, err := os.Open("testdata/blocks")
+	testBlocks, err := os.Open("../testdata/blocks")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestCompactBlocks(t *testing.T) {
 	}
 	var compactTests []compactTest
 
-	blockJSON, err := ioutil.ReadFile("testdata/compact_blocks.json")
+	blockJSON, err := ioutil.ReadFile("../testdata/compact_blocks.json")
 	if err != nil {
 		t.Fatal(err)
 	}

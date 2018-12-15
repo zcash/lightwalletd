@@ -152,7 +152,7 @@ func TestSproutTransactionParser(t *testing.T) {
 	// order as the test table above. If you update the test table without
 	// adding a line to the raw file, this test will panic due to index
 	// misalignment.
-	testData, err := os.Open("testdata/zip143_raw_tx")
+	testData, err := os.Open("../testdata/zip143_raw_tx")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -658,7 +658,7 @@ var zip243tests = []txTestVector{
 }
 
 func TestSaplingTransactionParser(t *testing.T) {
-	testData, err := os.Open("testdata/zip243_raw_tx")
+	testData, err := os.Open("../testdata/zip243_raw_tx")
 	if err != nil {
 		t.Fatal(err)
 	}
