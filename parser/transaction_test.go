@@ -225,7 +225,7 @@ func TestSproutTransactionParser(t *testing.T) {
 	}
 }
 
-func subTestCommonBlockMeta(tt *txTestVector, tx *transaction, t *testing.T, caseNum int) bool {
+func subTestCommonBlockMeta(tt *txTestVector, tx *Transaction, t *testing.T, caseNum int) bool {
 	headerBytes, _ := hex.DecodeString(tt.header)
 	header := binary.LittleEndian.Uint32(headerBytes)
 	if (header >> 31) == 1 != tx.fOverwintered {

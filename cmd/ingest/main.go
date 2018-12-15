@@ -188,30 +188,54 @@ func handleBlock(db *sql.DB, sequence int, blockData []byte) {
 		return
 	}
 
-	displayHash := hex.EncodeToString(block.GetEncodableHash())
+	blockHash := hex.EncodeToString(block.GetEncodableHash())
 	marshaledBlock, _ := proto.Marshal(block.ToCompact())
 
 	err = storage.StoreBlock(
 		db,
 		block.GetHeight(),
-		displayHash,
+		blockHash,
 		block.HasSaplingTransactions(),
 		marshaledBlock,
 	)
 
 	entry := log.WithFields(logrus.Fields{
-		"seqnum":         sequence,
-		"block_height":   block.GetHeight(),
-		"block_hash":     displayHash,
-		"block_version":  block.GetVersion(),
-		"tx_count":       block.GetTxCount(),
-		"has_sapling_tx": block.HasSaplingTransactions(),
-		"error":          err,
+		"seqnum":        sequence,
+		"block_height":  block.GetHeight(),
+		"block_hash":    blockHash,
+		"block_version": block.GetVersion(),
+		"tx_count":      block.GetTxCount(),
+		"has_sapling":   block.HasSaplingTransactions(),
+		"error":         err,
 	})
 
 	if err != nil {
 		entry.Error("error storing block")
 	} else {
 		entry.Info("received new block")
+	}
+
+	for index, tx := range block.Transactions() {
+		txHash := hex.EncodeToString(tx.GetEncodableHash())
+		err = storage.StoreTransaction(
+			db,
+			block.GetHeight(),
+			blockHash,
+			index,
+			txHash,
+			tx.Bytes(),
+		)
+		entry = log.WithFields(logrus.Fields{
+			"block_height": block.GetHeight(),
+			"block_hash":   blockHash,
+			"tx_index":     index,
+			"has_sapling":  tx.HasSaplingTransactions(),
+			"error":        err,
+		})
+		if err != nil {
+			entry.Error("error storing tx")
+		} else {
+			entry.Debug("storing tx")
+		}
 	}
 }

@@ -9,8 +9,8 @@ import (
 )
 
 type block struct {
-	hdr *blockHeader
-	vtx []*transaction
+	hdr    *blockHeader
+	vtx    []*Transaction
 }
 
 func NewBlock() *block {
@@ -23,6 +23,11 @@ func (b *block) GetVersion() int {
 
 func (b *block) GetTxCount() int {
 	return len(b.vtx)
+}
+
+func (b *block) Transactions() []*Transaction {
+	// TODO: these should NOT be mutable
+	return b.vtx
 }
 
 // GetDisplayHash returns the block hash in big-endian display order.
@@ -101,7 +106,7 @@ func (b *block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	}
 	data = []byte(s)
 
-	vtx := make([]*transaction, 0, txCount)
+	vtx := make([]*Transaction, 0, txCount)
 	for i := 0; len(data) > 0; i++ {
 		tx := NewTransaction()
 		data, err = tx.ParseFromSlice(data)

@@ -263,14 +263,14 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-type transaction struct {
+type Transaction struct {
 	*rawTransaction
 	rawBytes []byte
 	txId     []byte
 }
 
 // GetDisplayHash returns the transaction hash in big-endian display order.
-func (tx *transaction) GetDisplayHash() []byte {
+func (tx *Transaction) GetDisplayHash() []byte {
 	if tx.txId != nil {
 		return tx.txId
 	}
@@ -290,17 +290,21 @@ func (tx *transaction) GetDisplayHash() []byte {
 }
 
 // GetEncodableHash returns the transaction hash in little-endian wire format order.
-func (tx *transaction) GetEncodableHash() []byte {
+func (tx *Transaction) GetEncodableHash() []byte {
 	digest := sha256.Sum256(tx.rawBytes)
 	digest = sha256.Sum256(digest[:])
 	return digest[:]
 }
 
-func (tx *transaction) HasSaplingTransactions() bool {
+func (tx *Transaction) Bytes() []byte {
+	return tx.rawBytes
+}
+
+func (tx *Transaction) HasSaplingTransactions() bool {
 	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
 }
 
-func (tx *transaction) ToCompact(index int) *rpc.CompactTx {
+func (tx *Transaction) ToCompact(index int) *rpc.CompactTx {
 	ctx := &rpc.CompactTx{
 		Index: uint64(index), // index is contextual
 		Hash:  tx.GetEncodableHash(),
@@ -317,7 +321,7 @@ func (tx *transaction) ToCompact(index int) *rpc.CompactTx {
 	return ctx
 }
 
-func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
+func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
 	// declare here to prevent shadowing problems in cryptobyte assignments
@@ -465,8 +469,8 @@ func (tx *transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func NewTransaction() *transaction {
-	return &transaction{
+func NewTransaction() *Transaction {
+	return &Transaction{
 		rawTransaction: new(rawTransaction),
 	}
 }
