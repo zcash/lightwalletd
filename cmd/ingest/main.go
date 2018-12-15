@@ -124,6 +124,8 @@ func main() {
 	}
 	defer sock.Close()
 
+	log.Printf("Listening to 0mq on %s", opts.zmqAddr)
+
 	// Start listening for new blocks
 	for {
 		msg, err := sock.RecvMessageBytes(0)
