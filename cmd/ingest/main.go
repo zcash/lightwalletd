@@ -73,7 +73,8 @@ func main() {
 	})
 
 	// Initialize database
-	db, err := sql.Open("sqlite3", opts.dbPath)
+	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", opts.dbPath))
+	db.SetMaxOpenConns(1)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"db_path": opts.dbPath,
@@ -117,6 +118,7 @@ func main() {
 	}
 
 	connString := fmt.Sprintf("tcp://%s", opts.zmqAddr)
+
 	err = sock.Connect(connString)
 	if err != nil {
 		log.WithFields(logrus.Fields{
@@ -155,11 +157,6 @@ func main() {
 		switch string(topic) {
 
 		case opts.zmqTopic:
-			log.WithFields(logrus.Fields{
-				"seqnum": sequence,
-				"header": fmt.Sprintf("%x", body[:80]),
-			}).Debug("got block")
-
 			// there's an implicit mutex here
 			go handleBlock(db, sequence, body)
 

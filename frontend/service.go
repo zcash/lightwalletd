@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -25,7 +26,8 @@ type SqlStreamer struct {
 }
 
 func NewSQLiteStreamer(dbPath string) (rpc.CompactTxStreamerServer, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", dbPath))
+	db.SetMaxOpenConns(1)
 	if err != nil {
 		return nil, err
 	}
