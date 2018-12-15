@@ -23,6 +23,7 @@ var db *sql.DB
 
 type Options struct {
 	zmqAddr  string
+	zmqTopic string
 	dbPath   string
 	logLevel uint64
 	logPath  string
@@ -31,6 +32,7 @@ type Options struct {
 func main() {
 	opts := &Options{}
 	flag.StringVar(&opts.zmqAddr, "zmq-addr", "127.0.0.1:28332", "the address of the 0MQ publisher")
+	flag.StringVar(&opts.zmqTopic, "zmq-topic", "checkedblock", "the stream to listen to")
 	flag.StringVar(&opts.dbPath, "db-path", "", "the path to a sqlite database file")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
@@ -106,11 +108,11 @@ func main() {
 		}).Fatal("couldn't create zmq context socket")
 	}
 
-	err = sock.SetSubscribe("rawblock")
+	err = sock.SetSubscribe(opts.zmqTopic)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error":  err,
-			"stream": "rawblock",
+			"stream": opts.zmqTopic,
 		}).Fatal("couldn't subscribe to stream")
 	}
 
@@ -152,7 +154,7 @@ func main() {
 
 		switch string(topic) {
 
-		case "rawblock":
+		case opts.zmqTopic:
 			log.WithFields(logrus.Fields{
 				"seqnum": sequence,
 				"header": fmt.Sprintf("%x", body[:80]),
