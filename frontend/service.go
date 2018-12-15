@@ -120,7 +120,7 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*r
 
 	if txf.Hash != nil {
 		leHashString := hex.EncodeToString(txf.Hash)
-		txBytes, err = storage.GetFullTxByHash(ctx, s.db, leHashString)
+		txBytes, err = storage.GetTxByHash(ctx, s.db, leHashString)
 		if err != nil {
 			return nil, err
 		}
@@ -130,7 +130,7 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*r
 
 	if txf.Block.Hash != nil {
 		leHashString := hex.EncodeToString(txf.Hash)
-		txBytes, err = storage.GetFullTxByHashAndIndex(ctx, s.db, leHashString, int(txf.Index))
+		txBytes, err = storage.GetTxByHashAndIndex(ctx, s.db, leHashString, int(txf.Index))
 		if err != nil {
 			return nil, err
 		}
@@ -138,7 +138,7 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*r
 	}
 
 	// A totally unset protobuf will attempt to fetch the genesis coinbase tx.
-	txBytes, err = storage.GetFullTxByHeightAndIndex(ctx, s.db, int(txf.Block.Height), int(txf.Index))
+	txBytes, err = storage.GetTxByHeightAndIndex(ctx, s.db, int(txf.Block.Height), int(txf.Index))
 	if err != nil {
 		return nil, err
 	}
