@@ -83,7 +83,7 @@ func (b *block) ToCompact() *rpc.CompactBlock {
 		//TODO ProtoVersion: 1,
 		Height: uint64(b.GetHeight()),
 		Hash:   b.GetEncodableHash(),
-		//TODO Time:   b.hdr.Time,
+		Time:   b.hdr.Time,
 	}
 
 	// Only Sapling transactions have a meaningful compact encoding
