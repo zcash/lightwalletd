@@ -3,8 +3,8 @@ package parser
 import (
 	"crypto/sha256"
 
-	"github.com/gtank/ctxd/parser/internal/bytestring"
-	"github.com/gtank/ctxd/rpc"
+	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash-hackworks/lightwalletd/rpc"
 	"github.com/pkg/errors"
 )
 

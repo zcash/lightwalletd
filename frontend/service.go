@@ -11,8 +11,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/gtank/ctxd/rpc"
-	"github.com/gtank/ctxd/storage"
+	"github.com/zcash-hackworks/lightwalletd/rpc"
+	"github.com/zcash-hackworks/lightwalletd/storage"
 )
 
 var (

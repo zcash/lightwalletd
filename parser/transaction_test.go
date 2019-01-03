@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gtank/ctxd/parser/internal/bytestring"
+	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
 )
 
 // "Human-readable" version of joinSplit struct defined in transaction.go.

@@ -15,8 +15,8 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/gtank/ctxd/frontend"
-	"github.com/gtank/ctxd/rpc"
+	"github.com/zcash-hackworks/lightwalletd/frontend"
+	"github.com/zcash-hackworks/lightwalletd/rpc"
 )
 
 var log *logrus.Entry

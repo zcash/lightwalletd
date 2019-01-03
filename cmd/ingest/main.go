@@ -13,8 +13,8 @@ import (
 	zmq "github.com/pebbe/zmq4"
 	"github.com/sirupsen/logrus"
 
-	"github.com/gtank/ctxd/parser"
-	"github.com/gtank/ctxd/storage"
+	"github.com/zcash-hackworks/lightwalletd/parser"
+	"github.com/zcash-hackworks/lightwalletd/storage"
 )
 
 var log *logrus.Entry
