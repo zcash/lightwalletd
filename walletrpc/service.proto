@@ -1,5 +1,6 @@
 syntax = "proto3";
-package rpc;
+package cash.z.wallet.sdk.rpc;
+option go_package = "walletrpc";
 
 import "compact_formats.proto";
 
