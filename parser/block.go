@@ -3,9 +3,9 @@ package parser
 import (
 	"fmt"
 
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/rpc"
 	"github.com/pkg/errors"
+	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 type block struct {
@@ -78,8 +78,8 @@ func (b *block) GetHeight() int {
 	return int(blockHeight)
 }
 
-func (b *block) ToCompact() *rpc.CompactBlock {
-	compactBlock := &rpc.CompactBlock{
+func (b *block) ToCompact() *walletrpc.CompactBlock {
+	compactBlock := &walletrpc.CompactBlock{
 		//TODO ProtoVersion: 1,
 		Height: uint64(b.GetHeight()),
 		Hash:   b.GetEncodableHash(),
@@ -87,7 +87,7 @@ func (b *block) ToCompact() *rpc.CompactBlock {
 	}
 
 	// Only Sapling transactions have a meaningful compact encoding
-	saplingTxns := make([]*rpc.CompactTx, 0, len(b.vtx))
+	saplingTxns := make([]*walletrpc.CompactTx, 0, len(b.vtx))
 	for idx, tx := range b.vtx {
 		if tx.HasSaplingTransactions() {
 			saplingTxns = append(saplingTxns, tx.ToCompact(idx))

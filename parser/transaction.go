@@ -3,9 +3,9 @@ package parser
 import (
 	"crypto/sha256"
 
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/rpc"
 	"github.com/pkg/errors"
+	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 type rawTransaction struct {
@@ -126,8 +126,8 @@ func (p *spend) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (p *spend) ToCompact() *rpc.CompactSpend {
-	return &rpc.CompactSpend{
+func (p *spend) ToCompact() *walletrpc.CompactSpend {
+	return &walletrpc.CompactSpend{
 		Nf: p.nullifier,
 	}
 }
@@ -173,8 +173,8 @@ func (p *output) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (p *output) ToCompact() *rpc.CompactOutput {
-	return &rpc.CompactOutput{
+func (p *output) ToCompact() *walletrpc.CompactOutput {
+	return &walletrpc.CompactOutput{
 		Cmu:        p.cmu,
 		Epk:        p.ephemeralKey,
 		Ciphertext: p.encCiphertext[:52],
@@ -304,13 +304,13 @@ func (tx *Transaction) HasSaplingTransactions() bool {
 	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
 }
 
-func (tx *Transaction) ToCompact(index int) *rpc.CompactTx {
-	ctx := &rpc.CompactTx{
+func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
+	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
 		Hash:  tx.GetEncodableHash(),
 		//Fee:     0, // TODO: calculate fees
-		Spends:  make([]*rpc.CompactSpend, len(tx.shieldedSpends)),
-		Outputs: make([]*rpc.CompactOutput, len(tx.shieldedOutputs)),
+		Spends:  make([]*walletrpc.CompactSpend, len(tx.shieldedSpends)),
+		Outputs: make([]*walletrpc.CompactOutput, len(tx.shieldedOutputs)),
 	}
 	for i, spend := range tx.shieldedSpends {
 		ctx.Spends[i] = spend.ToCompact()

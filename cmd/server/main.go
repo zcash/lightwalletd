@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/zcash-hackworks/lightwalletd/frontend"
-	"github.com/zcash-hackworks/lightwalletd/rpc"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 var log *logrus.Entry
@@ -34,15 +34,15 @@ func init() {
 	})
 }
 
-func LoggingInterceptor() grpc.ServerOption {
-	return grpc.UnaryInterceptor(logInterceptor)
+func LoggingInterceptor() gwalletrpc.ServerOption {
+	return gwalletrpc.UnaryInterceptor(logInterceptor)
 }
 
 func logInterceptor(
 	ctx context.Context,
 	req interface{},
-	info *grpc.UnaryServerInfo,
-	handler grpc.UnaryHandler,
+	info *gwalletrpc.UnaryServerInfo,
+	handler gwalletrpc.UnaryHandler,
 ) (interface{}, error) {
 	reqLog := loggerFromContext(ctx)
 	start := time.Now()
@@ -115,7 +115,7 @@ func main() {
 	logger.SetLevel(logrus.Level(opts.logLevel))
 
 	// gRPC initialization
-	var server *grpc.Server
+	var server *gwalletrpc.Server
 
 	if opts.tlsCertPath != "" && opts.tlsKeyPath != "" {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
@@ -126,9 +126,9 @@ func main() {
 				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
+		server = gwalletrpc.NewServer(gwalletrpc.Creds(transportCreds), LoggingInterceptor())
 	} else {
-		server = grpc.NewServer(LoggingInterceptor())
+		server = gwalletrpc.NewServer(LoggingInterceptor())
 	}
 
 	// Enable reflection for debugging
@@ -147,7 +147,7 @@ func main() {
 	defer service.(*frontend.SqlStreamer).GracefulStop()
 
 	// Register service
-	rpc.RegisterCompactTxStreamerServer(server, service)
+	walletrpc.RegisterCompactTxStreamerServer(server, service)
 
 	// Start listening
 	listener, err := net.Listen("tcp", opts.bindAddr)
