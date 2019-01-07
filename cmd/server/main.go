@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/zcash-hackworks/lightwalletd/frontend"
-	"github.com/zcash-hackworks/lightwalletd/rpc"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 var log *logrus.Entry
@@ -147,7 +147,7 @@ func main() {
 	defer service.(*frontend.SqlStreamer).GracefulStop()
 
 	// Register service
-	rpc.RegisterCompactTxStreamerServer(server, service)
+	walletrpc.RegisterCompactTxStreamerServer(server, service)
 
 	// Start listening
 	listener, err := net.Listen("tcp", opts.bindAddr)

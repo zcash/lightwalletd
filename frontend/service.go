@@ -11,8 +11,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/zcash-hackworks/lightwalletd/rpc"
 	"github.com/zcash-hackworks/lightwalletd/storage"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 var (
@@ -25,7 +25,7 @@ type SqlStreamer struct {
 	db *sql.DB
 }
 
-func NewSQLiteStreamer(dbPath string) (rpc.CompactTxStreamerServer, error) {
+func NewSQLiteStreamer(dbPath string) (walletrpc.CompactTxStreamerServer, error) {
 	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", dbPath))
 	db.SetMaxOpenConns(1)
 	if err != nil {
@@ -45,17 +45,17 @@ func (s *SqlStreamer) GracefulStop() error {
 	return s.db.Close()
 }
 
-func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *rpc.ChainSpec) (*rpc.BlockID, error) {
+func (s *SqlStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	// the ChainSpec type is an empty placeholder
 	height, err := storage.GetCurrentHeight(ctx, s.db)
 	if err != nil {
 		return nil, err
 	}
 	// TODO: also return block hashes here
-	return &rpc.BlockID{Height: uint64(height)}, nil
+	return &walletrpc.BlockID{Height: uint64(height)}, nil
 }
 
-func (s *SqlStreamer) GetBlock(ctx context.Context, id *rpc.BlockID) (*rpc.CompactBlock, error) {
+func (s *SqlStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
 	if id.Height == 0 && id.Hash == nil {
 		return nil, ErrUnspecified
 	}
@@ -75,12 +75,12 @@ func (s *SqlStreamer) GetBlock(ctx context.Context, id *rpc.BlockID) (*rpc.Compa
 		return nil, err
 	}
 
-	cBlock := &rpc.CompactBlock{}
+	cBlock := &walletrpc.CompactBlock{}
 	err = proto.Unmarshal(blockBytes, cBlock)
 	return cBlock, err
 }
 
-func (s *SqlStreamer) GetBlockRange(span *rpc.BlockRange, resp rpc.CompactTxStreamer_GetBlockRangeServer) error {
+func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan []byte)
 	errChan := make(chan error)
 
@@ -101,7 +101,7 @@ func (s *SqlStreamer) GetBlockRange(span *rpc.BlockRange, resp rpc.CompactTxStre
 			// this will also catch context.DeadlineExceeded from the timeout
 			return err
 		case blockBytes := <-blockChan:
-			cBlock := &rpc.CompactBlock{}
+			cBlock := &walletrpc.CompactBlock{}
 			err := proto.Unmarshal(blockBytes, cBlock)
 			if err != nil {
 				return err // TODO really need better logging in this whole service
@@ -116,7 +116,7 @@ func (s *SqlStreamer) GetBlockRange(span *rpc.BlockRange, resp rpc.CompactTxStre
 	return nil
 }
 
-func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*rpc.RawTransaction, error) {
+func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	var txBytes []byte
 	var err error
 
@@ -126,7 +126,7 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*r
 		if err != nil {
 			return nil, err
 		}
-		return &rpc.RawTransaction{Data: txBytes}, nil
+		return &walletrpc.RawTransaction{Data: txBytes}, nil
 
 	}
 
@@ -136,7 +136,7 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*r
 		if err != nil {
 			return nil, err
 		}
-		return &rpc.RawTransaction{Data: txBytes}, nil
+		return &walletrpc.RawTransaction{Data: txBytes}, nil
 	}
 
 	// A totally unset protobuf will attempt to fetch the genesis coinbase tx.
@@ -144,9 +144,9 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *rpc.TxFilter) (*r
 	if err != nil {
 		return nil, err
 	}
-	return &rpc.RawTransaction{Data: txBytes}, nil
+	return &walletrpc.RawTransaction{Data: txBytes}, nil
 }
 
-func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *rpc.RawTransaction) (*rpc.SendResponse, error) {
+func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	return nil, ErrNoImpl
 }

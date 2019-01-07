@@ -15,7 +15,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/zcash-hackworks/lightwalletd/parser"
-	"github.com/zcash-hackworks/lightwalletd/rpc"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 type compactTest struct {
@@ -107,7 +107,7 @@ func TestSqliteStorage(t *testing.T) {
 		if err != nil {
 			t.Error(errors.Wrap(err, "retrieving stored block"))
 		}
-		cblock := &rpc.CompactBlock{}
+		cblock := &walletrpc.CompactBlock{}
 		err = proto.Unmarshal(storedBlock, cblock)
 		if err != nil {
 			t.Fatal(err)
