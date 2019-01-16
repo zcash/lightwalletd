@@ -34,15 +34,15 @@ func init() {
 	})
 }
 
-func LoggingInterceptor() gwalletrpc.ServerOption {
-	return gwalletrpc.UnaryInterceptor(logInterceptor)
+func LoggingInterceptor() grpc.ServerOption {
+	return grpc.UnaryInterceptor(logInterceptor)
 }
 
 func logInterceptor(
 	ctx context.Context,
 	req interface{},
-	info *gwalletrpc.UnaryServerInfo,
-	handler gwalletrpc.UnaryHandler,
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
 ) (interface{}, error) {
 	reqLog := loggerFromContext(ctx)
 	start := time.Now()
@@ -115,7 +115,7 @@ func main() {
 	logger.SetLevel(logrus.Level(opts.logLevel))
 
 	// gRPC initialization
-	var server *gwalletrpc.Server
+	var server *grpc.Server
 
 	if opts.tlsCertPath != "" && opts.tlsKeyPath != "" {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
@@ -126,9 +126,9 @@ func main() {
 				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = gwalletrpc.NewServer(gwalletrpc.Creds(transportCreds), LoggingInterceptor())
+		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 	} else {
-		server = gwalletrpc.NewServer(LoggingInterceptor())
+		server = grpc.NewServer(LoggingInterceptor())
 	}
 
 	// Enable reflection for debugging
