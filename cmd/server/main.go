@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -33,6 +34,8 @@ func init() {
 		"app": "frontend-grpc",
 	})
 }
+
+// TODO stream logging
 
 func LoggingInterceptor() grpc.ServerOption {
 	return grpc.UnaryInterceptor(logInterceptor)
@@ -73,12 +76,13 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 }
 
 type Options struct {
-	bindAddr    string `json:"bind_address,omitempty"`
-	dbPath      string `json:"db_path"`
-	tlsCertPath string `json:"tls_cert_path,omitempty"`
-	tlsKeyPath  string `json:"tls_cert_key,omitempty"`
-	logLevel    uint64 `json:"log_level,omitempty"`
-	logPath     string `json:"log_file,omitempty"`
+	bindAddr      string `json:"bind_address,omitempty"`
+	dbPath        string `json:"db_path"`
+	tlsCertPath   string `json:"tls_cert_path,omitempty"`
+	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
+	logLevel      uint64 `json:"log_level,omitempty"`
+	logPath       string `json:"log_file,omitempty"`
+	zcashConfPath string `json:"zcash_conf,omitempty"`
 }
 
 func main() {
@@ -89,6 +93,7 @@ func main() {
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
+	flag.Stringvar(&opt.zcashConfPath, "conf-file", "~/.zcash/zcash.conf", "conf file to pull RPC creds from")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
@@ -113,6 +118,26 @@ func main() {
 	}
 
 	logger.SetLevel(logrus.Level(opts.logLevel))
+
+	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
+	// sending transactions, but in the future it could back a different type
+	// of block streamer.
+
+	var rpcClient *rpcclient.Client
+	rpcClient, err = NewZRPCFromConfig(opts.zcashConfPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"error": err,
+		}).Warn("zcash.conf failed, will try empty credentials for rpc")
+
+		rpcClient, err = NewZRPCFromCreds(opts.bindAddr, "", "")
+
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"error": err,
+			}).Warn("couldn't start rpc conn. won't be able to send transactions")
+		}
+	}
 
 	// gRPC initialization
 	var server *grpc.Server

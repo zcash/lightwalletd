@@ -8,7 +8,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
+
+	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/zcash-hackworks/lightwalletd/storage"
@@ -22,7 +26,8 @@ var (
 
 // the service type
 type SqlStreamer struct {
-	db *sql.DB
+	db     *sql.DB
+	client *rpcclient.Client
 }
 
 func NewSQLiteStreamer(dbPath string) (walletrpc.CompactTxStreamerServer, error) {
@@ -147,6 +152,18 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 	return &walletrpc.RawTransaction{Data: txBytes}, nil
 }
 
+// SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
 func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
-	return nil, ErrNoImpl
+	// sendrawtransaction "hexstring" ( allowhighfees )
+	txHexString := hex.EncodeToSring(rawtx.Data)
+	cmd := btcjson.NewSendRawTransactionCmd(txHexString, false)
+	result, err := s.client.sendCmd(cmd).Receive()
+
+	// TODO figure out this error handling.
+	// zcash-cli gets a signed number and a message
+
+	return &walletrpc.SendResponse{
+		//ErrorCode: err,
+		ErrorMessage: result,
+	}, err
 }
