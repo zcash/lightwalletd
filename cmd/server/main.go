@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -93,12 +92,12 @@ func main() {
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
-	flag.Stringvar(&opt.zcashConfPath, "conf-file", "~/.zcash/zcash.conf", "conf file to pull RPC creds from")
+	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
 
-	if opts.dbPath == "" {
+	if opts.dbPath == "" || opts.zcashConfPath == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -118,26 +117,6 @@ func main() {
 	}
 
 	logger.SetLevel(logrus.Level(opts.logLevel))
-
-	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
-	// sending transactions, but in the future it could back a different type
-	// of block streamer.
-
-	var rpcClient *rpcclient.Client
-	rpcClient, err = NewZRPCFromConfig(opts.zcashConfPath)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"error": err,
-		}).Warn("zcash.conf failed, will try empty credentials for rpc")
-
-		rpcClient, err = NewZRPCFromCreds(opts.bindAddr, "", "")
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"error": err,
-			}).Warn("couldn't start rpc conn. won't be able to send transactions")
-		}
-	}
 
 	// gRPC initialization
 	var server *grpc.Server
@@ -161,13 +140,32 @@ func main() {
 		reflection.Register(server)
 	}
 
+	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
+	// sending transactions, but in the future it could back a different type
+	// of block streamer.
+
+	rpcClient, err := frontend.NewZRPCFromConf(opts.zcashConfPath)
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"error": err,
+		}).Warn("zcash.conf failed, will try empty credentials for rpc")
+
+		rpcClient, err = frontend.NewZRPCFromCreds("127.0.0.1:8232", "", "")
+
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"error": err,
+			}).Warn("couldn't start rpc conn. won't be able to send transactions")
+		}
+	}
+
 	// Compact transaction service initialization
-	service, err := frontend.NewSQLiteStreamer(opts.dbPath)
+	service, err := frontend.NewSQLiteStreamer(opts.dbPath, rpcClient)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"db_path": opts.dbPath,
 			"error":   err,
-		}).Fatal("couldn't create SQL streamer")
+		}).Fatal("couldn't create SQL backend")
 	}
 	defer service.(*frontend.SqlStreamer).GracefulStop()
 

@@ -4,11 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
 
@@ -20,7 +22,6 @@ import (
 )
 
 var (
-	ErrNoImpl      = errors.New("not yet implemented")
 	ErrUnspecified = errors.New("request for unspecified identifier")
 )
 
@@ -30,7 +31,7 @@ type SqlStreamer struct {
 	client *rpcclient.Client
 }
 
-func NewSQLiteStreamer(dbPath string) (walletrpc.CompactTxStreamerServer, error) {
+func NewSQLiteStreamer(dbPath string, client *rpcclient.Client) (walletrpc.CompactTxStreamerServer, error) {
 	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", dbPath))
 	db.SetMaxOpenConns(1)
 	if err != nil {
@@ -43,7 +44,7 @@ func NewSQLiteStreamer(dbPath string) (walletrpc.CompactTxStreamerServer, error)
 		return nil, err
 	}
 
-	return &SqlStreamer{db}, nil
+	return &SqlStreamer{db, client}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
@@ -155,15 +156,46 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
 func (s *SqlStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	// sendrawtransaction "hexstring" ( allowhighfees )
-	txHexString := hex.EncodeToSring(rawtx.Data)
-	cmd := btcjson.NewSendRawTransactionCmd(txHexString, false)
-	result, err := s.client.sendCmd(cmd).Receive()
+	//
+	// Submits raw transaction (serialized, hex-encoded) to local node and network.
+	//
+	// Also see createrawtransaction and signrawtransaction calls.
+	//
+	// Arguments:
+	// 1. "hexstring"    (string, required) The hex string of the raw transaction)
+	// 2. allowhighfees    (boolean, optional, default=false) Allow high fees
+	//
+	// Result:
+	// "hex"             (string) The transaction hash in hex
 
-	// TODO figure out this error handling.
-	// zcash-cli gets a signed number and a message
+	// Construct raw JSON-RPC params
+	params := make([]json.RawMessage, 1)
+	txHexString := hex.EncodeToString(rawtx.Data)
+	params[0] = json.RawMessage("\"" + txHexString + "\"")
+	result, rpcErr := s.client.RawRequest("sendrawtransaction", params)
 
+	var err error
+	var errCode int64
+	var errMsg string
+
+	// For some reason, the error responses are not JSON
+	if rpcErr != nil {
+		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+		errMsg = strings.TrimSpace(errParts[1])
+		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+		if err != nil {
+			// This should never happen. We can't panic here, but it's that class of error.
+			// This is why we need integration testing to work better than regtest currently does. TODO.
+			return nil, errors.New("SendTransaction couldn't parse error code")
+		}
+	} else {
+		errMsg = string(result)
+	}
+
+	// TODO these are called Error but they aren't at the moment.
+	// A success will return code 0 and message txhash.
 	return &walletrpc.SendResponse{
-		//ErrorCode: err,
-		ErrorMessage: result,
-	}, err
+		ErrorCode:    int32(errCode),
+		ErrorMessage: errMsg,
+	}, nil
 }
