@@ -91,7 +91,7 @@ func (s *SqlStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	errChan := make(chan error)
 
 	// TODO configure or stress-test this timeout
-	timeout, cancel := context.WithTimeout(resp.Context(), 1*time.Second)
+	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
 	defer cancel()
 	go storage.GetBlockRange(timeout,
 		s.db,
