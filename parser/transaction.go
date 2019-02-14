@@ -383,7 +383,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 		return nil, errors.New("could not read nLockTime")
 	}
 
-	if tx.version >= 3 {
+	if tx.fOverwintered {
 		if ok := s.ReadUint32(&tx.nExpiryHeight); !ok {
 			return nil, errors.New("could not read nExpiryHeight")
 		}
