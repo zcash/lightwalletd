@@ -52,6 +52,9 @@ func (b *block) HasSaplingTransactions() bool {
 	return false
 }
 
+// see https://github.com/zcash-hackworks/lightwalletd/issues/17#issuecomment-467110828
+const genesisTargetDifficulty = 520617983
+
 // GetHeight() extracts the block height from the coinbase transaction. See
 // BIP34. Returns block height on success, or -1 on error.
 func (b *block) GetHeight() int {
@@ -74,6 +77,11 @@ func (b *block) GetHeight() int {
 		blockHeight <<= 8
 		blockHeight = blockHeight | uint32(heightBytes[i])
 	}
+
+	if blockHeight == genesisTargetDifficulty {
+		blockHeight = 0
+	}
+
 	b.height = int(blockHeight)
 	return int(blockHeight)
 }

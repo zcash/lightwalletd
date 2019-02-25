@@ -42,6 +42,46 @@ func TestBlockParser(t *testing.T) {
 			t.Error("Read wrong version in a test block.")
 			break
 		}
+
+		if block.GetTxCount() < 1 {
+			t.Error("No transactions in block")
+			break
+		}
+	}
+}
+
+func TestGenesisBlockParser(t *testing.T) {
+	blockFile, err := os.Open("../testdata/mainnet_genesis")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockFile.Close()
+
+	scan := bufio.NewScanner(blockFile)
+	for i := 0; scan.Scan(); i++ {
+		blockDataHex := scan.Text()
+		blockData, err := hex.DecodeString(blockDataHex)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		block := NewBlock()
+		blockData, err = block.ParseFromSlice(blockData)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+
+		// Some basic sanity checks
+		if block.hdr.Version != 4 {
+			t.Error("Read wrong version in genesis block.")
+			break
+		}
+
+		if block.GetHeight() != 0 {
+			t.Errorf("Got wrong height for genesis block: %d", block.GetHeight())
+		}
 	}
 }
 
