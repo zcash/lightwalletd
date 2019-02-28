@@ -123,39 +123,53 @@ func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errO
 
 func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
 	insertBlock := "INSERT INTO blocks (block_height, block_hash, sapling, compact_encoding) values (?, ?, ?, ?)"
-	_, err := conn.Exec(insertBlock, height, hash, sapling, encoded)
+
+	tx, err := conn.Begin()
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("creating db tx %d", height))
+	}
+
+	_, err = tx.Exec(insertBlock, height, hash, sapling, encoded)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("storing compact block %d", height))
 	}
 
-	currentHeight, err := GetCurrentHeight(context.Background(), conn)
+	var currentHeight int
+	query := "SELECT current_height FROM state WHERE rowid = 1"
+	err = tx.QueryRow(query).Scan(&currentHeight)
+
 	if err != nil || height > currentHeight {
-		// TODO database transactions!
-		err = SetCurrentHeight(conn, height)
+		err = setCurrentHeight(tx, height)
 	}
-	return err
+
+	err = tx.Commit()
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("committing db tx %d", height))
+
+	}
+	return nil
 }
 
-func SetCurrentHeight(conn *sql.DB, height int) error {
+func setCurrentHeight(tx *sql.Tx, height int) error {
 	update := "UPDATE state SET current_height=?, timestamp=CURRENT_TIMESTAMP WHERE rowid = 1"
-	result, err := conn.Exec(update, height)
+	result, err := tx.Exec(update, height)
 	if err != nil {
 		return errors.Wrap(err, "updating state row")
 	}
 	rowCount, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "checking if state row exists")
+		return errors.Wrap(err, "checking if state row exists after update")
 	}
 	if rowCount == 0 {
 		// row does not yet exist
 		insert := "INSERT OR IGNORE INTO state (rowid, current_height) VALUES (1, ?)"
-		result, err = conn.Exec(insert, height)
+		result, err = tx.Exec(insert, height)
 		if err != nil {
 			return errors.Wrap(err, "on state row insert")
 		}
 		rowCount, err = result.RowsAffected()
 		if err != nil {
-			return errors.Wrap(err, "checking if state row exists")
+			return errors.Wrap(err, "checking if state row exists after insert")
 		}
 		if rowCount != 1 {
 			return errors.New("totally failed to update current height state")
