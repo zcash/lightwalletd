@@ -2,7 +2,7 @@
 
 [lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
 
-lightwalled consists of three loosely coupled components: an "ingester", a "frontend", and an arbitrary storage layer (such as a SQL database) that connects the two. The ingester receives raw block data, parses out the transactions and block metadata, then stores them in a format convenient for the frontend to serve to clients. Thus, these components can operate and scale independently of each other and are connected only by a shared storage convention.
+lightwalletd consists of three loosely coupled components: an "ingester", a "frontend", and an arbitrary storage layer (such as a SQL database) that connects the two. The ingester receives raw block data, parses out the transactions and block metadata, then stores them in a format convenient for the frontend to serve to clients. Thus, these components can operate and scale independently of each other and are connected only by a shared storage convention.
 
 # Definitions
 
@@ -31,7 +31,7 @@ A **compact block** is a collection of compact transactions along with certain m
                                    +----------+    +-------+
 ```
 
-## ingester
+## Ingester
 
 The ingester is the component responsible for transforming raw Zcash block data into a compact block.
 
@@ -137,4 +137,4 @@ lightwalletd currently lacks several things that you'll want in production. Cave
 - Logging coverage is patchy and inconsistent. However, what exists emits structured JSON compatible with various collectors.
 - Logging may capture identifiable user data. It hasn't received any privacy analysis yet and makes no attempt at sanitization.
 - The only storage provider we've implemented is sqlite. sqlite is [likely not appropriate](https://sqlite.org/whentouse.html) for the number of concurrent requests we expect to handle. Because sqlite uses a global write lock, the code limits the number of open database connections to *one* and currently makes no distinction betwen read-only (frontend) and read/write (ingester) connections. It will probably begin to exhibit lock contention at low user counts, and should be improved or replaced with your own data store in production.
-- [Load-balancing with gRPC](https://grpc.io/blog/loadbalancing) may not work quite like you're used to. A full explanation is beyond the scope of this documents, but we recommend looking into [Envoy](https://www.envoyproxy.io/), [nginx](https://nginx.com), or [haproxy](https://www.haproxy.org) depending on your existing infrastruture.
+- [Load-balancing with gRPC](https://grpc.io/blog/loadbalancing) may not work quite like you're used to. A full explanation is beyond the scope of this document, but we recommend looking into [Envoy](https://www.envoyproxy.io/), [nginx](https://nginx.com), or [haproxy](https://www.haproxy.org) depending on your existing infrastruture.
