@@ -91,6 +91,7 @@ func (b *block) ToCompact() *walletrpc.CompactBlock {
 		//TODO ProtoVersion: 1,
 		Height: uint64(b.GetHeight()),
 		Hash:   b.GetEncodableHash(),
+		PrevHash: b.hdr.HashPrevBlock,
 		Time:   b.hdr.Time,
 	}
 
