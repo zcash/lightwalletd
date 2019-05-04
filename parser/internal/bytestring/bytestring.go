@@ -9,6 +9,11 @@ import (
 
 const MAX_COMPACT_SIZE uint64 = 0x02000000
 
+const OP_0 uint8 = 0x00
+const OP_1NEGATE uint8 = 0x4f
+const OP_1 uint8 = 0x51
+const OP_16 uint8 = 0x60
+
 // String represents a string of bytes and provides methods for parsing values
 // from it.
 type String []byte
@@ -192,5 +197,44 @@ func (s *String) ReadUint64(out *uint64) bool {
 	}
 	*out = uint64(v[0]) | uint64(v[1])<<8 | uint64(v[2])<<16 | uint64(v[3])<<24 |
 		uint64(v[4])<<32 | uint64(v[5])<<40 | uint64(v[6])<<48 | uint64(v[7])<<56
+	return true
+}
+
+// ReadScriptInt64 reads and interprets a Bitcoin-custom compact integer
+// encoding used for int64 numbers in scripts.
+//
+// See https://github.com/zcash/zcash/blob/4df60f4b334dd9aee5df3a481aee63f40b52654b/src/script/script.h#L363-L378
+func (s *String) ReadScriptInt64(num *int64) bool {
+	// First byte is either an integer opcode, or the number of bytes in the
+	// number.
+	firstBytes := s.read(1)
+	if firstBytes == nil {
+		return false
+	}
+	firstByte := firstBytes[0]
+
+	var number uint64
+
+	if firstByte == OP_1NEGATE {
+		*num = -1
+		return true
+	} else if firstByte == OP_0 {
+		number = 0
+	} else if firstByte >= OP_1 && firstByte <= OP_16 {
+		number = uint64(firstByte) - uint64(OP_1 - 1)
+	} else {
+		numLen := int(firstByte)
+		// expect little endian int of varying size
+		numBytes := s.read(numLen)
+		if numBytes == nil {
+			return false
+		}
+		for i := numLen - 1; i >= 0; i-- {
+			number <<= 8
+			number = number | uint64(numBytes[i])
+		}
+	}
+
+	*num = int64(number)
 	return true
 }
