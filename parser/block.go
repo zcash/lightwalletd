@@ -62,21 +62,15 @@ func (b *block) GetHeight() int {
 		return b.height
 	}
 	coinbaseScript := bytestring.String(b.vtx[0].transparentInputs[0].ScriptSig)
-	var heightByte byte
-	if ok := coinbaseScript.ReadByte(&heightByte); !ok {
+	var heightNum int64
+	if ok := coinbaseScript.ReadScriptInt64(&heightNum); !ok {
 		return -1
 	}
-	heightLen := int(heightByte)
-	var heightBytes = make([]byte, heightLen)
-	if ok := coinbaseScript.ReadBytes(&heightBytes, heightLen); !ok {
+	if heightNum < 0 {
 		return -1
 	}
 	// uint32 should last us a while (Nov 2018)
-	var blockHeight uint32
-	for i := heightLen - 1; i >= 0; i-- {
-		blockHeight <<= 8
-		blockHeight = blockHeight | uint32(heightBytes[i])
-	}
+	blockHeight := uint32(heightNum)
 
 	if blockHeight == genesisTargetDifficulty {
 		blockHeight = 0
