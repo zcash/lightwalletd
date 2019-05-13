@@ -7,12 +7,14 @@ import (
 	"io"
 )
 
-const MAX_COMPACT_SIZE uint64 = 0x02000000
+const maxCompactSize uint64 = 0x02000000
 
-const OP_0 uint8 = 0x00
-const OP_1NEGATE uint8 = 0x4f
-const OP_1 uint8 = 0x51
-const OP_16 uint8 = 0x60
+const (
+	op0       uint8 = 0x00
+	op1Negate uint8 = 0x4f
+	op1       uint8 = 0x51
+	op16      uint8 = 0x60
+)
 
 // String represents a string of bytes and provides methods for parsing values
 // from it.
@@ -117,7 +119,7 @@ func (s *String) ReadCompactSize(size *int) bool {
 		}
 	}
 
-	if length > MAX_COMPACT_SIZE || length < minSize {
+	if length > maxCompactSize || length < minSize {
 		return false
 	}
 
@@ -219,13 +221,13 @@ func (s *String) ReadScriptInt64(num *int64) bool {
 
 	var number uint64
 
-	if firstByte == OP_1NEGATE {
+	if firstByte == op1Negate {
 		*num = -1
 		return true
-	} else if firstByte == OP_0 {
+	} else if firstByte == op0 {
 		number = 0
-	} else if firstByte >= OP_1 && firstByte <= OP_16 {
-		number = uint64(firstByte) - uint64(OP_1 - 1)
+	} else if firstByte >= op1 && firstByte <= op16 {
+		number = uint64(firstByte) - uint64(op1-1)
 	} else {
 		numLen := int(firstByte)
 		// expect little endian int of varying size
