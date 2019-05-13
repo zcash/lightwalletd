@@ -203,7 +203,11 @@ func (s *String) ReadUint64(out *uint64) bool {
 // ReadScriptInt64 reads and interprets a Bitcoin-custom compact integer
 // encoding used for int64 numbers in scripts.
 //
-// See https://github.com/zcash/zcash/blob/4df60f4b334dd9aee5df3a481aee63f40b52654b/src/script/script.h#L363-L378
+// Serializer in zcashd:
+// https://github.com/zcash/zcash/blob/4df60f4b334dd9aee5df3a481aee63f40b52654b/src/script/script.h#L363-L378
+//
+// Partial parser in zcashd:
+// https://github.com/zcash/zcash/blob/4df60f4b334dd9aee5df3a481aee63f40b52654b/src/script/interpreter.cpp#L308-L335
 func (s *String) ReadScriptInt64(num *int64) bool {
 	// First byte is either an integer opcode, or the number of bytes in the
 	// number.
