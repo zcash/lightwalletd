@@ -50,6 +50,7 @@ func TestBlockParser(t *testing.T) {
 	}
 }
 
+// Checks on the first 20 blocks from mainnet genesis.
 func TestGenesisBlockParser(t *testing.T) {
 	blockFile, err := os.Open("../testdata/mainnet_genesis")
 	if err != nil {
@@ -79,8 +80,8 @@ func TestGenesisBlockParser(t *testing.T) {
 			break
 		}
 
-		if block.GetHeight() != 0 {
-			t.Errorf("Got wrong height for genesis block: %d", block.GetHeight())
+		if block.GetHeight() != i {
+			t.Errorf("Got wrong height for block %d: %d", i, block.GetHeight())
 		}
 	}
 }
