@@ -70,6 +70,9 @@ func (b *block) GetHeight() int {
 		return -1
 	}
 	// uint32 should last us a while (Nov 2018)
+	if heightNum > int64(^uint32(0)) {
+		return -1
+	}
 	blockHeight := uint32(heightNum)
 
 	if blockHeight == genesisTargetDifficulty {
