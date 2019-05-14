@@ -123,6 +123,7 @@ func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errO
 
 func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
 	insertBlock := "REPLACE INTO blocks (block_height, block_hash, sapling, compact_encoding) values (?, ?, ?, ?)"
+
 	tx, err := conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("creating db tx %d", height))
