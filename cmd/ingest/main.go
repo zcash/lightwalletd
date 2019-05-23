@@ -201,7 +201,7 @@ func handleBlock(db *sql.DB, sequence int, blockData []byte) {
 	entry := log.WithFields(logrus.Fields{
 		"seqnum":        sequence,
 		"block_height":  block.GetHeight(),
-		"block_hash":    blockHash,
+		"block_hash":    hex.EncodeToString(block.GetDisplayHash()),
 		"block_version": block.GetVersion(),
 		"tx_count":      block.GetTxCount(),
 		"sapling":       block.HasSaplingTransactions(),
@@ -226,7 +226,7 @@ func handleBlock(db *sql.DB, sequence int, blockData []byte) {
 		)
 		entry = log.WithFields(logrus.Fields{
 			"block_height": block.GetHeight(),
-			"block_hash":   blockHash,
+			"block_hash":   hex.EncodeToString(block.GetDisplayHash()),
 			"tx_index":     index,
 			"tx_size":      len(tx.Bytes()),
 			"sapling":      tx.HasSaplingTransactions(),
