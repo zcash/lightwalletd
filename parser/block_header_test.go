@@ -91,7 +91,7 @@ func TestBlockHeader(t *testing.T) {
 		}
 		lastBlockTime = blockHeader.Time
 
-		if len(blockHeader.Solution) != EQUIHASH_SIZE {
+		if len(blockHeader.Solution) != equihashSizeMainnet {
 			t.Error("Got wrong Equihash solution size.")
 			break
 		}
@@ -103,7 +103,7 @@ func TestBlockHeader(t *testing.T) {
 			break
 		}
 
-		if !bytes.Equal(serializedHeader, blockData[:SER_BLOCK_HEADER_SIZE]) {
+		if !bytes.Equal(serializedHeader, blockData[:serBlockHeaderMinusEquihashSize+3+equihashSizeMainnet]) {
 			offset := 0
 			length := 0
 			for i := 0; i < len(serializedHeader); i++ {
