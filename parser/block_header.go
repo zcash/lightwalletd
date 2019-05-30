@@ -7,13 +7,13 @@ import (
 	"log"
 	"math/big"
 
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
 	"github.com/pkg/errors"
+	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
 )
 
 const (
-	EQUIHASH_SIZE         = 1344 // size of an Equihash solution in bytes
-	SER_BLOCK_HEADER_SIZE = 1487 // size of a serialized block header
+	serBlockHeaderMinusEquihashSize = 140  // size of a serialized block header minus the Equihash solution
+	equihashSizeMainnet             = 1344 // size of a mainnet / testnet Equihash solution in bytes
 )
 
 // A block header as defined in version 2018.0-beta-29 of the Zcash Protocol Spec.
@@ -62,8 +62,47 @@ type blockHeader struct {
 	targetThreshold *big.Int
 }
 
+func CompactLengthPrefixedLen(val []byte) int {
+	length := len(val)
+	if length < 253 {
+		return 1 + length
+	} else if length < 0xffff {
+		return 1 + 2 + length
+	} else if length < 0xffff {
+		return 1 + 4 + length
+	} else {
+		return 1 + 8 + length
+	}
+}
+
+func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) error {
+	length := len(val)
+	if length < 253 {
+		binary.Write(buf, binary.LittleEndian, uint8(length))
+		binary.Write(buf, binary.LittleEndian, val)
+	} else if length < 0xffff {
+		binary.Write(buf, binary.LittleEndian, byte(253))
+		binary.Write(buf, binary.LittleEndian, uint16(length))
+		binary.Write(buf, binary.LittleEndian, val)
+	} else if length < 0xffff {
+		binary.Write(buf, binary.LittleEndian, byte(254))
+		binary.Write(buf, binary.LittleEndian, uint32(length))
+		binary.Write(buf, binary.LittleEndian, val)
+	} else {
+		binary.Write(buf, binary.LittleEndian, byte(255))
+		binary.Write(buf, binary.LittleEndian, uint64(length))
+		binary.Write(buf, binary.LittleEndian, val)
+	}
+	return nil
+}
+
+func (hdr *rawBlockHeader) GetSize() int {
+	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(hdr.Solution)
+}
+
 func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
-	backing := make([]byte, 0, SER_BLOCK_HEADER_SIZE)
+	headerSize := hdr.GetSize()
+	backing := make([]byte, 0, headerSize)
 	buf := bytes.NewBuffer(backing)
 	binary.Write(buf, binary.LittleEndian, hdr.Version)
 	binary.Write(buf, binary.LittleEndian, hdr.HashPrevBlock)
@@ -72,11 +111,8 @@ func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 	binary.Write(buf, binary.LittleEndian, hdr.Time)
 	binary.Write(buf, binary.LittleEndian, hdr.NBitsBytes)
 	binary.Write(buf, binary.LittleEndian, hdr.Nonce)
-	// TODO: write a Builder that knows about CompactSize
-	binary.Write(buf, binary.LittleEndian, byte(253))
-	binary.Write(buf, binary.LittleEndian, uint16(1344))
-	binary.Write(buf, binary.LittleEndian, hdr.Solution)
-	return backing[:SER_BLOCK_HEADER_SIZE], nil
+	WriteCompactLengthPrefixed(buf, hdr.Solution)
+	return backing[:headerSize], nil
 }
 
 func NewBlockHeader() *blockHeader {
