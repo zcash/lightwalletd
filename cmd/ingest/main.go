@@ -120,8 +120,8 @@ func main() {
 	}
 	
 	//ingest from Sapling testnet height
-	if height < 252500 {
-		height = 252500
+	if height < 280000 {
+		height = 280000
 		log.WithFields(logrus.Fields{
 			"error": err,
   	}).Warn("invalid current height read from local db storage")
