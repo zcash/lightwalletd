@@ -8,42 +8,42 @@ import (
 	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
-type block struct {
+type Block struct {
 	hdr    *blockHeader
 	vtx    []*Transaction
 	height int
 }
 
-func NewBlock() *block {
-	return &block{height: -1}
+func NewBlock() *Block {
+	return &Block{height: -1}
 }
 
-func (b *block) GetVersion() int {
+func (b *Block) GetVersion() int {
 	return int(b.hdr.Version)
 }
 
-func (b *block) GetTxCount() int {
+func (b *Block) GetTxCount() int {
 	return len(b.vtx)
 }
 
-func (b *block) Transactions() []*Transaction {
+func (b *Block) Transactions() []*Transaction {
 	// TODO: these should NOT be mutable
 	return b.vtx
 }
 
 // GetDisplayHash returns the block hash in big-endian display order.
-func (b *block) GetDisplayHash() []byte {
+func (b *Block) GetDisplayHash() []byte {
 	return b.hdr.GetDisplayHash()
 }
 
 // TODO: encode hash endianness in a type?
 
 // GetEncodableHash returns the block hash in little-endian wire order.
-func (b *block) GetEncodableHash() []byte {
+func (b *Block) GetEncodableHash() []byte {
 	return b.hdr.GetEncodableHash()
 }
 
-func (b *block) HasSaplingTransactions() bool {
+func (b *Block) HasSaplingTransactions() bool {
 	for _, tx := range b.vtx {
 		if tx.HasSaplingTransactions() {
 			return true
@@ -57,7 +57,7 @@ const genesisTargetDifficulty = 520617983
 
 // GetHeight() extracts the block height from the coinbase transaction. See
 // BIP34. Returns block height on success, or -1 on error.
-func (b *block) GetHeight() int {
+func (b *Block) GetHeight() int {
 	if b.height != -1 {
 		return b.height
 	}
@@ -83,7 +83,7 @@ func (b *block) GetHeight() int {
 	return int(blockHeight)
 }
 
-func (b *block) ToCompact() *walletrpc.CompactBlock {
+func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	compactBlock := &walletrpc.CompactBlock{
 		//TODO ProtoVersion: 1,
 		Height: uint64(b.GetHeight()),
@@ -103,7 +103,7 @@ func (b *block) ToCompact() *walletrpc.CompactBlock {
 	return compactBlock
 }
 
-func (b *block) ParseFromSlice(data []byte) (rest []byte, err error) {
+func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	hdr := NewBlockHeader()
 	data, err = hdr.ParseFromSlice(data)
 	if err != nil {
