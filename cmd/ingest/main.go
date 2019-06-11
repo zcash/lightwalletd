@@ -101,7 +101,7 @@ func main() {
 		}).Warn("zcash.conf failed, will try empty credentials for rpc")
 
 		//Default to testnet, but user MUST specify rpcuser and rpcpassword in zcash.conf; no default
-		rpcClient, err = frontend.NewZRPCFromCreds("127.0.0.1:18232", " ", " ")
+		rpcClient, err = frontend.NewZRPCFromCreds("127.0.0.1:18232", "", "")
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -136,11 +136,11 @@ func main() {
 				"error":  err,
 			}).Fatal("error with getblock")
 		}
-		if block != nil{
-			handleBlock(db , block)
+		if block != nil {
+			handleBlock(db, block)
 			height++
 			//TODO store block current/prev hash for formal reorg
-		}else{
+		} else {
 			//TODO implement blocknotify to minimize polling on corner cases
 			time.Sleep(60 * time.Second)
 		}
@@ -160,6 +160,7 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 	if rpcErr != nil {
 		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
 		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
+		//Check to see if we are requesting a height the zcashd doesn't have yet
 		if err == nil && errCode == -8 {
 			return nil, nil
 		}
