@@ -157,8 +157,7 @@ func main() {
 		switch string(topic) {
 
 		case opts.zmqTopic:
-			// there's an implicit mutex here
-			go handleBlock(db, sequence, body)
+			handleBlock(db, sequence, body)
 
 		default:
 			log.WithFields(logrus.Fields{
