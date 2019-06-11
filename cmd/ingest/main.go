@@ -126,19 +126,30 @@ func main() {
 			"error": err,
   	}).Warn("invalid current height read from local db storage")
 	}
-	 
+	
+	timeout_count := 0
 	// Start listening for new blocks
 	for {
 		block, err := getBlock(rpcClient, height)
-		if err != nil{
+		if err != nil {
 			log.WithFields(logrus.Fields{
 				"height": height,
 				"error":  err,
-			}).Fatal("error with getblock")
+			}).Warn("error with getblock")
+			timeout_count++
+			if timeout_count == 3 {
+				log.WithFields(logrus.Fields{
+					"timeouts":  timeout_count,
+				}).Warn("unable to issue RPC call to zcashd node 3 times")
+				break
+			}
 		}
 		if block != nil {
 			handleBlock(db, block)
 			height++
+			if timeout_count > 0 {
+				timeout_count--
+			}
 			//TODO store block current/prev hash for formal reorg
 		} else {
 			//TODO implement blocknotify to minimize polling on corner cases
