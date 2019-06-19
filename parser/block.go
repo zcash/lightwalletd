@@ -86,10 +86,10 @@ func (b *block) GetHeight() int {
 func (b *block) ToCompact() *walletrpc.CompactBlock {
 	compactBlock := &walletrpc.CompactBlock{
 		//TODO ProtoVersion: 1,
-		Height: uint64(b.GetHeight()),
-		Hash:   b.GetEncodableHash(),
+		Height:   uint64(b.GetHeight()),
+		Hash:     b.GetEncodableHash(),
 		PrevHash: b.hdr.HashPrevBlock,
-		Time:   b.hdr.Time,
+		Time:     b.hdr.Time,
 	}
 
 	// Only Sapling transactions have a meaningful compact encoding

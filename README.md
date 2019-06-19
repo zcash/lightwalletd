@@ -138,3 +138,34 @@ lightwalletd currently lacks several things that you'll want in production. Cave
 - Logging may capture identifiable user data. It hasn't received any privacy analysis yet and makes no attempt at sanitization.
 - The only storage provider we've implemented is sqlite. sqlite is [likely not appropriate](https://sqlite.org/whentouse.html) for the number of concurrent requests we expect to handle. Because sqlite uses a global write lock, the code limits the number of open database connections to *one* and currently makes no distinction betwen read-only (frontend) and read/write (ingester) connections. It will probably begin to exhibit lock contention at low user counts, and should be improved or replaced with your own data store in production.
 - [Load-balancing with gRPC](https://grpc.io/blog/loadbalancing) may not work quite like you're used to. A full explanation is beyond the scope of this document, but we recommend looking into [Envoy](https://www.envoyproxy.io/), [nginx](https://nginx.com), or [haproxy](https://www.haproxy.org) depending on your existing infrastruture.
+
+**Pull Requests**
+
+We welcome pull requests! We like to keep our Go code neatly formatted in a standard way,
+which the standard tool [gofmt](https://golang.org/cmd/gofmt/) can do. Please consider
+adding the following to the file `.git/hooks/pre-commit` in your clone:
+
+```
+#!/bin/sh
+
+modified_go_files=$(git diff --cached --name-only -- '*.go')
+if test "$modified_go_files"
+then
+    need_formatting=$(gofmt -l $modified_go_files)
+    if test "$need_formatting"
+    then
+        echo files need formatting:
+        echo gofmt -w $need_formatting
+        exit 1
+    fi
+fi
+```
+
+You'll also need to make this file executable:
+
+```
+$ chmod +x .git/hooks/pre-commit
+```
+
+Doing this will prevent commits that break the standard formatting. Simply run the
+`gofmt` command as indicated and rerun the `git commit` command.
