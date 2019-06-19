@@ -81,3 +81,34 @@ Example using server binary built from Makefile:
 ```
 ./server --tls-cert cert.pem --tls-key key.pem --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/server.log --bind-addr 127.0.0.1:18232
 ```
+
+# Pull Requests
+
+We welcome pull requests! We like to keep our Go code neatly formatted in a standard way,
+which the standard tool [gofmt](https://golang.org/cmd/gofmt/) can do. Please consider
+adding the following to the file `.git/hooks/pre-commit` in your clone:
+
+```
+#!/bin/sh
+
+modified_go_files=$(git diff --cached --name-only -- '*.go')
+if test "$modified_go_files"
+then
+    need_formatting=$(gofmt -l $modified_go_files)
+    if test "$need_formatting"
+    then
+        echo files need formatting:
+        echo gofmt -w $need_formatting
+        exit 1
+    fi
+fi
+```
+
+You'll also need to make this file executable:
+
+```
+$ chmod +x .git/hooks/pre-commit
+```
+
+Doing this will prevent commits that break the standard formatting. Simply run the
+`gofmt` command as indicated and rerun the `git commit` command.
