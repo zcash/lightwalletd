@@ -217,6 +217,7 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 	entry := log.WithFields(logrus.Fields{
 		"block_height":  block.GetHeight(),
 		"block_hash":    hex.EncodeToString(block.GetDisplayHash()),
+		"prev_hash":     hex.EncodeToString(block.GetDisplayPrevHash()),
 		"block_version": block.GetVersion(),
 		"tx_count":      block.GetTxCount(),
 		"sapling":       block.HasSaplingTransactions(),

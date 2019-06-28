@@ -43,6 +43,16 @@ func (b *Block) GetEncodableHash() []byte {
 	return b.hdr.GetEncodableHash()
 }
 
+func (b *Block) GetDisplayPrevHash() []byte {
+	h := b.hdr.HashPrevBlock
+	// Reverse byte order
+	for i := 0; i < len(h)/2; i++ {
+		j := len(h) - 1 - i
+		h[i], h[j] = h[j], h[i]
+	}
+	return h
+}
+
 func (b *Block) HasSaplingTransactions() bool {
 	for _, tx := range b.vtx {
 		if tx.HasSaplingTransactions() {
