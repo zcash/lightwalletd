@@ -130,7 +130,7 @@ func main() {
 	}
 
 	if opts.startHeight != 0 {
-		height = opts.startHeight
+		height = int(opts.startHeight)
 	}
 
 	timeout_count := 0
