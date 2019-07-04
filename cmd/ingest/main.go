@@ -31,6 +31,7 @@ type Options struct {
 	logLevel uint64
 	logPath  string
 	zcashConfPath string
+	startHeight uint64
 }
 
 func main() {
@@ -39,6 +40,7 @@ func main() {
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
+	flag.Uint64Var(&opts.startHeight, "start-height", "", "start sync from this height (> 419200 for mainnet)")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
@@ -125,6 +127,10 @@ func main() {
 		log.WithFields(logrus.Fields{
 			"error": err,
   	}).Warn("invalid current height read from local db storage")
+	}
+
+	if opts.startHeight != "" {
+		height = opts.startHeight
 	}
 
 	timeout_count := 0
