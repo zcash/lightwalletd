@@ -1,0 +1,106 @@
+# /************************************************************************
+ #  File: .gitlab-ci.yml
+ #  Author: mdr0id
+ #  Date: 7/16/2019
+ #  Description:  Used to setup runners/jobs for lightwalletd
+ #  Usage: Commit source and the pipeline will trigger the according jobs.
+ #         
+ #  Known bugs/missing features:
+ #
+ #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline 
+ # ************************************************************************/
+ 
+image: golang:1.11-alpine
+  
+stages:
+  - build
+  - test
+  - deploy
+  - monitor
+
+# ************************************************************************/
+# BUILD
+# ************************************************************************/
+.lint-check:
+  stage: build
+  script:
+    - make lint
+
+.build-docs:
+  stage: build
+  script:
+    - made docs
+
+build-linux:
+  stage: build
+  script:
+    - make
+
+.build-windows:
+  stage: build
+  script:
+    - make
+
+.build-mac:
+  stage: build
+  script:
+    - make
+
+# Build against latest Golang
+.build-latest:
+  stage: build
+  image: golang:latest-alpine
+  script:
+    - make
+  allow_failure: true 
+
+# Likely don't need a nightly in always deployable model; will revisit after requirement gathering
+.build-nightly:
+  stage: build
+  script:
+    - make
+  allow_failure: true
+
+# ************************************************************************/
+# TEST
+# ************************************************************************/
+test-coverage:
+  stage: test
+  script:
+    - make coverage  
+
+test-coverage-report:
+  stage: test
+  script:
+    - make coverage_report
+
+test-coverage-report-html:
+  stage: test
+  script:
+    - make coverage_html
+
+# ************************************************************************/
+# DEPLOY
+# ************************************************************************/
+.release-candidate:
+  stage: deploy
+  script:
+    - echo "Generating v0.0.1-rc"
+  when: manual
+
+.release-production:
+  stage: deploy
+  script:
+    - echo "Generating v0.0.1"
+  when: manual
+
+
+# ************************************************************************/
+# MONITOR
+# ************************************************************************/
+.monitor-release:
+  stage: deploy
+  script:
+    - echo "Building docker image for v0.0.0"
+    - make image
+  when: manual
