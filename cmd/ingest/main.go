@@ -208,13 +208,14 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 
 
 func handleBlock(db *sql.DB, block *parser.Block) {
-
+  prevBlockHash := hex.EncodeToString(block.GetPrevHash())
 	blockHash := hex.EncodeToString(block.GetEncodableHash())
 	marshaledBlock, _ := proto.Marshal(block.ToCompact())
 
 	err := storage.StoreBlock(
 		db,
 		block.GetHeight(),
+		prevBlockHash,
 		blockHash,
 		block.HasSaplingTransactions(),
 		marshaledBlock,
