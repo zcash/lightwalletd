@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/samosudov/lightwalletd/parser/internal/bytestring"
+	"github.com/samosudov/lightwalletd/walletrpc"
 )
 
 type Block struct {
@@ -41,6 +41,16 @@ func (b *Block) GetDisplayHash() []byte {
 // GetEncodableHash returns the block hash in little-endian wire order.
 func (b *Block) GetEncodableHash() []byte {
 	return b.hdr.GetEncodableHash()
+}
+
+func (b *Block) GetDisplayPrevHash() []byte {
+	h := b.hdr.HashPrevBlock
+	// Reverse byte order
+	for i := 0; i < len(h)/2; i++ {
+		j := len(h) - 1 - i
+		h[i], h[j] = h[j], h[i]
+	}
+	return h
 }
 
 func (b *Block) HasSaplingTransactions() bool {
@@ -83,12 +93,16 @@ func (b *Block) GetHeight() int {
 	return int(blockHeight)
 }
 
+func (b *Block) GetPrevHash() []byte {
+	return b.hdr.HashPrevBlock
+}
+
 func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	compactBlock := &walletrpc.CompactBlock{
 		//TODO ProtoVersion: 1,
 		Height: uint64(b.GetHeight()),
-		Hash:   b.GetEncodableHash(),
 		PrevHash: b.hdr.HashPrevBlock,
+		Hash:   b.GetEncodableHash(),
 		Time:   b.hdr.Time,
 	}
 

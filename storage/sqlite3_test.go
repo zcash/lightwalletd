@@ -14,8 +14,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 
-	"github.com/zcash-hackworks/lightwalletd/parser"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/samosudov/lightwalletd/parser"
+	"github.com/samosudov/lightwalletd/walletrpc"
 )
 
 type compactTest struct {
