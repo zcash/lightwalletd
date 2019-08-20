@@ -32,6 +32,10 @@ type Options struct {
 	logPath  string
 	zcashConfPath string
 	startHeight uint64
+	rpcHost string
+	rpcPort string
+	rpcLogin string
+	rpcPass string
 }
 
 func main() {
@@ -41,6 +45,12 @@ func main() {
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
 	flag.Uint64Var(&opts.startHeight, "start-height", uint64(0), "start sync from this height (> 419200 for mainnet)")
+	flag.StringVar(&opts.rpcHost, "rpc-host", "", "RPC host of zcashd")
+	flag.StringVar(&opts.rpcPort, "rpc-port", "", "RPC port of zcashd")
+	flag.StringVar(&opts.rpcLogin, "rpc-login", "", "RPC login of zcashd")
+	flag.StringVar(&opts.rpcPass, "rpc-pass", "", "RPC password of zcashd")
+
+
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
@@ -103,7 +113,7 @@ func main() {
 		}).Warn("zcash.conf failed, will try empty credentials for rpc")
 
 		//Default to testnet, but user MUST specify rpcuser and rpcpassword in zcash.conf; no default
-		rpcClient, err = frontend.NewZRPCFromCreds("127.0.0.1:18232", "", "")
+		rpcClient, err = frontend.NewZRPCFromCreds(opts.rpcHost+":"+opts.rpcPort, opts.rpcLogin, opts.rpcPass)
 
 		if err != nil {
 			log.WithFields(logrus.Fields{
