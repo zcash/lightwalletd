@@ -14,7 +14,7 @@ func NewZRPCFromConf(confPath string) (*rpcclient.Client, error) {
 		return nil, errors.Wrap(err, "failed to read config file")
 	}
 
-	rpcaddr := "zec-lightwallet-guarda"
+	rpcaddr := cfg.Section("").Key("rpcbind").String()
 	rpcport := cfg.Section("").Key("rpcport").String()
 	username := cfg.Section("").Key("rpcuser").String()
 	password := cfg.Section("").Key("rpcpassword").String()
