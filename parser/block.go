@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/samosudov/lightwalletd/tree/reorg/parser/internal/bytestring"
-	"github.com/samosudov/lightwalletd/tree/reorg/walletrpc"
+	"github.com/samosudov/lightwalletd/parser/internal/bytestring"
+	"github.com/samosudov/lightwalletd/walletrpc"
 )
 
 type Block struct {

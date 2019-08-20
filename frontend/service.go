@@ -17,8 +17,8 @@ import (
 	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/samosudov/lightwalletd/tree/reorg/storage"
-	"github.com/samosudov/lightwalletd/tree/reorg/walletrpc"
+	"github.com/samosudov/lightwalletd/storage"
+	"github.com/samosudov/lightwalletd/walletrpc"
 )
 
 var (
