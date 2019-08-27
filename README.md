@@ -45,29 +45,15 @@ The ingester is a modular component. Anything that can retrieve the necessary da
 
 First, install [Go >= 1.11](https://golang.org/dl/#stable). Older versions of Go may work but are not actively supported at this time. Note that the version of Go packaged by Debian stable (or anything prior to Buster) is far too old to work.
 
-Next, install the ZMQ development library. On Debian-derived distros, this is called `libzmq3-dev`.
-
-Next, configure your zcashd instance to publish blocks on a ZMQ stream:
-
-```
-$ echo "zmqpubcheckedblock=tcp://127.0.0.1:28332" >> $HOME/.zcash/zcashd.conf
-```
-
 Now clone this repo and start the ingester. The first run will start slow as Go builds the sqlite C interface:
 
 ```
 $ git clone https://github.com/zcash-hackworks/lightwalletd
 $ cd lightwalletd
-$ go run cmd/ingest/main.go --db-path <path to sqlite db> --zmq-addr 127.0.0.1:28332
+$ go run cmd/ingest/main.go --conf-file <path_to_zcash.conf> --db-path <path_to_sqllightdb>
 ```
 
 To see the other command line options, run `go run cmd/ingest/main.go --help`.
-
-To begin building a compact block database, run your zcashd with the `--reindex` option. This will cause zcashd to recheck all of the blocks it knows about and emit them on the newly configured ZMQ stream for the ingester to read. This is the part of the process that takes a long time.
-
-**What should I watch out for?**
-
-Because of how ZMQ works in the zcashd codebase, the ingester doesn't have the ability to retry any blocks it misses without doing a complete reindexing. For now this means that we only recommend running this setup with a completely reliable connection between zcashd and the ingester. So while ZMQ certainly can publish over arbitrary TCP connections, rather than localhost, doing so risks wasting a lot of your time if the connection hiccups.
 
 ## Frontend
 
@@ -122,7 +108,6 @@ sqlite is extremely reliable for what it is, but it isn't good at high concurren
 The first-order dependencies of this code are:
 
 - Go (>= 1.11 suggested; older versions are currently unsupported)
-- libzmq3-dev (used by our zmq interface library; optional if ingester changes)
 - libsqlite3-dev (used by our sqlite interface library; optional with another datastore)
 
 **Containers**
