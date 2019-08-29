@@ -5,7 +5,8 @@ import (
 	"flag"
 	"net"
 	"os"
-	"os/signal"
+	"fmt"
+ 	"os/signal"
 	"syscall"
 	"time"
 
@@ -29,9 +30,15 @@ func init() {
 		DisableLevelTruncation: true,
 	})
 
+	onexit := func () {
+		fmt.Printf("Lightwalletd died with a Fatal error. Check logfile for details.\n")
+	}
+
 	log = logger.WithFields(logrus.Fields{
 		"app": "frontend-grpc",
 	})
+
+	logrus.RegisterExitHandler(onexit)
 }
 
 // TODO stream logging
@@ -75,31 +82,55 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 }
 
 type Options struct {
-	bindAddr      string `json:"bind_address,omitempty"`
-	dbPath        string `json:"db_path"`
-	tlsCertPath   string `json:"tls_cert_path,omitempty"`
-	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
-	logLevel      uint64 `json:"log_level,omitempty"`
-	logPath       string `json:"log_file,omitempty"`
-	zcashConfPath string `json:"zcash_conf,omitempty"`
+	bindAddr      string  `json:"bind_address,omitempty"`
+	dbPath        string  `json:"db_path"`
+	tlsCertPath   string  `json:"tls_cert_path,omitempty"`
+	tlsKeyPath    string  `json:"tls_cert_key,omitempty"`
+	logLevel      uint64  `json:"log_level,omitempty"`
+	logPath       string  `json:"log_file,omitempty"`
+	zcashConfPath string  `json:"zcash_conf,omitempty"`
+	veryInsecure  bool    `json:"very_insecure,omitempty"`
+}
+
+func fileExists(filename string) bool {
+    info, err := os.Stat(filename)
+    if os.IsNotExist(err) {
+        return false
+    }
+    return !info.IsDir()
 }
 
 func main() {
 	opts := &Options{}
 	flag.StringVar(&opts.bindAddr, "bind-addr", "127.0.0.1:9067", "the address to listen on")
-	flag.StringVar(&opts.dbPath, "db-path", "", "the path to a sqlite database file")
-	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate (optional)")
-	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file (optional)")
+	flag.StringVar(&opts.dbPath, "db-path", "./database.sqlite", "the path to a sqlite database file")
+	flag.StringVar(&opts.tlsCertPath, "tls-cert", "./cert.pem", "the path to a TLS certificate")
+	flag.StringVar(&opts.tlsKeyPath, "tls-key", "./cert.key", "the path to a TLS key file")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
-	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
-	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
+	flag.StringVar(&opts.logPath, "log-file", "./server.log", "log file to write to")
+	flag.StringVar(&opts.zcashConfPath, "conf-file", "./zcash.conf", "conf file to pull RPC creds from")
+	flag.BoolVar(&opts.veryInsecure, "very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
 
-	if opts.dbPath == "" || opts.zcashConfPath == "" {
-		flag.Usage()
-		os.Exit(1)
+	filesThatShouldExist := []string {
+		opts.dbPath,
+		opts.tlsCertPath,
+		opts.tlsKeyPath,
+		opts.logPath,
+		opts.zcashConfPath,
+	}
+
+	for _, filename := range filesThatShouldExist {
+		if (opts.veryInsecure && (filename == opts.tlsCertPath || filename == opts.tlsKeyPath)) {
+			continue
+		}
+		if !fileExists(filename) {
+			os.Stderr.WriteString(fmt.Sprintf("\n  ** File does not exist: %s\n\n", filename))
+			flag.Usage()
+			os.Exit(1)
+		}
 	}
 
 	if opts.logPath != "" {
@@ -132,7 +163,9 @@ func main() {
 		}
 		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 	} else {
-		server = grpc.NewServer(LoggingInterceptor())
+		if (opts.veryInsecure) {
+			server = grpc.NewServer(LoggingInterceptor())
+		}
 	}
 
 	// Enable reflection for debugging

@@ -1,0 +1,6 @@
+*.conf
+*.config
+*.log
+*.sqlite
+*.pem
+*.key

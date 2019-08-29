@@ -95,7 +95,9 @@ To see the other command line options, run `go run cmd/server/main.go --help`.
 
 **What should I watch out for?**
 
-Not much! This is a very simple piece of software. Make sure you point it at the same storage as the ingester. See the "Production" section for some caveats.
+x509 Certificates! This software relies on the confidentiality and integrity of a modern TLS connection between incoming clients and the front-end. Without an x509 certificate that incoming clients accurately authenticate, the security properties of this software are lost.
+
+Otherwise, not much! This is a very simple piece of software. Make sure you point it at the same storage as the ingester. See the "Production" section for some caveats.
 
 Support for users sending transactions will require the ability to make JSON-RPC calls to a zcashd instance. By default the frontend tries to pull RPC credentials from your zcashd.conf file, but you can specify other credentials via command line flag. In the future, it should be possible to do this with environment variables [(#2)](https://github.com/zcash-hackworks/lightwalletd/issues/2).
 
@@ -116,6 +118,30 @@ sqlite is extremely reliable for what it is, but it isn't good at high concurren
 ## Production
 
 ⚠️ This is informational documentation about a piece of alpha software. It has not yet undergone audits or been subject to rigorous testing. It lacks some affordances necessary for production-level reliability. We do not recommend using it to handle customer funds at this time (March 2019).
+
+**x509 Certificates**
+You will need to supply an x509 certificate that connecting clients will have good reason to trust (hint: do not use a self-signed one, our SDK will reject those unless you distribute them to the client out-of-band). We suggest that you be sure to buy a reputable one from a supplier that uses a modern hashing algorithm (NOT md5 or sha1) and that uses Certificate Transparency (OID 1.3.6.1.4.1.11129.2.4.2 will be present in the certificate).
+
+To check a given certificate's (cert.pem) hashing algorithm:
+```
+openssl x509 -text -in certificate.crt | grep "Signature Algorithm"
+```
+
+To check if a given certificate (cert.pem) contains a Certificate Transparency OID:
+```
+echo "1.3.6.1.4.1.11129.2.4.2 certTransparency Certificate Transparency" > oid.txt
+openssl asn1parse -in cert.pem -oid ./oid.txt | grep 'Certificate Transparency'
+```
+
+To use Let's Encrypt to generate a free certificate for your frontend, one method is to:
+1) Install certbot
+2) Open port 80 to your host
+3) Point some forward dns to that host (some.forward.dns.com)
+4) Run
+```
+certbot certonly --standalone --preferred-challenges http -d some.forward.dns.com
+```
+5) Pass the resulting certificate and key to frontend using the -tls-cert and -tls-key options.
 
 **Dependencies**
 
