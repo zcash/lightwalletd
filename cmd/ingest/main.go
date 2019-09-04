@@ -225,6 +225,9 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 
 	// if local block has different hash delete it before store new block
 	if localBlockHash != nil && localBlockHash != nodeBlockHash {
+		log.WithFields(logrus.Fields{
+			"nodeBlockHeight": nodeBlockHeight,
+		}).Warn("reorg: local block hash is different, will be changed with new node block")
 		deleteError = storage.DeleteBlock(ctx, s.db, nodeBlockHeight)
 		if deleteError != nil {
 			log.WithFields(logrus.Fields{
