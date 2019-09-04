@@ -98,19 +98,19 @@ func GetBlockByHash(ctx context.Context, db *sql.DB, hash string) ([]byte, error
 	return blockBytes, err
 }
 
-func GetBlockHash(ctx context.Context, db *sql.DB, height int) (string, error) {
+func GetBlockHash(db *sql.DB, height int) (string, error) {
 	var blockHash string
 	query := "SELECT block_hash from blocks WHERE block_height = ?"
-	err := db.QueryRowContext(ctx, query, height).Scan(&blockHash)
+	err := db.QueryRow(query, height).Scan(&blockHash)
 	if err != nil {
 		return "", err
 	}
 	return blockHash, err
 }
 
-func DeleteBlock(ctx context.Context, db *sql.DB, height int) (Result, error) {
+func DeleteBlock(db *sql.DB, height int) (Result, error) {
 	query := "DELETE FROM blocks WHERE block_height = ?"
-	res, err := db.ExecContext(ctx, query, height)
+	res, err := db.Exec(query, height)
 
 	return res, err
 }
