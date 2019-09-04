@@ -222,7 +222,7 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 	nodeBlockHash := hex.EncodeToString(block.GetEncodableHash())
 
 	nodeBlockHeight := block.GetHeight()
-	localBlockHash, err := storage.GetBlockHash(ctx, s.db, handleBlockHeight)
+	localBlockHash, err := storage.GetBlockHash(ctx, s.db, nodeBlockHeight)
 
 	// if local block has different hash delete it before store new block
 	if localBlockHash != nil && localBlockHash != nodeBlockHash {
