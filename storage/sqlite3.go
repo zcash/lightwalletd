@@ -94,13 +94,11 @@ func GetBlockHash(ctx context.Context, db *sql.DB, height int) (string, error) {
 	return blockHash, err
 }
 
-func DeleteBlock(ctx context.Context, db *sql.DB, height int) error {
+func DeleteBlock(ctx context.Context, db *sql.DB, height int) (Result, error) {
 	query := "DELETE FROM blocks WHERE block_height = ?"
-	err := db.ExecContext(ctx, query, height)
-	if err != nil {
-		return err
-	}
-	return nil
+	res, err := db.ExecContext(ctx, query, height)
+
+	return res, err
 }
 
 // [start, end] inclusive
