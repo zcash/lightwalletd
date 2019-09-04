@@ -84,6 +84,25 @@ func GetBlockByHash(ctx context.Context, db *sql.DB, hash string) ([]byte, error
 	return blockBytes, err
 }
 
+func GetBlockHash(ctx context.Context, db *sql.DB, height int) (string, error) {
+	var blockHash string
+	query := "SELECT block_hash from blocks WHERE block_height = ?"
+	err := db.QueryRowContext(ctx, query, height).Scan(&blockHash)
+	if err != nil {
+		return nil, err
+	}
+	return blockHash, err
+}
+
+func DeleteBlock(ctx context.Context, db *sql.DB, height int) error {
+	query := "DELETE FROM blocks WHERE block_height = ?"
+	err := db.ExecContext(ctx, query, height)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // [start, end] inclusive
 func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errOut chan<- error, start, end int) {
 	// TODO sanity check ranges, this limit, etc

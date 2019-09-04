@@ -143,18 +143,9 @@ func main() {
 		height = int(opts.startHeight)
 	}
 
-	timeout_count := 0
-	reorg_count := -1
-	hash := ""
-	phash := ""
 	// Start listening for new blocks
 	for {
-		if reorg_count > 0 {
-			reorg_count = -1
-			height -= 10
-		}
 		block, err := getBlock(rpcClient, height)
-
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"height": height,
@@ -170,29 +161,13 @@ func main() {
 		}
 		if block != nil {
 			handleBlock(db, block)
+			height++
 			if timeout_count > 0 {
 				timeout_count--
 			}
-			phash = hex.EncodeToString(block.GetPrevHash())
-			//check for reorgs once we have inital block hash from startup
-			if hash != phash && reorg_count != -1 {
-				reorg_count++
-				log.WithFields(logrus.Fields{
-					"height": height,
-					"hash":  hash,
-					"phash": phash,
-					"reorg": reorg_count,
-				}).Warn("REORG")
-			} else {
-			  hash = hex.EncodeToString(block.GetDisplayHash())
-			}
-			if reorg_count == -1 {
-				hash = hex.EncodeToString(block.GetDisplayHash())
-				reorg_count =0
-			}
-			height++
 			//TODO store block current/prev hash for formal reorg
 		} else {
+			height -= 4
 			//TODO implement blocknotify to minimize polling on corner cases
 			time.Sleep(60 * time.Second)
 		}
@@ -243,8 +218,22 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 
 
 func handleBlock(db *sql.DB, block *parser.Block) {
+	nodeBlockHash := hex.EncodeToString(block.GetEncodableHash())
+
+	nodeBlockHeight := block.GetHeight()
+	localBlockHash, err := storage.GetBlockHash(ctx, s.db, handleBlockHeight)
+
+	// if local block has different hash delete it before store new block
+	if localBlockHash != nil && localBlockHash != nodeBlockHash {
+		deleteError = storage.DeleteBlock(ctx, s.db, nodeBlockHeight)
+		if deleteError != nil {
+			log.WithFields(logrus.Fields{
+				"error": deleteError,
+	  	}).Warn("reorg: cant delete block with the same height (local block hash is different)")
+		}
+	}
+
   prevBlockHash := hex.EncodeToString(block.GetPrevHash())
-	blockHash := hex.EncodeToString(block.GetEncodableHash())
 	marshaledBlock, _ := proto.Marshal(block.ToCompact())
 
 	err := storage.StoreBlock(
