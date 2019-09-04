@@ -245,7 +245,7 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 		db,
 		block.GetHeight(),
 		prevBlockHash,
-		blockHash,
+		nodeBlockHash,
 		block.HasSaplingTransactions(),
 		marshaledBlock,
 	)
@@ -271,7 +271,7 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 		err = storage.StoreTransaction(
 			db,
 			block.GetHeight(),
-			blockHash,
+			nodeBlockHash,
 			index,
 			txHash,
 			tx.Bytes(),
