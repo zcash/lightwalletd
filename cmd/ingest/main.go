@@ -222,7 +222,7 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 	nodeBlockHash := hex.EncodeToString(block.GetEncodableHash())
 
 	nodeBlockHeight := block.GetHeight()
-	localBlockHash, localBlockHashError := storage.GetBlockHash(db, nodeBlockHeight)
+	localBlockHash, err := storage.GetBlockHash(db, nodeBlockHeight)
 
 	// if local block has different hash delete it before store new block
 	if localBlockHash != "" && localBlockHash != nodeBlockHash {
@@ -241,7 +241,7 @@ func handleBlock(db *sql.DB, block *parser.Block) {
   prevBlockHash := hex.EncodeToString(block.GetPrevHash())
 	marshaledBlock, _ := proto.Marshal(block.ToCompact())
 
-	err := storage.StoreBlock(
+	err = storage.StoreBlock(
 		db,
 		block.GetHeight(),
 		prevBlockHash,
