@@ -230,10 +230,10 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 			"nodeBlockHeight": nodeBlockHeight,
 		}).Warn("reorg: local block hash is different, will be changed with new node block")
 
-		result, deleteError = storage.DeleteBlock(db, nodeBlockHeight)
+		deleteResult, deleteError = storage.DeleteBlock(db, nodeBlockHeight)
 
 		log.WithFields(logrus.Fields{
-			"result": result,
+			"result": deleteResult,
 			"error": deleteError,
 		}).Warn("reorg: cant delete block with the same height (local block hash is different)")
 	}
