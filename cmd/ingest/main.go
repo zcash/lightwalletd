@@ -143,6 +143,7 @@ func main() {
 		height = int(opts.startHeight)
 	}
 
+	timeout_count := 0
 	// Start listening for new blocks
 	for {
 		block, err := getBlock(rpcClient, height)
