@@ -89,7 +89,7 @@ func GetBlockHash(ctx context.Context, db *sql.DB, height int) (string, error) {
 	query := "SELECT block_hash from blocks WHERE block_height = ?"
 	err := db.QueryRowContext(ctx, query, height).Scan(&blockHash)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	return blockHash, err
 }
