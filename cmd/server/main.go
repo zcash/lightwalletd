@@ -82,6 +82,10 @@ type Options struct {
 	logLevel      uint64 `json:"log_level,omitempty"`
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
+	rpcHost string `json:"rpc_host,omitempty"`
+	rpcPort string `json:"rpc_port,omitempty"`
+	rpcLogin string
+	rpcPass string
 }
 
 func main() {
@@ -93,11 +97,15 @@ func main() {
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
+	flag.StringVar(&opts.rpcHost, "rpc-host", "", "RPC host of zcashd")
+	flag.StringVar(&opts.rpcPort, "rpc-port", "", "RPC port of zcashd")
+	flag.StringVar(&opts.rpcLogin, "rpc-login", "", "RPC login of zcashd")
+	flag.StringVar(&opts.rpcPass, "rpc-pass", "", "RPC password of zcashd")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
 
-	if opts.dbPath == "" || opts.zcashConfPath == "" {
+	if opts.dbPath == "" {
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -144,7 +152,7 @@ func main() {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
-	rpcClient, err := frontend.NewZRPCFromConf(opts.zcashConfPath)
+	rpcClient, err = frontend.NewZRPCFromCreds(opts.rpcHost+":"+opts.rpcPort, opts.rpcLogin, opts.rpcPass)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
