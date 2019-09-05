@@ -152,7 +152,7 @@ func main() {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
-	rpcClient, err = frontend.NewZRPCFromCreds(opts.rpcHost+":"+opts.rpcPort, opts.rpcLogin, opts.rpcPass)
+	rpcClient, err := frontend.NewZRPCFromCreds(opts.rpcHost+":"+opts.rpcPort, opts.rpcLogin, opts.rpcPass)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
