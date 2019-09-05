@@ -157,7 +157,8 @@ func main() {
 				log.WithFields(logrus.Fields{
 					"timeouts":  timeout_count,
 				}).Warn("unable to issue RPC call to zcashd node 3 times")
-				break
+				timeout_count = 0
+				time.Sleep(3 * 60 * time.Second)
 			}
 		}
 		if block != nil {
