@@ -72,7 +72,7 @@ func main() {
 	logger.SetLevel(logrus.Level(opts.logLevel))
 
 	log = logger.WithFields(logrus.Fields{
-		"app": "lightwd",
+		"app": "lightwalletd",
 	})
 
 	// Initialize database
