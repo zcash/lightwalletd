@@ -29,7 +29,7 @@ func TestSendTransaction(t *testing.T) {
 	errParts := strings.SplitN(err.Error(), ":", 2)
 	errCode, err := strconv.ParseInt(errParts[0], 10, 64)
 	if err != nil {
-		t.Errorf("couldn't parse error code: %v", err)
+		t.Errorf("couldn't parse error code: %v, zcashd running?", err)
 	}
 	errMsg := strings.TrimSpace(errParts[1])
 

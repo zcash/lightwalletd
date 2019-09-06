@@ -16,6 +16,9 @@ func NewZRPCFromConf(confPath string) (*rpcclient.Client, error) {
 
 	rpcaddr := cfg.Section("").Key("rpcbind").String()
 	rpcport := cfg.Section("").Key("rpcport").String()
+	if rpcport == "" {
+		rpcport = "18232"
+	}
 	username := cfg.Section("").Key("rpcuser").String()
 	password := cfg.Section("").Key("rpcpassword").String()
 
