@@ -10,7 +10,7 @@
  #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline 
  # ************************************************************************/
  
-image: golang:1.11-alpine
+image:  golang:1.12-stretch
   
 stages:
   - build
@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk add make git gcc linux-headers musl-dev sqlite
+  - apt-get update
 
 # ************************************************************************/
 # BUILD
