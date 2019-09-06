@@ -67,17 +67,20 @@ build-linux:
 test-coverage:
   stage: test
   script:
-    - make coverage  
+    - make coverage
+  allow_failure: true  
 
 test-coverage-report:
   stage: test
   script:
     - make coverage_report
+  allow_failure: true
 
 test-coverage-report-html:
   stage: test
   script:
     - make coverage_html
+  allow_failure: true
 
 # ************************************************************************/
 # DEPLOY
