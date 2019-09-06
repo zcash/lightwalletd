@@ -66,7 +66,7 @@ dep:
 # Build binary
 build:
 	@go build -i -v ./cmd/ingest
-	@go build -i -v ./cmd/server
+#	@go build -i -v ./cmd/server
 
 # Install binaries into Go path
 install:
