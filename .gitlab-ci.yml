@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk add make git gcc
+  - apk add make git gcc libc6-dev
 
 # ************************************************************************/
 # BUILD
