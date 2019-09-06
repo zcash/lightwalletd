@@ -115,7 +115,7 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-  	}).Warn("unable to get current height from local db storage")	
+  		}).Warn("unable to get current height from local db storage")	
 	height = 0
 	}
 
@@ -125,7 +125,7 @@ func main() {
 		height = 280000
 		log.WithFields(logrus.Fields{
 			"error": err,
-  	}).Warn("invalid current height read from local db storage")
+  		}).Warn("invalid current height read from local db storage")
 	}
 	
 	timeout_count := 0
