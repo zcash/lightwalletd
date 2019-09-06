@@ -115,9 +115,10 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-  	}).Warn("unable to get current height from local db storage")
-		
+  	}).Warn("unable to get current height from local db storage")	
+	height = 0
 	}
+
 	
 	//ingest from Sapling testnet height
 	if height < 280000 {
