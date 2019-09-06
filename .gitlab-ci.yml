@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk add make git
+  - apk add make git gcc
 
 # ************************************************************************/
 # BUILD
