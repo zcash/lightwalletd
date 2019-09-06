@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk add make git gcc linux-headers  musl-dev
+  - apk add make git gcc linux-headers musl-dev sqlite
 
 # ************************************************************************/
 # BUILD
