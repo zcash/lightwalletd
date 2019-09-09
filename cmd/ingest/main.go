@@ -233,10 +233,12 @@ func handleBlock(db *sql.DB, block *parser.Block) {
 
 		deleteResult, deleteError := storage.DeleteBlock(db, nodeBlockHeight)
 
-		log.WithFields(logrus.Fields{
-			"result": deleteResult,
-			"error": deleteError,
-		}).Warn("reorg: cant delete block with the same height (local block hash is different)")
+		if deleteError != nil {
+			log.WithFields(logrus.Fields{
+				"result": deleteResult,
+				"error": deleteError,
+			}).Warn("reorg: cant delete block with the same height (local block hash is different)")
+		}
 	}
 
   prevBlockHash := hex.EncodeToString(block.GetPrevHash())
