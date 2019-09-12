@@ -17,8 +17,8 @@ import (
 	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/samosudov/lightwalletd/storage"
-	"github.com/samosudov/lightwalletd/walletrpc"
+	"github.com/zcash-hackworks/lightwalletd/storage"
+	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
 
 var (

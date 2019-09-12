@@ -1,4 +1,4 @@
-module github.com/samosudov/lightwalletd
+module github.com/zcash-hackworks/lightwalletd
 
 go 1.12
 
