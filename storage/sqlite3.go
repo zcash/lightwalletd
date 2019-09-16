@@ -28,6 +28,7 @@ func CreateTables(conn *sql.DB) error {
 	blockTable := `
 		CREATE TABLE IF NOT EXISTS blocks (
 			block_height INTEGER PRIMARY KEY,
+			prev_hash TEXT,
 			block_hash TEXT,
 			sapling BOOL,
 			compact_encoding BLOB
@@ -121,15 +122,15 @@ func GetBlockRange(ctx context.Context, db *sql.DB, blockOut chan<- []byte, errO
 	errOut <- nil
 }
 
-func StoreBlock(conn *sql.DB, height int, hash string, sapling bool, encoded []byte) error {
-	insertBlock := "REPLACE INTO blocks (block_height, block_hash, sapling, compact_encoding) values (?, ?, ?, ?)"
+func StoreBlock(conn *sql.DB, height int, prev_hash string, hash string, sapling bool, encoded []byte) error {
+	insertBlock := "REPLACE INTO blocks (block_height, prev_hash, block_hash, sapling, compact_encoding) values ( ?, ?, ?, ?, ?)"
 
 	tx, err := conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("creating db tx %d", height))
 	}
 
-	_, err = tx.Exec(insertBlock, height, hash, sapling, encoded)
+	_, err = tx.Exec(insertBlock, height, prev_hash, hash, sapling, encoded)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("storing compact block %d", height))
 	}
