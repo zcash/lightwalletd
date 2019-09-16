@@ -136,7 +136,7 @@ func main() {
 	for {
 		if reorg_count > 0 {
 			reorg_count = -1
-			height -= 10
+			height -= 11
 		}
 		block, err := getBlock(rpcClient, height)
 		
