@@ -18,6 +18,11 @@ stages:
   - deploy
   - monitor
 
+before_script:
+  - apk update && apk add make git gcc musl-dev
+  - export GO111MODULE=on
+  - export CGO_ENABLED=1
+
 # ************************************************************************/
 # BUILD
 # ************************************************************************/
