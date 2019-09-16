@@ -208,7 +208,7 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 	if err != nil{
 		return nil, errors.Wrap(err, "error reading JSON response")
 	}
-
+  
 	blockData, err := hex.DecodeString(blockDataHex)
 	if err != nil {
 		return nil, errors.Wrap(err, "error decoding getblock output")
