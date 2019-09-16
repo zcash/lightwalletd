@@ -35,7 +35,7 @@ A **compact block** is a collection of compact transactions along with certain m
 
 The ingester is the component responsible for transforming raw Zcash block data into a compact block.
 
-The ingester is a modular component. Anything that can retrieve the necessary data and put it into storage can fulfill this role. Currently, the only ingester available subscribes to a 0MQ feed from zcashd and parses that raw block data. This approach has turned out to be fairly brittle - for instance, zcashd provides no way to resend a block that's been missed without a full resync. It's clear that the 0MQ publisher isn't meant for production use, and we're looking into improvements. Future versions could retrieve information via the zcashd RPC or download pre-parsed blocks from a cloud store.
+The ingester is a modular component. Anything that can retrieve the necessary data and put it into storage can fulfill this role. Currently, the only ingester available communicated to zcashd through RPCs and parses that raw block data. 
 
 **How do I run it?**
 
