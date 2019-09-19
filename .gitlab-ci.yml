@@ -40,6 +40,8 @@ build-linux:
   stage: build
   script:
     - make
+  only:
+    - merge_requests
 
 .build-windows:
   stage: build
