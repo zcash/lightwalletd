@@ -1,3 +1,6 @@
+
+[![pipeline status](https://gitlab.com/mdr0id/lightwalletd/badges/master/pipeline.svg)](https://gitlab.com/mdr0id/lightwalletd/commits/master)
+
 # Overview
 
 [lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
