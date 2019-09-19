@@ -152,7 +152,9 @@ func main() {
 	// gRPC initialization
 	var server *grpc.Server
 
-	if opts.tlsCertPath != "" && opts.tlsKeyPath != "" {
+    if opts.veryInsecure {
+        server = grpc.NewServer(LoggingInterceptor())
+    } else {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -162,11 +164,7 @@ func main() {
 			}).Fatal("couldn't load TLS credentials")
 		}
 		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
-	} else {
-		if (opts.veryInsecure) {
-			server = grpc.NewServer(LoggingInterceptor())
-		}
-	}
+    }
 
 	// Enable reflection for debugging
 	if opts.logLevel >= uint64(logrus.WarnLevel) {
