@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk update && apk add make git gcc musl-dev sqlite3
+  - apk update && apk add make git gcc musl-dev sqlite
 
 # ************************************************************************/
 # BUILD
