@@ -50,7 +50,7 @@ build-linux:
     - make
 
 # Build against latest Golang
-build-latest:
+.build-latest:
   stage: build
   image: golang:latest-alpine
   script:
