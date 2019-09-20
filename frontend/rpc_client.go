@@ -19,13 +19,9 @@ func NewZRPCFromConf(confPath string) (*rpcclient.Client, error) {
 	username := cfg.Section("").Key("rpcuser").String()
 	password := cfg.Section("").Key("rpcpassword").String()
 
-	return NewZRPCFromCreds(net.JoinHostPort(rpcaddr, rpcport), username, password)
-}
-
-func NewZRPCFromCreds(addr, username, password string) (*rpcclient.Client, error) {
 	// Connect to local Zcash RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
-		Host:         addr,
+		Host:         net.JoinHostPort(rpcaddr, rpcport),
 		User:         username,
 		Pass:         password,
 		HTTPPostMode: true, // Zcash only supports HTTP POST mode

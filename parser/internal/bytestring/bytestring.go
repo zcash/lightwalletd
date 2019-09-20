@@ -3,7 +3,6 @@
 package bytestring
 
 import (
-	"errors"
 	"io"
 )
 
@@ -45,9 +44,7 @@ func (s *String) Read(p []byte) (n int, err error) {
 	}
 
 	n = copy(p, *s)
-	if !s.Skip(n) {
-		return 0, errors.New("unexpected end of bytestring read")
-	}
+	s.Skip(n)
 	return n, nil
 }
 
@@ -58,7 +55,11 @@ func (s *String) Empty() bool {
 
 // Skip advances the string by n bytes and reports whether it was successful.
 func (s *String) Skip(n int) bool {
-	return s.read(n) != nil
+	if len(*s) < n {
+		return false
+	}
+	(*s) = (*s)[n:]
+	return true
 }
 
 // ReadByte reads a single byte into out and advances over it. It reports if
@@ -87,6 +88,7 @@ func (s *String) ReadBytes(out *[]byte, n int) bool {
 // encoding used for length-prefixing and count values. If the values fall
 // outside the expected canonical ranges, it returns false.
 func (s *String) ReadCompactSize(size *int) bool {
+	*size = 0
 	lenBytes := s.read(1)
 	if lenBytes == nil {
 		return false
@@ -106,8 +108,10 @@ func (s *String) ReadCompactSize(size *int) bool {
 		lenLen = 4
 		minSize = 0x10000
 	case lenByte == 255:
-		lenLen = 8
-		minSize = 0x100000000
+		// this case is not currently usable, beyond maxCompactSize;
+        // also, this is not possible if sizeof(int) is 4 bytes
+		//     lenLen = 8; minSize = 0x100000000
+		return false
 	}
 
 	if lenLen > 0 {
@@ -122,7 +126,6 @@ func (s *String) ReadCompactSize(size *int) bool {
 	if length > maxCompactSize || length < minSize {
 		return false
 	}
-
 	*size = int(length)
 	return true
 }
@@ -131,7 +134,7 @@ func (s *String) ReadCompactSize(size *int) bool {
 // length field into out. It reports whether the read was successful.
 func (s *String) ReadCompactLengthPrefixed(out *String) bool {
 	var length int
-	if ok := s.ReadCompactSize(&length); !ok {
+	if !s.ReadCompactSize(&length) {
 		return false
 	}
 
@@ -148,7 +151,7 @@ func (s *String) ReadCompactLengthPrefixed(out *String) bool {
 // signed, and advances over it. It reports whether the read was successful.
 func (s *String) ReadInt32(out *int32) bool {
 	var tmp uint32
-	if ok := s.ReadUint32(&tmp); !ok {
+	if !s.ReadUint32(&tmp) {
 		return false
 	}
 
@@ -160,7 +163,7 @@ func (s *String) ReadInt32(out *int32) bool {
 // signed, and advances over it. It reports whether the read was successful.
 func (s *String) ReadInt64(out *int64) bool {
 	var tmp uint64
-	if ok := s.ReadUint64(&tmp); !ok {
+	if !s.ReadUint64(&tmp) {
 		return false
 	}
 
@@ -175,7 +178,11 @@ func (s *String) ReadUint16(out *uint16) bool {
 	if v == nil {
 		return false
 	}
-	*out = uint16(v[0]) | uint16(v[1])<<8
+	*out = 0
+	for i := 1; i >= 0; i-- {
+		*out <<= 8
+		*out |= uint16(v[i])
+	}
 	return true
 }
 
@@ -186,7 +193,11 @@ func (s *String) ReadUint32(out *uint32) bool {
 	if v == nil {
 		return false
 	}
-	*out = uint32(v[0]) | uint32(v[1])<<8 | uint32(v[2])<<16 | uint32(v[3])<<24
+	*out = 0
+	for i := 3; i >= 0; i-- {
+		*out <<= 8
+		*out |= uint32(v[i])
+	}
 	return true
 }
 
@@ -197,8 +208,11 @@ func (s *String) ReadUint64(out *uint64) bool {
 	if v == nil {
 		return false
 	}
-	*out = uint64(v[0]) | uint64(v[1])<<8 | uint64(v[2])<<16 | uint64(v[3])<<24 |
-		uint64(v[4])<<32 | uint64(v[5])<<40 | uint64(v[6])<<48 | uint64(v[7])<<56
+	*out = 0
+	for i := 7; i >= 0; i-- {
+		*out <<= 8
+		*out |= uint64(v[i])
+	}
 	return true
 }
 
@@ -213,6 +227,7 @@ func (s *String) ReadUint64(out *uint64) bool {
 func (s *String) ReadScriptInt64(num *int64) bool {
 	// First byte is either an integer opcode, or the number of bytes in the
 	// number.
+	*num = 0
 	firstBytes := s.read(1)
 	if firstBytes == nil {
 		return false

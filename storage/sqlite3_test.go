@@ -21,6 +21,7 @@ import (
 type compactTest struct {
 	BlockHeight int    `json:"block"`
 	BlockHash   string `json:"hash"`
+	PrevHash    string `json:"prev"`
 	Full        string `json:"full"`
 	Compact     string `json:"compact"`
 }
@@ -66,7 +67,7 @@ func TestSqliteStorage(t *testing.T) {
 			protoBlock := block.ToCompact()
 			marshaled, _ := proto.Marshal(protoBlock)
 
-			err = StoreBlock(db, height, hash, hasSapling, marshaled)
+			err = StoreBlock(db, height, test.PrevHash, hash, hasSapling, marshaled)
 			if err != nil {
 				t.Error(err)
 				continue
