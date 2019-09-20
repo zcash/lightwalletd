@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk update && apk add make git gcc musl-dev sqlite
+  - apk update && apk add make git gcc musl-dev
 
 # ************************************************************************/
 # BUILD
@@ -78,6 +78,7 @@ test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
+  allow_failure: true
   artifacts:
     paths:
     - ./coverage.html
