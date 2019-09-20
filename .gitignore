@@ -4,3 +4,4 @@
 *.sqlite
 *.pem
 *.key
+*.elf
