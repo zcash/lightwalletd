@@ -6,15 +6,13 @@
  #  Usage: make <target_name>
  #
  #  Known bugs/missing features:
+ #  1. make msan is not stable as of 9/20/2019
  #
  # ************************************************************************/
 PROJECT_NAME := "lightwalletd"
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v '*_test.go')
 GO_TEST_FILES := $(shell find . -name '*_test.go' -type f | rev | cut -d "/" -f2- | rev | sort -u)
 GO_BUILD_FILES := $(shell find . -name 'main.go')
-
-#PKG_LIST := $(shell go list | grep -v /vendor/)
-#GO_COV_REPORTS :=
 
 .PHONY: all dep build clean test coverage coverhtml lint
 
@@ -29,19 +27,19 @@ show_tests:
 
 # Run unittests
 test:
-	@go test -v -short ${GO_TEST_FILES}
+	@go test -v ./...
 
 # Run data race detector
-race: dep
-	@go test -v -race -short ${GO_TEST_FILES}
+race:
+	@go test -v -race -short ./...
 
 # Run memory sanitizer (need to ensure proper build flag is set)
-msan: dep
+msan:
 	@go test -v -msan -short ${GO_TEST_FILES}
 
 # Generate global code coverage report
 coverage:
-	@go test -coverprofile=coverage.out ${GO_TEST_FILES}
+	@go test -coverprofile=coverage.out ./...
 
 # Generate code coverage report
 coverage_report:
@@ -49,7 +47,7 @@ coverage_report:
 
 # Generate code coverage report in HTML
 coverage_html: 
-	@go tool cover -html=coverage.out
+	@go tool cover -html=coverage.out -o coverage.html
 
 # Generate documents
 docs:
@@ -65,8 +63,8 @@ dep:
 
 # Build binary
 build:
-	@go build -i -v ./cmd/ingest
-	@go build -i -v ./cmd/server
+	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/ingest
+	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
 
 # Install binaries into Go path
 install:

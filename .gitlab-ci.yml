@@ -20,8 +20,6 @@ stages:
 
 before_script:
   - apk update && apk add make git gcc musl-dev
-  - export GO111MODULE=on
-  - export CGO_ENABLED=1
 
 # ************************************************************************/
 # BUILD
@@ -40,9 +38,6 @@ build-linux:
   stage: build
   script:
     - make
-  only:
-    - merge_requests
-    - master
 
 .build-windows:
   stage: build
@@ -62,33 +57,31 @@ build-linux:
     - make
   allow_failure: true 
 
-# Likely don't need a nightly in always deployable model; will revisit after requirement gathering
-.build-nightly:
-  stage: build
-  script:
-    - make
-  allow_failure: true
-
 # ************************************************************************/
 # TEST
 # ************************************************************************/
+test-unittest:
+  stage: test
+  script:
+    - make test
+  allow_failure: true
+
+test-race-conditions:
+  stage: test
+  script:
+    - make race
+  allow_failure: true
+
 test-coverage:
   stage: test
   script:
     - make coverage
-  allow_failure: true  
-
-test-coverage-report:
-  stage: test
-  script:
     - make coverage_report
-  allow_failure: true
-
-test-coverage-report-html:
-  stage: test
-  script:
     - make coverage_html
   allow_failure: true
+  artifacts:
+    paths:
+    - ./coverage.html
 
 # ************************************************************************/
 # DEPLOY
