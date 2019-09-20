@@ -38,9 +38,6 @@ build-linux:
   stage: build
   script:
     - make
-  only:
-    - merge_requests
-    - master
 
 .build-windows:
   stage: build
