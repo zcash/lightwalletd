@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"time"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/btcsuite/btcd/rpcclient"
@@ -109,6 +111,18 @@ func main() {
 			}).Fatal("couldn't start rpc connection")
 		}
 	}
+
+	// Signal handler
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		s := <-signals
+		log.WithFields(logrus.Fields{
+			"signal": s.String(),
+		}).Info("caught signal, stopping gRPC ingester")
+		db.Close()
+		os.Exit(1)
+	}()
 
 	ctx := context.Background()
 	height, err := storage.GetCurrentHeight(ctx, db)
