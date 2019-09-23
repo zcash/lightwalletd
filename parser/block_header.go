@@ -66,9 +66,9 @@ func CompactLengthPrefixedLen(val []byte) int {
 	length := len(val)
 	if length < 253 {
 		return 1 + length
-	} else if length < 0xffff {
+	} else if length <= 0xffff {
 		return 1 + 2 + length
-	} else if length < 0xffff {
+	} else if length <= 0xffffffff {
 		return 1 + 4 + length
 	} else {
 		return 1 + 8 + length
@@ -80,11 +80,11 @@ func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) error {
 	if length < 253 {
 		binary.Write(buf, binary.LittleEndian, uint8(length))
 		binary.Write(buf, binary.LittleEndian, val)
-	} else if length < 0xffff {
+	} else if length <= 0xffff {
 		binary.Write(buf, binary.LittleEndian, byte(253))
 		binary.Write(buf, binary.LittleEndian, uint16(length))
 		binary.Write(buf, binary.LittleEndian, val)
-	} else if length < 0xffff {
+	} else if length <= 0xffffffff {
 		binary.Write(buf, binary.LittleEndian, byte(254))
 		binary.Write(buf, binary.LittleEndian, uint32(length))
 		binary.Write(buf, binary.LittleEndian, val)
