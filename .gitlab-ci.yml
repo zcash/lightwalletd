@@ -77,8 +77,8 @@ test:test-race-conditions:
   dependencies:
     - build:build-linux
   script:
-    - apk add clang-5.0
-    - export CC=clang-5.0
+    - apk add clang
+    - export CC=clang
     - make race
   allow_failure: true
 
