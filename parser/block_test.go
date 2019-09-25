@@ -42,6 +42,10 @@ func TestBlockParser(t *testing.T) {
 			t.Error("Read wrong version in a test block.")
 			break
 		}
+		if block.GetVersion() != 4 {
+			t.Error("Read wrong version in a test block.")
+			break
+		}
 
 		if block.GetTxCount() < 1 {
 			t.Error("No transactions in block")
@@ -90,6 +94,7 @@ func TestCompactBlocks(t *testing.T) {
 	type compactTest struct {
 		BlockHeight int    `json:"block"`
 		BlockHash   string `json:"hash"`
+		PrevHash    string `json:"prev"`
 		Full        string `json:"full"`
 		Compact     string `json:"compact"`
 	}

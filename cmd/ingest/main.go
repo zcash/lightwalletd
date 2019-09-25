@@ -98,16 +98,7 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-		}).Warn("zcash.conf failed, will try empty credentials for rpc")
-
-		//Default to testnet, but user MUST specify rpcuser and rpcpassword in zcash.conf; no default
-		rpcClient, err = frontend.NewZRPCFromCreds("127.0.0.1:18232", "", "")
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"error": err,
-			}).Fatal("couldn't start rpc connection")
-		}
+		}).Fatal("setting up RPC connection to zcashd")
 	}
 
 	ctx := context.Background()

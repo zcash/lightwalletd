@@ -179,15 +179,7 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-		}).Warn("zcash.conf failed, will try empty credentials for rpc")
-
-		rpcClient, err = frontend.NewZRPCFromCreds("127.0.0.1:8232", "", "")
-
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"error": err,
-			}).Warn("couldn't start rpc conn. won't be able to send transactions")
-		}
+		}).Fatal("setting up RPC connection to zcashd")
 	}
 
 	// Compact transaction service initialization
