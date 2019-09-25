@@ -39,7 +39,7 @@ build:build-linux:
   script:
     - make
   artifacts:
-    path:
+    paths:
     - ./server
     - ./ingest
 
