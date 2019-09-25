@@ -8,12 +8,12 @@ This document describes the standard workflows and terminology for developers at
 5. Discuss / Review PR
 6. Deploy / Merge PR
 
-Before continuing, please ensure you have an existing Github or Gitlab account. If not, visit [Github](https://github.com) or [Gitlab](https://gitlab.com) to create an account. 
+Before continuing, please ensure you have an existing GitHub or GitLab account. If not, visit [GitHub](https://github.com) or [GitLab](https://gitlab.com) to create an account. 
 
 ## Fork Repository
-This step assumes you are starting with a new Github/Gitlab environment. If you have already forked the Lightwalletd repository, please continue to [Create Branch] section. Otherwise, open up a terminal and issue the below commands:
+This step assumes you are starting with a new GitHub/GitLab environment. If you have already forked the Lightwalletd repository, please continue to [Create Branch] section. Otherwise, open up a terminal and issue the below commands:
 
-Note: Please replace `your_username`, with your actual Github username
+Note: Please replace `your_username`, with your actual GitHub username
 
 ```bash
 git clone git@github.com:your_username/lightwalletd.git
@@ -57,14 +57,14 @@ To create a new branch (assuming you are in `lightwalletd` directory):
 ```bash
 git checkout -b [new_branch_name]
 ```
-Note: Even though you have created a new branch, until you `git push` this local branch, it will not show up in your Lightwalletd fork on Github (e.g. https://github.com/your_username/lightwalletd)
+Note: Even though you have created a new branch, until you `git push` this local branch, it will not show up in your Lightwalletd fork on GitHub (e.g. https://github.com/your_username/lightwalletd)
 
 To checkout an existing branch (assuming you are in `lightwalletd` directory):
 
 ```bash
 git checkout [existing_branch_name]
 ```
-If you are fixing a bug or implementing a new feature, you likely will want to create a new branch. If you are reviewing code or working on exisiting branches, you likely will checkout an existing branch. To view the list of current Lightwalletd Github issues, click [here](https://github.com/zcash-hackworks/lightwalletd/issues). 
+If you are fixing a bug or implementing a new feature, you likely will want to create a new branch. If you are reviewing code or working on existing branches, you likely will checkout an existing branch. To view the list of current Lightwalletd GitHub issues, click [here](https://github.com/zcash-hackworks/lightwalletd/issues). 
 
 ## Make & Commit Changes
 If you have created a new branch or checked out an existing one, it is time to make changes to your local source code. Below are some formalities for commits:
@@ -73,7 +73,7 @@ If you have created a new branch or checked out an existing one, it is time to m
 2. Commit messages **MUST** be descriptive
 3. Commit messages **MUST** be clean (see squashing commits for details)
 
-While continuing to do developement on a branch, keep in mind that other approved commits are getting merged into `master`.  In order to ensure there are minimal to no merge conflicts, we need `rebase` with master.
+While continuing to do development on a branch, keep in mind that other approved commits are getting merged into `master`.  In order to ensure there are minimal to no merge conflicts, we need `rebase` with master.
 
 If you are new to this process, please sanity check your remotes:
 
@@ -100,14 +100,14 @@ This output should be consistent with your `.git/config`:
 	fetch = +refs/heads/*:refs/remotes/upstream/*
 	pushurl = DISABLED
 ```
-Once you have confirmed your branch/remote is valid, issue the following commands (assumes you have **NO** existing uncommited changes):
+Once you have confirmed your branch/remote is valid, issue the following commands (assumes you have **NO** existing uncommitted changes):
 
 ```bash
 git fetch upstream
 git rebase upstream/master
 git push -f
 ```
-If you have uncommited changes, use `git stash` to preserve them:
+If you have uncommitted changes, use `git stash` to preserve them:
 
 ```bash
 git stash
@@ -116,11 +116,11 @@ git rebase upstream/master
 git push -f
 git stash pop
 ```
-Using `git stash` allows you to temporarly store your changes while you rebase with `master`. Without this, you will rebase with master and loose your local changes.
+Using `git stash` allows you to temporarily store your changes while you rebase with `master`. Without this, you will rebase with master and lose your local changes.
 
-Before commiting changes, ensure your commit messages follow these guidelines:
+Before committing changes, ensure your commit messages follow these guidelines:
 
-1. Seperate subject from body with a blank line
+1. Separate subject from body with a blank line
 2. Limit the subject line to 50 characters
 3. Capitalize the subject line
 4. Do not end the subject line with a period
@@ -134,10 +134,10 @@ git add [files...] # default is all files, be careful not to add unintended file
 git commit -m 'Message describing commit'
 git push
 ```
-Now that all the files changed have been commited, let's continue to Create Pull Request section.
+Now that all the files changed have been committed, let's continue to Create Pull Request section.
 
 ## Create Pull Request
-On your Github page (e.g. https://github.com/your_username/lightwalletd), you will notice a newly created banner containing your recent commit with a big green `Compare & pull request`. Click on it.
+On your GitHub page (e.g. https://github.com/your_username/lightwalletd), you will notice a newly created banner containing your recent commit with a big green `Compare & pull request`. Click on it.
 
 First, write a brief summary comment for your PR -- this first comment should be no more than a few lines because it ends up in the merge commit message. This comment should mention the issue number preceded by a hash symbol (for example, #2984).
 
@@ -152,7 +152,7 @@ In order to merge your PR with `master`, you will need to convince the reviewers
 
 **IMPORTANT:** If your PR introduces code that does not have existing tests to ensure it operates gracefully, you **MUST** also create these tests to accompany your PR.
 
-Reviewers will investigate your PR and provide feedback. Generally the comments are explicity requesting code changes or clarifying implementations. Otherwise Reviewers will reply with PR terminology:
+Reviewers will investigate your PR and provide feedback. Generally the comments are explicitly requesting code changes or clarifying implementations. Otherwise Reviewers will reply with PR terminology:
 
 > **Concept ACK** - Agree with the idea and overall direction, but have neither reviewed nor tested the code changes.
 

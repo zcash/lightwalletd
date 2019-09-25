@@ -44,7 +44,7 @@ The ingester is a modular component. Anything that can retrieve the necessary da
 
 ⚠️ This section literally describes how to execute the binaries from source code. This is suitable only for testing, not production deployment. See section Production for cleaner instructions.
 
-⚠️ Bringing up a fresh compact block database can take serveral hours of uninterrupted runtime.
+⚠️ Bringing up a fresh compact block database can take several hours of uninterrupted runtime.
 
 First, install [Go >= 1.11](https://golang.org/dl/#stable). Older versions of Go may work but are not actively supported at this time. Note that the version of Go packaged by Debian stable (or anything prior to Buster) is far too old to work.
 
@@ -102,7 +102,7 @@ It's not necessary to explicitly run anything. Both the ingester and the fronten
 
 **What should I watch out for?**
 
-sqlite is extremely reliable for what it is, but it isn't good at high concurrency. Because sqlite uses a global write lock, the code limits the number of open database connections to *one* and currently makes no distinction betwen read-only (frontend) and read/write (ingester) connections. It will probably begin to exhibit lock contention at low user counts, and should be improved or replaced with your own data store in production.
+sqlite is extremely reliable for what it is, but it isn't good at high concurrency. Because sqlite uses a global write lock, the code limits the number of open database connections to *one* and currently makes no distinction between read-only (frontend) and read/write (ingester) connections. It will probably begin to exhibit lock contention at low user counts, and should be improved or replaced with your own data store in production.
 
 ## Production
 
@@ -150,5 +150,5 @@ lightwalletd currently lacks several things that you'll want in production. Cave
 - There are no monitoring / metrics endpoints yet. You're on your own to notice if it goes down or check on its performance.
 - Logging coverage is patchy and inconsistent. However, what exists emits structured JSON compatible with various collectors.
 - Logging may capture identifiable user data. It hasn't received any privacy analysis yet and makes no attempt at sanitization.
-- The only storage provider we've implemented is sqlite. sqlite is [likely not appropriate](https://sqlite.org/whentouse.html) for the number of concurrent requests we expect to handle. Because sqlite uses a global write lock, the code limits the number of open database connections to *one* and currently makes no distinction betwen read-only (frontend) and read/write (ingester) connections. It will probably begin to exhibit lock contention at low user counts, and should be improved or replaced with your own data store in production.
-- [Load-balancing with gRPC](https://grpc.io/blog/loadbalancing) may not work quite like you're used to. A full explanation is beyond the scope of this document, but we recommend looking into [Envoy](https://www.envoyproxy.io/), [nginx](https://nginx.com), or [haproxy](https://www.haproxy.org) depending on your existing infrastruture.
+- The only storage provider we've implemented is sqlite. sqlite is [likely not appropriate](https://sqlite.org/whentouse.html) for the number of concurrent requests we expect to handle. Because sqlite uses a global write lock, the code limits the number of open database connections to *one* and currently makes no distinction between read-only (frontend) and read/write (ingester) connections. It will probably begin to exhibit lock contention at low user counts, and should be improved or replaced with your own data store in production.
+- [Load-balancing with gRPC](https://grpc.io/blog/loadbalancing) may not work quite like you're used to. A full explanation is beyond the scope of this document, but we recommend looking into [Envoy](https://www.envoyproxy.io/), [nginx](https://nginx.com), or [haproxy](https://www.haproxy.org) depending on your existing infrastructure.

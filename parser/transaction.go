@@ -64,7 +64,7 @@ func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 
 // Txout format as described in https://en.bitcoin.it/wiki/Transaction
 type txOut struct {
-	// Non-negative int giving the number of Satoshis to be transferred
+	// Non-negative int giving the number of zatoshis to be transferred
 	Value uint64
 
 	// Script. CompactSize-prefixed.

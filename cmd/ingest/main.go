@@ -159,7 +159,7 @@ func main() {
 				timeout_count--
 			}
 			phash = hex.EncodeToString(block.GetPrevHash())
-			//check for reorgs once we have inital block hash from startup
+			//check for reorgs once we have initial block hash from startup
 			if hash != phash && reorg_count != -1 {
 				reorg_count++
 				log.WithFields(logrus.Fields{
