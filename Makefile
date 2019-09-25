@@ -31,7 +31,7 @@ test:
 
 # Run data race detector
 race:
-	@go test -v -race -short ./...
+	GO111MODULE=on CGO_ENABLED=1 go test -v -race -short ./...
 
 # Run memory sanitizer (need to ensure proper build flag is set)
 msan:
