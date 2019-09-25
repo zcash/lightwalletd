@@ -23,7 +23,7 @@ func NewZRPCFromConf(confPath string) (*rpcclient.Client, error) {
 }
 
 func NewZRPCFromCreds(addr, username, password string) (*rpcclient.Client, error) {
-	// Connect to local zcash RPC server using HTTP POST mode.
+	// Connect to local Zcash RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
 		Host:         addr,
 		User:         username,
