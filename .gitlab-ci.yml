@@ -34,10 +34,14 @@ before_script:
   script:
     - made docs
 
-build-linux:
+build:build-linux:
   stage: build
   script:
     - make
+  artifacts:
+    path:
+    - ./server
+    - ./ingest
 
 .build-windows:
   stage: build
@@ -60,20 +64,26 @@ build-linux:
 # ************************************************************************/
 # TEST
 # ************************************************************************/
-test-unittest:
+test:test-unittest:
   stage: test
+  dependencies:
+    - build:build-linux
   script:
     - make test
   allow_failure: true
 
-test-race-conditions:
+test:test-race-conditions:
   stage: test
+  dependencies:
+    - build:build-linux
   script:
     - make race
   allow_failure: true
 
-test-coverage:
+test:test-coverage:
   stage: test
+  dependencies:
+    - build:build-linux
   script:
     - make coverage
     - make coverage_report
