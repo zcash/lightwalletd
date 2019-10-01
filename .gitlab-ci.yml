@@ -72,7 +72,7 @@ test:test-unittest:
     - make test
   allow_failure: true
 
-test:test-race-conditions:
+.test:test-race-conditions:
   stage: test
   dependencies:
     - build:build-linux
