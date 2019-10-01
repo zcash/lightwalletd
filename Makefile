@@ -54,8 +54,36 @@ docs:
 	@echo "Generating docs..."
 
 # Generate docker image
-image:
-	@echo "Building lightwalletd image..."
+docker_img:
+	docker build -t zcash_lwd_base .
+
+# Run the above docker image in a container
+docker_img_run:
+	docker run -i --name zcashdlwd zcash_lwd_base
+
+# Execture a bash process on zcashdlwdcontainer
+docker_img_bash:
+	docker exec -it zcashdlwd bash
+
+# Start the zcashd process in the zcashdlwd container
+docker_img_run_zcashd:
+	docker exec -i zcashdlwd zcashd -printtoconsole
+
+# Stop the zcashd process in the zcashdlwd container
+docker_img_stop_zcashd:
+	docker exec -i zcashdlwd zcash-cli stop
+
+# Start the lightwalletd ingester in the zcashdlwd container 
+docker_img_run_lightwalletd_ingest:
+	docker exec -i zcashdlwd ingest --conf-file /root/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/ingest.log
+
+# Start the lightwalletd server in the zcashdlwd container
+docker_img_run_lightwalletd_insecure_server:
+	docker exec -i zcashdlwd server --very-insecure=true --conf-file /root/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/server.log --bind-addr 127.0.0.1:18232
+
+# Remove and delete ALL images and containers in Docker; assumes containers are stopped
+docker_remove_all:
+	docker system prune -f
 
 # Get dependencies
 dep:
