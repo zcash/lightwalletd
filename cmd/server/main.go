@@ -123,6 +123,9 @@ func main() {
 	}
 
 	for _, filename := range filesThatShouldExist {
+		if !fileExists(opts.logPath) {
+			os.OpenFile(opts.logPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)	
+		}
 		if (opts.veryInsecure && (filename == opts.tlsCertPath || filename == opts.tlsKeyPath)) {
 			continue
 		}
