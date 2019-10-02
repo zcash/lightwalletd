@@ -34,11 +34,10 @@
  #
  #  *** DO NOT USE IN PRODUCTION ***
  #  
- #  1. Create docker-compose with according .env scaffolding 
- #  2. Setup container volume for blocks dir; remove sync time
- #  3. Determine librustzcash bug that breaks zcashd alpine builds at runtime
- #  4. Once versioning is stable add config flags for images
- #  5. Add mainnet config once lightwalletd stack supports it 
+ #  - Create docker-compose with according .env scaffolding 
+ #  - Determine librustzcash bug that breaks zcashd alpine builds at runtime
+ #  - Once versioning is stable add config flags for images
+ #  - Add mainnet config once lightwalletd stack supports it 
  #
  # ************************************************************************/
 
@@ -98,3 +97,6 @@ RUN echo "testnet=1" >> ${ZCASH_CONF} && \
     echo "rpcport=18232" >> ${ZCASH_CONF} && \
     echo "rpcuser=lwd" >> ${ZCASH_CONF} && \
     echo "rpcpassword=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo ''`" >> ${ZCASH_CONF}
+ 
+VOLUME [/root/.zcash]
+VOLUME [/root/.zcash-params]
