@@ -22,6 +22,9 @@
  #  make docker_img_run_lightwalletd_ingest
  #  make docker_img_run_lightwalletd_insecure_server
  #  
+ #  If you need a random bash session in the container, use:
+ #  make docker_img_bash
+ #
  #  If you get kicked out of docker or it locks up...
  #  To restart, check to see what container you want to restart via docker ps -a
  #  Then, docker restart <container id>
