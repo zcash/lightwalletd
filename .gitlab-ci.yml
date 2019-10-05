@@ -70,9 +70,9 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  allow_failure: true
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+  allow_failure: true
 
 .test:test-race-conditions:
   stage: test
