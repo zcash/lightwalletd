@@ -38,6 +38,19 @@ build:build-linux:
   stage: build
   script:
     - make
+    - ls -l ./server
+    - ls -l ./ingest
+  artifacts:
+    paths:
+    - ./server
+    - ./ingest
+
+build:build-linux-release:
+  stage: build
+  script:
+    - make build_rel
+    - ls -l ./server
+    - ls -l ./ingest
   artifacts:
     paths:
     - ./server
