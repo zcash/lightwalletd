@@ -70,6 +70,8 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
+  after_script:
+    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
   allow_failure: true
 
 .test:test-race-conditions:
@@ -89,6 +91,8 @@ test:test-coverage:
     - make coverage_report
     - make coverage_html
   allow_failure: true
+  after_script:
+    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
   artifacts:
     paths:
     - ./coverage.html
