@@ -92,7 +92,7 @@ test:test-coverage:
     - make coverage_html
   allow_failure: true
   after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+    - bash <(curl -s https://codecov.io/bash) $CODECOV_TOKEN
   artifacts:
     paths:
     - ./coverage.html
