@@ -90,7 +90,7 @@ test:test-coverage:
     - make coverage_report
     - make coverage_html
   after_script:
-    - bash <(curl -s https://codecov.io/bash) --t "${CODECOV_TOKEN}"
+    - bash <(curl -s https://codecov.io/bash) --t $CODECOV_TOKEN
   artifacts:
     paths:
     - ./coverage.html
