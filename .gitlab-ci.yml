@@ -71,7 +71,7 @@ test:test-unittest:
   script:
     - make test
   after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+    - bash <(curl -s https://codecov.io/bash) -t "${CODECOV_TOKEN}"
 
 .test:test-race-conditions:
   stage: test
@@ -90,7 +90,7 @@ test:test-coverage:
     - make coverage_report
     - make coverage_html
   after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+    - bash <(curl -s https://codecov.io/bash) -t "${CODECOV_TOKEN}"
   artifacts:
     paths:
     - ./coverage.html
