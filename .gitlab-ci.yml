@@ -71,7 +71,7 @@ test:test-unittest:
   script:
     - make test
   after_script:
-    - bash <(curl -s https://codecov.io/bash)
+    - bash <(curl -s https://codecov.io/bash) -v
   allow_failure: true
 
 .test:test-race-conditions:
@@ -92,7 +92,7 @@ test:test-coverage:
     - make coverage_html
   allow_failure: true
   after_script:
-    - bash <(curl -s https://codecov.io/bash)
+    - bash <(curl -s https://codecov.io/bash) -v
   artifacts:
     paths:
     - ./coverage.html
