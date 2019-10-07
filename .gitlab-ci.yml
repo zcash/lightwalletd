@@ -72,7 +72,6 @@ test:test-unittest:
     - make test
   after_script:
     - bash <(curl -s https://codecov.io/bash) -v
-  allow_failure: true
 
 .test:test-race-conditions:
   stage: test
