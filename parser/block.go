@@ -44,13 +44,14 @@ func (b *Block) GetEncodableHash() []byte {
 }
 
 func (b *Block) GetDisplayPrevHash() []byte {
-	h := b.hdr.HashPrevBlock
+	rhash := make([]byte, len(b.hdr.HashPrevBlock))
+	copy(rhash, b.hdr.HashPrevBlock)
 	// Reverse byte order
-	for i := 0; i < len(h)/2; i++ {
-		j := len(h) - 1 - i
-		h[i], h[j] = h[j], h[i]
+	for i := 0; i < len(rhash)/2; i++ {
+		j := len(rhash) - 1 - i
+		rhash[i], rhash[j] = rhash[j], rhash[i]
 	}
-	return h
+	return rhash
 }
 
 func (b *Block) HasSaplingTransactions() bool {
