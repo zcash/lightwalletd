@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk update && apk add make git gcc musl-dev curl
+  - apk update && apk add make git gcc musl-dev curl bash
 
 # ************************************************************************/
 # BUILD
@@ -89,7 +89,6 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  allow_failure: true
   after_script:
     - bash <(curl -s https://codecov.io/bash) -v
   artifacts:
