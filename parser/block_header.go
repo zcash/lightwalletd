@@ -129,35 +129,35 @@ func (hdr *blockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 
 	// Primary parsing layer: sort the bytes into things
 
-	if ok := s.ReadInt32(&hdr.Version); !ok {
+	if !s.ReadInt32(&hdr.Version) {
 		return in, errors.New("could not read header version")
 	}
 
-	if ok := s.ReadBytes(&hdr.HashPrevBlock, 32); !ok {
+	if !s.ReadBytes(&hdr.HashPrevBlock, 32) {
 		return in, errors.New("could not read HashPrevBlock")
 	}
 
-	if ok := s.ReadBytes(&hdr.HashMerkleRoot, 32); !ok {
+	if !s.ReadBytes(&hdr.HashMerkleRoot, 32) {
 		return in, errors.New("could not read HashMerkleRoot")
 	}
 
-	if ok := s.ReadBytes(&hdr.HashFinalSaplingRoot, 32); !ok {
+	if !s.ReadBytes(&hdr.HashFinalSaplingRoot, 32) {
 		return in, errors.New("could not read HashFinalSaplingRoot")
 	}
 
-	if ok := s.ReadUint32(&hdr.Time); !ok {
+	if !s.ReadUint32(&hdr.Time) {
 		return in, errors.New("could not read timestamp")
 	}
 
-	if ok := s.ReadBytes(&hdr.NBitsBytes, 4); !ok {
+	if !s.ReadBytes(&hdr.NBitsBytes, 4) {
 		return in, errors.New("could not read NBits bytes")
 	}
 
-	if ok := s.ReadBytes(&hdr.Nonce, 32); !ok {
+	if !s.ReadBytes(&hdr.Nonce, 32) {
 		return in, errors.New("could not read Nonce bytes")
 	}
 
-	if ok := s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)); !ok {
+	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)) {
 		return in, errors.New("could not read CompactSize-prefixed Equihash solution")
 	}
 

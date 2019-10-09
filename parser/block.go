@@ -74,7 +74,7 @@ func (b *Block) GetHeight() int {
 	}
 	coinbaseScript := bytestring.String(b.vtx[0].transparentInputs[0].ScriptSig)
 	var heightNum int64
-	if ok := coinbaseScript.ReadScriptInt64(&heightNum); !ok {
+	if !coinbaseScript.ReadScriptInt64(&heightNum) {
 		return -1
 	}
 	if heightNum < 0 {
@@ -127,7 +127,7 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 
 	s := bytestring.String(data)
 	var txCount int
-	if ok := s.ReadCompactSize(&txCount); !ok {
+	if !s.ReadCompactSize(&txCount) {
 		return nil, errors.New("could not read tx_count")
 	}
 	data = []byte(s)
