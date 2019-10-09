@@ -195,21 +195,21 @@ func TestSproutTransactionParser(t *testing.T) {
 		}
 
 		// Transaction metadata
-		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+		if !subTestCommonBlockMeta(&tt, tx, t, i) {
 			continue
 		}
 
 		// Transparent inputs and outputs
-		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+		if !subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i) {
 			continue
 		}
 
-		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+		if !subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i) {
 			continue
 		}
 
 		// JoinSplits
-		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+		if !subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i) {
 			continue
 		}
 
@@ -706,20 +706,20 @@ func TestSaplingTransactionParser(t *testing.T) {
 		}
 
 		// Transaction metadata
-		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+		if !subTestCommonBlockMeta(&tt, tx, t, i) {
 			continue
 		}
 
 		// Transparent inputs and outputs
-		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+		if !subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i) {
 			continue
 		}
-		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+		if !subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i) {
 			continue
 		}
 
 		// JoinSplits
-		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+		if !subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i) {
 			continue
 		}
 
@@ -743,11 +743,11 @@ func TestSaplingTransactionParser(t *testing.T) {
 			continue
 		}
 
-		if ok := subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i); !ok {
+		if !subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i) {
 			continue
 		}
 
-		if ok := subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i); !ok {
+		if !subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i) {
 			continue
 		}
 
