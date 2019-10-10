@@ -5,3 +5,4 @@
 *.pem
 *.key
 *.elf
+coverage.*
