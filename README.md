@@ -16,25 +16,6 @@ A **compact transaction** is a representation of a Zcash Sapling transaction tha
 
 A **compact block** is a collection of compact transactions along with certain metadata (such as the block header) from their source block.
 
-# Architecture
-
-```
-+----------+
-|  zcashd  |                       +----------+    +-------+
-+----+-----+              +------->+ frontend +--->+       |
-     |                    |        +----------+    |  L    +<----Client
-     | raw blocks    +----+----+                   |  O B  |
-     v               |         |                   |  A A  |
-+----+-----+         |         |   +----------+    |  D L  +<---Client
-| ingester +-------->+ storage +-->+ frontend +--->+    A  |
-+----------+ compact |         |   +----------+    |    N  +<-------Client
-              blocks |         |                   |    C  |
-                     +----+----+                   |    E  +<----Client
-                          |        +----------+    |    R  |
-                          +------->+ frontend +--->+       +<------Client
-                                   +----------+    +-------+
-```
-
 ## Ingester
 
 The ingester is the component responsible for transforming raw Zcash block data into a compact block.
