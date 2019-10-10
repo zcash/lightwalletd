@@ -38,8 +38,8 @@ build:build-linux:
   stage: build
   script:
     - make
-  only:
-     - pushes
+  except:
+    - merge_requests
   artifacts:
     paths:
     - ./server
@@ -72,8 +72,8 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  only:
-    - pushes
+  except:
+    - merge_requests
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
@@ -93,8 +93,8 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  only:
-    - pushes
+  except:
+    - merge_requests
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
   artifacts:
