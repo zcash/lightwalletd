@@ -11,69 +11,33 @@
  # ************************************************************************/
  
 image: golang:1.11-alpine
-  
+
+cache:
+  paths:
+    - /apt-cache
+    - /go/src/github.com
+    - /go/src/golang.org
+    - /go/src/google.golang.org
+    - /go/src/gopkg.in
+
 stages:
-  - build
   - test
-  - deploy
-  - monitor
+  - build
 
 before_script:
   - apk update && apk add make git gcc musl-dev curl bash
-
-# ************************************************************************/
-# BUILD
-# ************************************************************************/
-.lint-check:
-  stage: build
-  script:
-    - make lint
-
-.build-docs:
-  stage: build
-  script:
-    - made docs
-
-build:build-linux:
-  stage: build
-  script:
-    - make
-  except:
-    - merge_requests
-  artifacts:
-    paths:
-    - ./server
-    - ./ingest
-
-.build-windows:
-  stage: build
-  script:
-    - make
-
-.build-mac:
-  stage: build
-  script:
-    - make
-
-# Build against latest Golang
-.build-latest:
-  stage: build
-  image: golang:latest-alpine
-  script:
-    - make
-  allow_failure: true 
+  - mkdir -p /go/src/gitlab.com/mdr0id/lightwalletd /go/src/_/builds
+  - cp -r $CI_PROJECT_DIR /go/src/gitlab.com/mdr0id/lightwalletd
+  - ln -s /go/src/gitlab.com/mdr0id/lightwalletd /go/src/_/builds/mdr0id/lightwalletd
+  - make dep
 
 # ************************************************************************/
 # TEST
 # ************************************************************************/
 test:test-unittest:
   stage: test
-  dependencies:
-    - build:build-linux
   script:
     - make test
-  except:
-    - merge_requests
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
@@ -87,12 +51,8 @@ test:test-unittest:
 
 test:test-coverage:
   stage: test
-  dependencies:
-    - build:build-linux
   script:
     - make coverage
-    - make coverage_report
-    - make coverage_html
   except:
     - merge_requests
   after_script:
@@ -126,3 +86,46 @@ test:test-coverage:
     - echo "Building docker image for v0.0.0"
     - make image
   when: manual
+
+
+
+# ************************************************************************/
+# BUILD
+# ************************************************************************/
+.lint-check:
+  stage: build
+  script:
+    - make lint
+
+.build-docs:
+  stage: build
+  script:
+    - made docs
+
+build:build-linux:
+  stage: build
+  script:
+    - make
+  artifacts:
+    paths:
+    - ./server
+    - ./ingest
+
+.build-windows:
+  stage: build
+  script:
+    - make
+
+.build-mac:
+  stage: build
+  script:
+    - make
+
+# Build against latest Golang
+.build-latest:
+  stage: build
+  image: golang:latest-alpine
+  script:
+    - make
+  allow_failure: true 
+
