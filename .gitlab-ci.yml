@@ -7,7 +7,8 @@
  #         
  #  Known bugs/missing features:
  #
- #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline 
+ #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline
+ # 
  # ************************************************************************/
  
 image: golang:1.11-alpine
@@ -38,8 +39,6 @@ build:build-linux:
   stage: build
   script:
     - make
-    - ls -l ./server
-    - ls -l ./ingest
   artifacts:
     paths:
     - ./server
@@ -49,12 +48,10 @@ build:build-linux-release:
   stage: build
   script:
     - make build_rel
-    - ls -l ./server
-    - ls -l ./ingest
   artifacts:
     paths:
-    - ./server
-    - ./ingest
+    - ./server-rel
+    - ./ingest-rel
 
 .build-windows:
   stage: build
@@ -97,6 +94,27 @@ test:test-coverage:
   stage: test
   dependencies:
     - build:build-linux
+  script:
+    - make coverage
+    - make coverage_report
+    - make coverage_html
+  allow_failure: true
+  artifacts:
+    paths:
+    - ./coverage.html
+
+test:test-rel-unittest:
+  stage: test
+  dependencies:
+    - build:build-linux-release
+  script:
+    - make test
+  allow_failure: true
+
+test:test-rel-coverage:
+  stage: test
+  dependencies:
+    - build:build-linux-release
   script:
     - make coverage
     - make coverage_report
