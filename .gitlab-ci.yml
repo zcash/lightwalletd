@@ -111,7 +111,7 @@ test:test-rel-unittest:
     - make test
   allow_failure: true
 
-  test:test-rel-coverage:
+test:test-rel-coverage:
   stage: test
   dependencies:
     - build:build-linux-release
