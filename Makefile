@@ -27,7 +27,7 @@ show_tests:
 
 # Run unittests
 test:
-	@go test -v -coverprofile=coverage.txt -covermode=atomic ./...
+	@go test -v ./...
 
 # Run data race detector
 race:
@@ -39,7 +39,7 @@ msan:
 
 # Generate global code coverage report
 coverage:
-	@go test -coverprofile=coverage.out -covermode=atomic ./...
+	@go test -coverprofile=coverage.out ./...
 
 # Generate code coverage report
 coverage_report:
@@ -93,6 +93,10 @@ dep:
 build:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/ingest
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
+
+build_rel:
+	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/ingest
+	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/server
 
 # Install binaries into Go path
 install:

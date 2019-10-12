@@ -7,7 +7,14 @@
  #         
  #  Known bugs/missing features:
  #
- #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline 
+ #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline
+ #
+ #  server 17994320
+ #  ingest 17173096
+ #
+ #  server rel 13003584
+ #  ingest rel 12392480
+ # 
  # ************************************************************************/
  
 image: golang:1.11-alpine
@@ -19,7 +26,7 @@ stages:
   - monitor
 
 before_script:
-  - apk update && apk add make git gcc musl-dev curl bash
+  - apk update && apk add make git gcc musl-dev
 
 # ************************************************************************/
 # BUILD
@@ -38,8 +45,19 @@ build:build-linux:
   stage: build
   script:
     - make
-  except:
-    - merge_requests
+    - ls -l ./server
+    - ls -l ./ingest
+  artifacts:
+    paths:
+    - ./server
+    - ./ingest
+
+build:build-linux-release:
+  stage: build
+  script:
+    - make build_rel
+    - ls -l ./server
+    - ls -l ./ingest
   artifacts:
     paths:
     - ./server
@@ -72,10 +90,7 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  except:
-    - merge_requests
-  after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+  allow_failure: true
 
 .test:test-race-conditions:
   stage: test
@@ -93,10 +108,7 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  except:
-    - merge_requests
-  after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+  allow_failure: true
   artifacts:
     paths:
     - ./coverage.html
