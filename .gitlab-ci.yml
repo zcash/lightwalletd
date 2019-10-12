@@ -35,7 +35,7 @@ before_script:
   script:
     - made docs
 
-build-linux:
+build:build-linux:
   stage: build
   script:
     - make
@@ -44,7 +44,7 @@ build-linux:
     - ./server
     - ./ingest
 
-build-linux-rel:
+build:build-linux-rel:
   stage: build
   script:
     - make build_rel
