@@ -95,8 +95,8 @@ build:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
 
 build_rel:
-	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/ingest
-	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/server
+	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -o ingest-rel -ldflags="-s -w" -i -v ./cmd/ingest
+	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -o server-rel -ldflags="-s -w" -i -v ./cmd/server
 
 # Install binaries into Go path
 install:
