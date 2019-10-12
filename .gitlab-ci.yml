@@ -35,7 +35,7 @@ before_script:
   script:
     - made docs
 
-build:build-linux:
+build-linux:
   stage: build
   script:
     - make
@@ -44,7 +44,7 @@ build:build-linux:
     - ./server
     - ./ingest
 
-build:build-linux-release:
+build-linux-release:
   stage: build
   script:
     - make build_rel
@@ -74,7 +74,7 @@ build:build-linux-release:
 # ************************************************************************/
 # TEST
 # ************************************************************************/
-test:test-unittest:
+test-unittest:
   stage: test
   dependencies:
     - build:build-linux
@@ -82,7 +82,7 @@ test:test-unittest:
     - make test
   allow_failure: true
 
-.test:test-race-conditions:
+.test-race-conditions:
   stage: test
   dependencies:
     - build:build-linux
@@ -90,7 +90,7 @@ test:test-unittest:
     - make race
   allow_failure: true
 
-test:test-coverage:
+test-coverage:
   stage: test
   dependencies:
     - build:build-linux
@@ -103,7 +103,7 @@ test:test-coverage:
     paths:
     - ./coverage.html
 
-test:test-rel-unittest:
+test-rel-unittest:
   stage: test
   dependencies:
     - build:build-linux-release
@@ -111,7 +111,7 @@ test:test-rel-unittest:
     - make test
   allow_failure: true
 
-test:test-rel-coverage:
+test-rel-coverage:
   stage: test
   dependencies:
     - build:build-linux-release
