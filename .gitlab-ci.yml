@@ -44,7 +44,7 @@ build-linux:
     - ./server
     - ./ingest
 
-build-linux-release:
+build-linux-rel:
   stage: build
   script:
     - make build_rel
@@ -106,7 +106,7 @@ test-coverage:
 test-rel-unittest:
   stage: test
   dependencies:
-    - build:build-linux-release
+    - build:build-linux-rel
   script:
     - make test
   allow_failure: true
@@ -114,7 +114,7 @@ test-rel-unittest:
 test-rel-coverage:
   stage: test
   dependencies:
-    - build:build-linux-release
+    - build:build-linux-rel
   script:
     - make coverage
     - make coverage_report
