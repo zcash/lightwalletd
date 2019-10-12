@@ -26,9 +26,6 @@ stages:
 
 before_script:
   - apk update && apk add make git gcc musl-dev curl bash
-  - mkdir -p /go/src/gitlab.com/mdr0id/lightwalletd /go/src/_/builds
-  - cp -r $CI_PROJECT_DIR /go/src/gitlab.com/mdr0id/lightwalletd
-  - ln -s /go/src/gitlab.com/mdr0id/lightwalletd /go/src/_/builds/mdr0id/lightwalletd
   - make dep
 
 # ************************************************************************/
