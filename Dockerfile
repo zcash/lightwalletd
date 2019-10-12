@@ -78,17 +78,27 @@ RUN /usr/bin/install -c /build/zcash/src/zcashd /build/zcash/src/zcash-cli /usr/
 
 # Create layer for lightwalletd and zcash binaries to reduce image size
 FROM golang:1.11 AS zcash_runner
-ENV ZCASH_CONF=/root/.zcash/zcash.conf
 
-RUN mkdir -p /root/.zcash/ && \
-    mkdir -p /root/.zcash-params/ && \
+ARG ZCASH_VERSION=2.0.7+3
+ARG ZCASHD_USER=zcash
+ARG ZCASHD_UID=1001
+ARG ZCASH_CONF=/home/$ZCASHD_USER/.zcash/zcash.conf
+
+RUN useradd -s /bin/bash -u $ZCASHD_UID $ZCASHD_USER
+
+RUN mkdir -p /home/$ZCASHD_USER/.zcash/ && \
+    mkdir -p /home/$ZCASHD_USER/.zcash-params/ && \
+    chown -R $ZCASHD_USER /home/$ZCASHD_USER/.zcash/ && \
     mkdir /logs/ && \
     mkdir /db/
+
+USER $ZCASHD_USER
+WORKDIR /home/$ZCASHD_USER/
 
 # Use lightwallet server and ingest binaries from prior layer
 COPY --from=lightwalletd_base /usr/bin/ingest /usr/bin/server /usr/bin/
 COPY --from=zcash_builder /usr/bin/zcashd /usr/bin/zcash-cli /usr/bin/
-COPY --from=zcash_builder /root/.zcash-params/ /root/.zcash-params/
+COPY --from=zcash_builder /root/.zcash-params/ /home/$ZCASHD_USER/.zcash-params/
 
 # Configure zcash.conf
 RUN echo "testnet=1" >> ${ZCASH_CONF} && \
@@ -98,5 +108,5 @@ RUN echo "testnet=1" >> ${ZCASH_CONF} && \
     echo "rpcuser=lwd" >> ${ZCASH_CONF} && \
     echo "rpcpassword=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo ''`" >> ${ZCASH_CONF}
  
-VOLUME [/root/.zcash]
-VOLUME [/root/.zcash-params]
+VOLUME [/home/$ZCASH_USER/.zcash]
+VOLUME [/home/$ZCASH_USER/.zcash-params]
