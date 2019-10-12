@@ -95,6 +95,7 @@ test-coverage:
   dependencies:
     - build:build-linux
   script:
+    - ll
     - make coverage
     - make coverage_report
     - make coverage_html
@@ -116,6 +117,7 @@ test-rel-coverage:
   dependencies:
     - build:build-linux-rel
   script:
+    - ll
     - make coverage
     - make coverage_report
     - make coverage_html
