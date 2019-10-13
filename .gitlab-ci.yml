@@ -38,8 +38,6 @@ build:build-linux:
   stage: build
   script:
     - make
-  except:
-    - merge_requests
   artifacts:
     paths:
     - ./server
