@@ -72,8 +72,6 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  except:
-    - merge_requests
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
@@ -93,10 +91,6 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  except:
-    - merge_requests
-  after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
   artifacts:
     paths:
     - ./coverage.html
