@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -45,6 +46,8 @@ func TestSqliteStorage(t *testing.T) {
 	}
 	defer db.Close()
 
+	ctx := context.Background()
+
 	// Fill tables
 	{
 		err = CreateTables(db)
@@ -72,6 +75,14 @@ func TestSqliteStorage(t *testing.T) {
 				t.Error(err)
 				continue
 			}
+			blockLookup, err := GetBlockByHash(ctx, db, hash)
+			if err != nil {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetBlockByHash block %d", test.BlockHeight)))
+				continue
+			}
+			if !bytes.Equal(blockLookup, marshaled) {
+				t.Errorf("GetBlockByHash unexpected result, block %d", test.BlockHeight)
+			}
 		}
 	}
 
@@ -88,8 +99,6 @@ func TestSqliteStorage(t *testing.T) {
 			t.Errorf("Wrong row count, want %d got %d", len(compactTests), count)
 		}
 	}
-
-	ctx := context.Background()
 
 	// Check height state is as expected
 	{
