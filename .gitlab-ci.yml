@@ -89,6 +89,8 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
+  only:
+    - external_pull_requests
   artifacts:
     paths:
     - ./coverage.html
