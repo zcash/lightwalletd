@@ -38,6 +38,8 @@ build:build-linux:
   stage: build
   script:
     - make
+  only:
+    - external_pull_requests
   artifacts:
     paths:
     - ./server
@@ -70,6 +72,8 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
+  only:
+    - external_pull_requests
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
