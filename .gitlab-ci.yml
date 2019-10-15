@@ -38,8 +38,6 @@ build:build-linux:
   stage: build
   script:
     - make
-  only:
-    - external_pull_requests
   artifacts:
     paths:
     - ./server
@@ -72,10 +70,6 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  only:
-    - external_pull_requests
-  after_script:
-    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
 .test:test-race-conditions:
   stage: test
@@ -93,8 +87,6 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  only:
-    - external_pull_requests
   artifacts:
     paths:
     - ./coverage.html
@@ -102,6 +94,18 @@ test:test-coverage:
 # ************************************************************************/
 # DEPLOY
 # ************************************************************************/
+deploy_staging:
+  stage: deploy
+  script:
+    - make
+    - make test
+  environment:
+    name: staging
+  only:
+    - master
+  after_script:
+    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+
 .release-candidate:
   stage: deploy
   script:
@@ -113,7 +117,6 @@ test:test-coverage:
   script:
     - echo "Generating v0.0.1"
   when: manual
-
 
 # ************************************************************************/
 # MONITOR
