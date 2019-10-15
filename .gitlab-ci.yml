@@ -39,7 +39,7 @@ build:build-linux:
   script:
     - make
   only:
-    - master
+    - development
   artifacts:
     paths:
     - ./server
@@ -73,7 +73,7 @@ test:test-unittest:
   script:
     - make test
   only:
-    - master
+    - development
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
@@ -94,7 +94,7 @@ test:test-coverage:
     - make coverage_report
     - make coverage_html
   only:
-    - master
+    - development
   artifacts:
     paths:
     - ./coverage.html
