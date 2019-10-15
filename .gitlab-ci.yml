@@ -38,8 +38,9 @@ build:build-linux:
   stage: build
   script:
     - make
-  only:
-    - development
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
+      when: always
   artifacts:
     paths:
     - ./server
@@ -72,8 +73,9 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  only:
-    - development
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
+      when: always
   after_script:
     - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
@@ -93,8 +95,9 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  only:
-    - development
+  rules:
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
+      when: always
   artifacts:
     paths:
     - ./coverage.html
