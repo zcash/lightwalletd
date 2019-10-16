@@ -760,6 +760,10 @@ func TestSaplingTransactionParser(t *testing.T) {
 		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
 			t.Errorf("Test %d: incorrect txid", i)
 		}
+		// test caching
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect cached txid", i)
+		}
 	}
 }
 
