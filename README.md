@@ -142,7 +142,7 @@ The first-order dependencies of this code are:
 
 **Containers**
 
-This software was designed to be container-friendly! We highly recommend that you package and deploy the software in this manner. We've created an example Docker environment that is likewise new and minimally tested, but it's functional. It lives at [zcash-hackworks/lightwalletd-z-cash](https://github.com/zcash-hackworks/lightwalletd-z-cash).
+This software was designed to be container-friendly! We highly recommend that you package and deploy the software in this manner. We've created an example Docker environment that is likewise new and minimally tested, but it's functional.
 
 **What's missing?**
 
