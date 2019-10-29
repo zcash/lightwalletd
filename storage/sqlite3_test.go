@@ -1,12 +1,14 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,6 +47,8 @@ func TestSqliteStorage(t *testing.T) {
 	}
 	defer db.Close()
 
+	ctx := context.Background()
+
 	// Fill tables
 	{
 		err = CreateTables(db)
@@ -72,6 +76,25 @@ func TestSqliteStorage(t *testing.T) {
 				t.Error(err)
 				continue
 			}
+			blockLookup, err := GetBlockByHash(ctx, db, hash)
+			if err != nil {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetBlockByHash block %d", test.BlockHeight)))
+				continue
+			}
+			if !bytes.Equal(blockLookup, marshaled) {
+				t.Errorf("GetBlockByHash unexpected result, block %d", test.BlockHeight)
+			}
+			// nonexistent hash
+			_, err = GetBlockByHash(ctx, db, "4ff234f7b51971cbeb7719a1c32d1c7e1ed92afafed266a7b1ae235717df0501")
+			if err == nil {
+				t.Fatal(errors.Wrap(err, fmt.Sprintf("GetBlockByHash unexpected success block %d", test.BlockHeight)))
+				continue
+			}
+			if !strings.Contains(err.Error(), "getting block with hash") ||
+				!strings.Contains(err.Error(), "no rows in result set") {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetBlockByHash wrong error block %d", test.BlockHeight)))
+				continue
+			}
 		}
 	}
 
@@ -88,8 +111,6 @@ func TestSqliteStorage(t *testing.T) {
 			t.Errorf("Wrong row count, want %d got %d", len(compactTests), count)
 		}
 	}
-
-	ctx := context.Background()
 
 	// Check height state is as expected
 	{
@@ -108,6 +129,15 @@ func TestSqliteStorage(t *testing.T) {
 		if err != nil {
 			t.Error(errors.Wrap(err, "retrieving stored block"))
 		}
+		_, err = GetBlock(ctx, db, blockHeight+1)
+		if err == nil {
+			t.Fatal(errors.Wrap(err, "GetBlock unexpected success"))
+		}
+		if !strings.Contains(err.Error(), "getting block with height") ||
+			!strings.Contains(err.Error(), "no rows in result set") {
+			t.Error(errors.Wrap(err, fmt.Sprintf("GetBlock wrong error string: %s", err.Error())))
+		}
+
 		cblock := &walletrpc.CompactBlock{}
 		err = proto.Unmarshal(storedBlock, cblock)
 		if err != nil {
@@ -196,6 +226,26 @@ func TestSqliteStorage(t *testing.T) {
 		if count > 0 {
 			t.Errorf("got some blocks that shouldn't be there")
 		}
+
+		// Test requesting range that's too large
+		count = 0
+		go GetBlockRange(timeout, db, blockOut, errOut, 279465, 289465)
+	recvLoop4:
+		for {
+			select {
+			case <-blockOut:
+				count++
+			case err := <-errOut:
+				if err != ErrLotsOfBlocks {
+					t.Error(errors.Wrap(err, "in too-large blockrange"))
+				}
+				break recvLoop4
+			}
+		}
+
+		if count > 0 {
+			t.Errorf("got some blocks that shouldn't be there")
+		}
 	}
 
 	// Transaction storage
@@ -230,7 +280,69 @@ func TestSqliteStorage(t *testing.T) {
 		if len(storedBytes) != len(tx.Bytes()) {
 			t.Errorf("Wrong tx size, want %d got %d", len(tx.Bytes()), storedBytes)
 		}
-
+		{
+			r, err := GetTxByHash(ctx, db, txHash)
+			if err != nil || !bytes.Equal(r, tx.Bytes()) {
+				t.Error("GetTxByHash() incorrect return")
+			}
+			// nonexistent tx hash
+			_, err = GetTxByHash(ctx, db, "42")
+			if err == nil {
+				t.Fatal(errors.Wrap(err, "GetTxByHash unexpected success"))
+			}
+			if !strings.Contains(err.Error(), "getting tx with hash") ||
+				!strings.Contains(err.Error(), "no rows in result set") {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetTxByHash wrong error string: %s", err.Error())))
+			}
+		}
+		{
+			r, err := GetTxByHeightAndIndex(ctx, db, block.GetHeight(), 0)
+			if err != nil || !bytes.Equal(r, tx.Bytes()) {
+				t.Error("GetTxByHeightAndIndex() incorrect return")
+			}
+			// nonexistent height
+			_, err = GetTxByHeightAndIndex(ctx, db, 47, 0)
+			if err == nil {
+				t.Fatal(errors.Wrap(err, "GetTxByHeightAndIndex unexpected success"))
+			}
+			if !strings.Contains(err.Error(), "getting tx (") ||
+				!strings.Contains(err.Error(), "no rows in result set") {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetTxByHeightAndIndex wrong error string: %s", err.Error())))
+			}
+			// nonexistent index
+			_, err = GetTxByHeightAndIndex(ctx, db, block.GetHeight(), 1)
+			if err == nil {
+				t.Fatal(errors.Wrap(err, "GetTxByHeightAndIndex unexpected success"))
+			}
+			if !strings.Contains(err.Error(), "getting tx (") ||
+				!strings.Contains(err.Error(), "no rows in result set") {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetTxByHeightAndIndex wrong error string: %s", err.Error())))
+			}
+		}
+		{
+			r, err := GetTxByHashAndIndex(ctx, db, blockHash, 0)
+			if err != nil || !bytes.Equal(r, tx.Bytes()) {
+				t.Error("GetTxByHashAndIndex() incorrect return")
+			}
+			// nonexistent block hash
+			_, err = GetTxByHashAndIndex(ctx, db, "43", 0)
+			if err == nil {
+				t.Fatal(errors.Wrap(err, "GetTxByHashAndIndex unexpected success"))
+			}
+			if !strings.Contains(err.Error(), "getting tx (") ||
+				!strings.Contains(err.Error(), "no rows in result set") {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetTxByHashAndIndex wrong error string: %s", err.Error())))
+			}
+			// nonexistent index
+			_, err = GetTxByHashAndIndex(ctx, db, blockHash, 1)
+			if err == nil {
+				t.Fatal(errors.Wrap(err, "GetTxByHashAndIndex unexpected success"))
+			}
+			if !strings.Contains(err.Error(), "getting tx (") ||
+				!strings.Contains(err.Error(), "no rows in result set") {
+				t.Error(errors.Wrap(err, fmt.Sprintf("GetTxByHashAndIndex wrong error string: %s", err.Error())))
+			}
+		}
 	}
 
 }
