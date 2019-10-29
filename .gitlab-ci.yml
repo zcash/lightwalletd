@@ -70,6 +70,8 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
+  after_script:
+    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
 .test:test-race-conditions:
   stage: test
@@ -79,7 +81,7 @@ test:test-unittest:
     - make race
   allow_failure: true
 
-test:test-coverage:
+.test:test-coverage:
   stage: test
   dependencies:
     - build:build-linux
@@ -94,7 +96,7 @@ test:test-coverage:
 # ************************************************************************/
 # DEPLOY
 # ************************************************************************/
-deploy_staging:
+.deploy_staging:
   stage: deploy
   script:
     - make
