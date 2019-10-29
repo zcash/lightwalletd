@@ -6,7 +6,6 @@
  #  Usage: Commit source and the pipeline will trigger the according jobs.
  #         
  #  Known bugs/missing features:
- #
  #  IMPORTANT NOTE: any job with preceeding '.'' is ignored in pipeline 
  # ************************************************************************/
  
