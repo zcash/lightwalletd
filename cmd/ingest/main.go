@@ -8,13 +8,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 	"strconv"
 	"strings"
+	"time"
 
-	"github.com/pkg/errors"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/golang/protobuf/proto"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/zcash-hackworks/lightwalletd/frontend"
@@ -27,9 +27,9 @@ var logger = logrus.New()
 var db *sql.DB
 
 type Options struct {
-	dbPath   string
-	logLevel uint64
-	logPath  string
+	dbPath        string
+	logLevel      uint64
+	logPath       string
 	zcashConfPath string
 }
 
@@ -106,19 +106,18 @@ func main() {
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"error": err,
-  		}).Warn("unable to get current height from local db storage")	
-	height = 0
+		}).Warn("unable to get current height from local db storage")
+		height = 0
 	}
 
-	
 	//ingest from Sapling testnet height
 	if height < 280000 {
 		height = 280000
 		log.WithFields(logrus.Fields{
 			"error": err,
-  		}).Warn("invalid current height read from local db storage")
+		}).Warn("invalid current height read from local db storage")
 	}
-	
+
 	timeout_count := 0
 	reorg_count := -1
 	hash := ""
@@ -130,7 +129,7 @@ func main() {
 			height -= 11
 		}
 		block, err := getBlock(rpcClient, height)
-		
+
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"height": height,
@@ -139,7 +138,7 @@ func main() {
 			timeout_count++
 			if timeout_count == 3 {
 				log.WithFields(logrus.Fields{
-					"timeouts":  timeout_count,
+					"timeouts": timeout_count,
 				}).Warn("unable to issue RPC call to zcashd node 3 times")
 				break
 			}
@@ -155,17 +154,17 @@ func main() {
 				reorg_count++
 				log.WithFields(logrus.Fields{
 					"height": height,
-					"hash":  hash,
-					"phash": phash,
-					"reorg": reorg_count,
+					"hash":   hash,
+					"phash":  phash,
+					"reorg":  reorg_count,
 				}).Warn("REORG")
 			} else {
-			  hash = hex.EncodeToString(block.GetDisplayHash())
+				hash = hex.EncodeToString(block.GetDisplayHash())
 			}
 			if reorg_count == -1 {
 				hash = hex.EncodeToString(block.GetDisplayHash())
-				reorg_count =0
-			}	
+				reorg_count = 0
+			}
 			height++
 		} else {
 			//TODO implement blocknotify to minimize polling on corner cases
@@ -196,10 +195,10 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 
 	var blockDataHex string
 	err = json.Unmarshal(result, &blockDataHex)
-	if err != nil{
+	if err != nil {
 		return nil, errors.Wrap(err, "error reading JSON response")
 	}
-  
+
 	blockData, err := hex.DecodeString(blockDataHex)
 	if err != nil {
 		return nil, errors.Wrap(err, "error decoding getblock output")
@@ -216,12 +215,11 @@ func getBlock(rpcClient *rpcclient.Client, height int) (*parser.Block, error) {
 	return block, nil
 }
 
-
 func handleBlock(db *sql.DB, block *parser.Block) {
 	prevBlockHash := hex.EncodeToString(block.GetPrevHash())
 	blockHash := hex.EncodeToString(block.GetEncodableHash())
 	marshaledBlock, _ := proto.Marshal(block.ToCompact())
-	
+
 	err := storage.StoreBlock(
 		db,
 		block.GetHeight(),
