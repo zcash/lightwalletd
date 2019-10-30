@@ -43,19 +43,19 @@ type txIn struct {
 func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if ok := s.ReadBytes(&tx.PrevTxHash, 32); !ok {
+	if !s.ReadBytes(&tx.PrevTxHash, 32) {
 		return nil, errors.New("could not read PrevTxHash")
 	}
 
-	if ok := s.ReadUint32(&tx.PrevTxOutIndex); !ok {
+	if !s.ReadUint32(&tx.PrevTxOutIndex) {
 		return nil, errors.New("could not read PrevTxOutIndex")
 	}
 
-	if ok := s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.ScriptSig)); !ok {
+	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.ScriptSig)) {
 		return nil, errors.New("could not read ScriptSig")
 	}
 
-	if ok := s.ReadUint32(&tx.SequenceNumber); !ok {
+	if !s.ReadUint32(&tx.SequenceNumber) {
 		return nil, errors.New("could not read SequenceNumber")
 	}
 
@@ -74,11 +74,11 @@ type txOut struct {
 func (tx *txOut) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if ok := s.ReadUint64(&tx.Value); !ok {
+	if !s.ReadUint64(&tx.Value) {
 		return nil, errors.New("could not read txOut value")
 	}
 
-	if ok := s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.Script)); !ok {
+	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.Script)) {
 		return nil, errors.New("could not read txOut script")
 	}
 
@@ -99,27 +99,27 @@ type spend struct {
 func (p *spend) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if ok := s.ReadBytes(&p.cv, 32); !ok {
+	if !s.ReadBytes(&p.cv, 32) {
 		return nil, errors.New("could not read cv")
 	}
 
-	if ok := s.ReadBytes(&p.anchor, 32); !ok {
+	if !s.ReadBytes(&p.anchor, 32) {
 		return nil, errors.New("could not read anchor")
 	}
 
-	if ok := s.ReadBytes(&p.nullifier, 32); !ok {
+	if !s.ReadBytes(&p.nullifier, 32) {
 		return nil, errors.New("could not read nullifier")
 	}
 
-	if ok := s.ReadBytes(&p.rk, 32); !ok {
+	if !s.ReadBytes(&p.rk, 32) {
 		return nil, errors.New("could not read rk")
 	}
 
-	if ok := s.ReadBytes(&p.zkproof, 192); !ok {
+	if !s.ReadBytes(&p.zkproof, 192) {
 		return nil, errors.New("could not read zkproof")
 	}
 
-	if ok := s.ReadBytes(&p.spendAuthSig, 64); !ok {
+	if !s.ReadBytes(&p.spendAuthSig, 64) {
 		return nil, errors.New("could not read spendAuthSig")
 	}
 
@@ -146,27 +146,27 @@ type output struct {
 func (p *output) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if ok := s.ReadBytes(&p.cv, 32); !ok {
+	if !s.ReadBytes(&p.cv, 32) {
 		return nil, errors.New("could not read cv")
 	}
 
-	if ok := s.ReadBytes(&p.cmu, 32); !ok {
+	if !s.ReadBytes(&p.cmu, 32) {
 		return nil, errors.New("could not read cmu")
 	}
 
-	if ok := s.ReadBytes(&p.ephemeralKey, 32); !ok {
+	if !s.ReadBytes(&p.ephemeralKey, 32) {
 		return nil, errors.New("could not read ephemeralKey")
 	}
 
-	if ok := s.ReadBytes(&p.encCiphertext, 580); !ok {
+	if !s.ReadBytes(&p.encCiphertext, 580) {
 		return nil, errors.New("could not read encCiphertext")
 	}
 
-	if ok := s.ReadBytes(&p.outCiphertext, 80); !ok {
+	if !s.ReadBytes(&p.outCiphertext, 80) {
 		return nil, errors.New("could not read outCiphertext")
 	}
 
-	if ok := s.ReadBytes(&p.zkproof, 192); !ok {
+	if !s.ReadBytes(&p.zkproof, 192) {
 		return nil, errors.New("could not read zkproof")
 	}
 
@@ -204,50 +204,50 @@ type joinSplit struct {
 func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if ok := s.ReadUint64(&p.vpubOld); !ok {
+	if !s.ReadUint64(&p.vpubOld) {
 		return nil, errors.New("could not read vpubOld")
 	}
 
-	if ok := s.ReadUint64(&p.vpubNew); !ok {
+	if !s.ReadUint64(&p.vpubNew) {
 		return nil, errors.New("could not read vpubNew")
 	}
 
-	if ok := s.ReadBytes(&p.anchor, 32); !ok {
+	if !s.ReadBytes(&p.anchor, 32) {
 		return nil, errors.New("could not read anchor")
 	}
 
 	for i := 0; i < 2; i++ {
-		if ok := s.ReadBytes(&p.nullifiers[i], 32); !ok {
+		if !s.ReadBytes(&p.nullifiers[i], 32) {
 			return nil, errors.New("could not read a nullifier")
 		}
 	}
 
 	for i := 0; i < 2; i++ {
-		if ok := s.ReadBytes(&p.commitments[i], 32); !ok {
+		if !s.ReadBytes(&p.commitments[i], 32) {
 			return nil, errors.New("could not read a commitment")
 		}
 	}
 
-	if ok := s.ReadBytes(&p.ephemeralKey, 32); !ok {
+	if !s.ReadBytes(&p.ephemeralKey, 32) {
 		return nil, errors.New("could not read ephemeralKey")
 	}
 
-	if ok := s.ReadBytes(&p.randomSeed, 32); !ok {
+	if !s.ReadBytes(&p.randomSeed, 32) {
 		return nil, errors.New("could not read randomSeed")
 	}
 
 	for i := 0; i < 2; i++ {
-		if ok := s.ReadBytes(&p.vmacs[i], 32); !ok {
+		if !s.ReadBytes(&p.vmacs[i], 32) {
 			return nil, errors.New("could not read a vmac")
 		}
 	}
 
 	if p.version == 2 || p.version == 3 {
-		if ok := s.ReadBytes(&p.proofPHGR13, 296); !ok {
+		if !s.ReadBytes(&p.proofPHGR13, 296) {
 			return nil, errors.New("could not read PHGR13 proof")
 		}
 	} else if p.version >= 4 {
-		if ok := s.ReadBytes(&p.proofGroth16, 192); !ok {
+		if !s.ReadBytes(&p.proofGroth16, 192) {
 			return nil, errors.New("could not read Groth16 proof")
 		}
 	} else {
@@ -255,7 +255,7 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 	}
 
 	for i := 0; i < 2; i++ {
-		if ok := s.ReadBytes(&p.encCiphertexts[i], 601); !ok {
+		if !s.ReadBytes(&p.encCiphertexts[i], 601) {
 			return nil, errors.New("could not read an encCiphertext")
 		}
 	}
@@ -328,7 +328,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	var err error
 
 	var header uint32
-	if ok := s.ReadUint32(&header); !ok {
+	if !s.ReadUint32(&header) {
 		return nil, errors.New("could not read header")
 	}
 
@@ -336,13 +336,13 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	tx.version = header & 0x7FFFFFFF
 
 	if tx.version >= 3 {
-		if ok := s.ReadUint32(&tx.nVersionGroupId); !ok {
+		if !s.ReadUint32(&tx.nVersionGroupId) {
 			return nil, errors.New("could not read nVersionGroupId")
 		}
 	}
 
 	var txInCount int
-	if ok := s.ReadCompactSize(&txInCount); !ok {
+	if !s.ReadCompactSize(&txInCount) {
 		return nil, errors.New("could not read tx_in_count")
 	}
 
@@ -363,7 +363,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	}
 
 	var txOutCount int
-	if ok := s.ReadCompactSize(&txOutCount); !ok {
+	if !s.ReadCompactSize(&txOutCount) {
 		return nil, errors.New("could not read tx_out_count")
 	}
 
@@ -379,12 +379,12 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 		}
 	}
 
-	if ok := s.ReadUint32(&tx.nLockTime); !ok {
+	if !s.ReadUint32(&tx.nLockTime) {
 		return nil, errors.New("could not read nLockTime")
 	}
 
 	if tx.fOverwintered {
-		if ok := s.ReadUint32(&tx.nExpiryHeight); !ok {
+		if !s.ReadUint32(&tx.nExpiryHeight) {
 			return nil, errors.New("could not read nExpiryHeight")
 		}
 	}
@@ -392,11 +392,11 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	var spendCount, outputCount int
 
 	if tx.version >= 4 {
-		if ok := s.ReadInt64(&tx.valueBalance); !ok {
+		if !s.ReadInt64(&tx.valueBalance) {
 			return nil, errors.New("could not read valueBalance")
 		}
 
-		if ok := s.ReadCompactSize(&spendCount); !ok {
+		if !s.ReadCompactSize(&spendCount) {
 			return nil, errors.New("could not read nShieldedSpend")
 		}
 
@@ -412,7 +412,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 			}
 		}
 
-		if ok := s.ReadCompactSize(&outputCount); !ok {
+		if !s.ReadCompactSize(&outputCount) {
 			return nil, errors.New("could not read nShieldedOutput")
 		}
 
@@ -431,7 +431,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 
 	if tx.version >= 2 {
 		var joinSplitCount int
-		if ok := s.ReadCompactSize(&joinSplitCount); !ok {
+		if !s.ReadCompactSize(&joinSplitCount) {
 			return nil, errors.New("could not read nJoinSplit")
 		}
 
@@ -446,18 +446,18 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 				tx.joinSplits[i] = js
 			}
 
-			if ok := s.ReadBytes(&tx.joinSplitPubKey, 32); !ok {
+			if !s.ReadBytes(&tx.joinSplitPubKey, 32) {
 				return nil, errors.New("could not read joinSplitPubKey")
 			}
 
-			if ok := s.ReadBytes(&tx.joinSplitSig, 64); !ok {
+			if !s.ReadBytes(&tx.joinSplitSig, 64) {
 				return nil, errors.New("could not read joinSplitSig")
 			}
 		}
 	}
 
 	if tx.version >= 4 && (spendCount+outputCount > 0) {
-		if ok := s.ReadBytes(&tx.bindingSig, 64); !ok {
+		if !s.ReadBytes(&tx.bindingSig, 64) {
 			return nil, errors.New("could not read bindingSig")
 		}
 	}
