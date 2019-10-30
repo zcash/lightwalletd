@@ -1,5 +1,3 @@
-#used to disable false alarm in codecov/patch github status check
-
 coverage:
   status:
     patch: off
