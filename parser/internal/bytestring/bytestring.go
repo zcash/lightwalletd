@@ -109,7 +109,7 @@ func (s *String) ReadCompactSize(size *int) bool {
 		minSize = 0x10000
 	case lenByte == 255:
 		// this case is not currently usable, beyond maxCompactSize;
-        // also, this is not possible if sizeof(int) is 4 bytes
+		// also, this is not possible if sizeof(int) is 4 bytes
 		//     lenLen = 8; minSize = 0x100000000
 		return false
 	}
