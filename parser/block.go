@@ -44,13 +44,14 @@ func (b *Block) GetEncodableHash() []byte {
 }
 
 func (b *Block) GetDisplayPrevHash() []byte {
-	h := b.hdr.HashPrevBlock
+	rhash := make([]byte, len(b.hdr.HashPrevBlock))
+	copy(rhash, b.hdr.HashPrevBlock)
 	// Reverse byte order
-	for i := 0; i < len(h)/2; i++ {
-		j := len(h) - 1 - i
-		h[i], h[j] = h[j], h[i]
+	for i := 0; i < len(rhash)/2; i++ {
+		j := len(rhash) - 1 - i
+		rhash[i], rhash[j] = rhash[j], rhash[i]
 	}
-	return h
+	return rhash
 }
 
 func (b *Block) HasSaplingTransactions() bool {
@@ -73,7 +74,7 @@ func (b *Block) GetHeight() int {
 	}
 	coinbaseScript := bytestring.String(b.vtx[0].transparentInputs[0].ScriptSig)
 	var heightNum int64
-	if ok := coinbaseScript.ReadScriptInt64(&heightNum); !ok {
+	if !coinbaseScript.ReadScriptInt64(&heightNum) {
 		return -1
 	}
 	if heightNum < 0 {
@@ -100,10 +101,10 @@ func (b *Block) GetPrevHash() []byte {
 func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	compactBlock := &walletrpc.CompactBlock{
 		//TODO ProtoVersion: 1,
-		Height: uint64(b.GetHeight()),
+		Height:   uint64(b.GetHeight()),
 		PrevHash: b.hdr.HashPrevBlock,
-		Hash:   b.GetEncodableHash(),
-		Time:   b.hdr.Time,
+		Hash:     b.GetEncodableHash(),
+		Time:     b.hdr.Time,
 	}
 
 	// Only Sapling transactions have a meaningful compact encoding
@@ -126,7 +127,7 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 
 	s := bytestring.String(data)
 	var txCount int
-	if ok := s.ReadCompactSize(&txCount); !ok {
+	if !s.ReadCompactSize(&txCount) {
 		return nil, errors.New("could not read tx_count")
 	}
 	data = []byte(s)

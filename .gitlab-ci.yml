@@ -19,7 +19,7 @@ stages:
   - monitor
 
 before_script:
-  - apk update && apk add make git gcc musl-dev
+  - apk update && apk add make git gcc musl-dev curl bash
 
 # ************************************************************************/
 # BUILD
@@ -70,9 +70,10 @@ test:test-unittest:
     - build:build-linux
   script:
     - make test
-  allow_failure: true
+  after_script:
+    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
 
-test:test-race-conditions:
+.test:test-race-conditions:
   stage: test
   dependencies:
     - build:build-linux
@@ -82,7 +83,7 @@ test:test-race-conditions:
     - make race
   allow_failure: true
 
-test:test-coverage:
+.test:test-coverage:
   stage: test
   dependencies:
     - build:build-linux
@@ -90,7 +91,6 @@ test:test-coverage:
     - make coverage
     - make coverage_report
     - make coverage_html
-  allow_failure: true
   artifacts:
     paths:
     - ./coverage.html
@@ -98,6 +98,18 @@ test:test-coverage:
 # ************************************************************************/
 # DEPLOY
 # ************************************************************************/
+.deploy_staging:
+  stage: deploy
+  script:
+    - make
+    - make test
+  environment:
+    name: staging
+  only:
+    - master
+  after_script:
+    - bash <(curl -s https://codecov.io/bash) -t $CODECOV_TOKEN
+
 .release-candidate:
   stage: deploy
   script:
@@ -109,7 +121,6 @@ test:test-coverage:
   script:
     - echo "Generating v0.0.1"
   when: manual
-
 
 # ************************************************************************/
 # MONITOR

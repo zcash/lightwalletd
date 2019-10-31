@@ -27,7 +27,7 @@ show_tests:
 
 # Run unittests
 test:
-	@go test -v ./...
+	@go test -v -coverprofile=coverage.txt -covermode=atomic ./...
 
 # Run data race detector
 race:
@@ -39,7 +39,7 @@ msan:
 
 # Generate global code coverage report
 coverage:
-	@go test -coverprofile=coverage.out ./...
+	@go test -coverprofile=coverage.out -covermode=atomic ./...
 
 # Generate code coverage report
 coverage_report:
@@ -54,8 +54,36 @@ docs:
 	@echo "Generating docs..."
 
 # Generate docker image
-image:
-	@echo "Building lightwalletd image..."
+docker_img:
+	docker build -t zcash_lwd_base .
+
+# Run the above docker image in a container
+docker_img_run:
+	docker run -i --name zcashdlwd zcash_lwd_base
+
+# Execture a bash process on zcashdlwdcontainer
+docker_img_bash:
+	docker exec -it zcashdlwd bash
+
+# Start the zcashd process in the zcashdlwd container
+docker_img_run_zcashd:
+	docker exec -i zcashdlwd zcashd -printtoconsole
+
+# Stop the zcashd process in the zcashdlwd container
+docker_img_stop_zcashd:
+	docker exec -i zcashdlwd zcash-cli stop
+
+# Start the lightwalletd ingester in the zcashdlwd container 
+docker_img_run_lightwalletd_ingest:
+	docker exec -i zcashdlwd ingest --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/ingest.log
+
+# Start the lightwalletd server in the zcashdlwd container
+docker_img_run_lightwalletd_insecure_server:
+	docker exec -i zcashdlwd server --very-insecure=true --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/server.log --bind-addr 127.0.0.1:18232
+
+# Remove and delete ALL images and containers in Docker; assumes containers are stopped
+docker_remove_all:
+	docker system prune -f
 
 # Get dependencies
 dep:
@@ -65,6 +93,10 @@ dep:
 build:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/ingest
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
+
+build_rel:
+	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/ingest
+	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/server
 
 # Install binaries into Go path
 install:

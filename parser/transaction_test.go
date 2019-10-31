@@ -48,10 +48,10 @@ type outputTestVector struct {
 
 type txTestVector struct {
 	// Sprout and Sapling
-	header, nVersionGroupId, nLockTime, nExpiryHeight string
-	vin, vout                                         [][]string
-	vJoinSplits                                       []joinSplitTestVector
-	joinSplitPubKey, joinSplitSig                     string
+	txid, header, nVersionGroupId, nLockTime, nExpiryHeight string
+	vin, vout                                               [][]string
+	vJoinSplits                                             []joinSplitTestVector
+	joinSplitPubKey, joinSplitSig                           string
 
 	// Sapling-only
 	valueBalance string // encoded int64
@@ -64,6 +64,7 @@ type txTestVector struct {
 var zip143tests = []txTestVector{
 	{
 		// Test vector 1
+		txid:            "f0b22277ac851b5f4df590fe6a128aad9d0ce8063235eb2b328c2dc6a23c1ec5",
 		header:          "03000080",
 		nVersionGroupId: "7082c403",
 		nLockTime:       "481cdd86",
@@ -77,6 +78,7 @@ var zip143tests = []txTestVector{
 	{
 		// Test vector 2
 		//raw: "we have some raw data for this tx, which this comment is too small to contain",
+		txid:            "39fe585a56b005f568c3171d22afa916e946e2a8aff5971d58ee8a6fc1482059",
 		header:          "03000080",
 		nVersionGroupId: "7082c403",
 		nLockTime:       "97b0e4e4",
@@ -193,21 +195,21 @@ func TestSproutTransactionParser(t *testing.T) {
 		}
 
 		// Transaction metadata
-		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+		if !subTestCommonBlockMeta(&tt, tx, t, i) {
 			continue
 		}
 
 		// Transparent inputs and outputs
-		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+		if !subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i) {
 			continue
 		}
 
-		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+		if !subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i) {
 			continue
 		}
 
 		// JoinSplits
-		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+		if !subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i) {
 			continue
 		}
 
@@ -221,6 +223,9 @@ func TestSproutTransactionParser(t *testing.T) {
 		if !bytes.Equal(testJSSig, tx.joinSplitSig) {
 			t.Errorf("Test %d: jsSig mismatch %x %x", i, testJSSig, tx.joinSplitSig)
 			continue
+		}
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect txid", i)
 		}
 	}
 }
@@ -507,6 +512,7 @@ func subTestTransparentOutputs(testOutputs [][]string, txOutputs []*txOut, t *te
 var zip243tests = []txTestVector{
 	// Test vector 1
 	{
+		txid:            "5fc4867a1b8bd5ab709799adf322a85d10607e053726d5f5ab4b1c9ab897e6bc",
 		header:          "04000080",
 		nVersionGroupId: "85202f89",
 		vin:             nil,
@@ -609,6 +615,7 @@ var zip243tests = []txTestVector{
 	},
 	// Test vector 2
 	{
+		txid:            "6732cf8d67aac5b82a2a0f0217a7d4aa245b2adb0b97fd2d923dfc674415e221",
 		header:          "04000080",
 		nVersionGroupId: "85202f89",
 		vin: [][]string{
@@ -699,20 +706,20 @@ func TestSaplingTransactionParser(t *testing.T) {
 		}
 
 		// Transaction metadata
-		if ok := subTestCommonBlockMeta(&tt, tx, t, i); !ok {
+		if !subTestCommonBlockMeta(&tt, tx, t, i) {
 			continue
 		}
 
 		// Transparent inputs and outputs
-		if ok := subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i); !ok {
+		if !subTestTransparentInputs(tt.vin, tx.transparentInputs, t, i) {
 			continue
 		}
-		if ok := subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i); !ok {
+		if !subTestTransparentOutputs(tt.vout, tx.transparentOutputs, t, i) {
 			continue
 		}
 
 		// JoinSplits
-		if ok := subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i); !ok {
+		if !subTestJoinSplits(tt.vJoinSplits, tx.joinSplits, t, i) {
 			continue
 		}
 
@@ -736,11 +743,11 @@ func TestSaplingTransactionParser(t *testing.T) {
 			continue
 		}
 
-		if ok := subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i); !ok {
+		if !subTestShieldedSpends(tt.spends, tx.shieldedSpends, t, i) {
 			continue
 		}
 
-		if ok := subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i); !ok {
+		if !subTestShieldedOutputs(tt.outputs, tx.shieldedOutputs, t, i) {
 			continue
 		}
 
@@ -748,6 +755,14 @@ func TestSaplingTransactionParser(t *testing.T) {
 		if !bytes.Equal(testBinding, tx.bindingSig) {
 			t.Errorf("Test %d: bindingSig %x %x", i, testBinding, tx.bindingSig)
 			continue
+		}
+
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect txid", i)
+		}
+		// test caching
+		if hex.EncodeToString(tx.GetDisplayHash()) != tt.txid {
+			t.Errorf("Test %d: incorrect cached txid", i)
 		}
 	}
 }

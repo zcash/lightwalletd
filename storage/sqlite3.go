@@ -69,7 +69,7 @@ func GetBlock(ctx context.Context, db *sql.DB, height int) ([]byte, error) {
 	query := "SELECT compact_encoding from blocks WHERE block_height = ?"
 	err := db.QueryRowContext(ctx, query, height).Scan(&blockBytes)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, fmt.Sprintf("getting block with height %d", height))
 	}
 	return blockBytes, err
 }

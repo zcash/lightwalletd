@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"os"
-	"fmt"
- 	"os/signal"
+	"os/signal"
 	"syscall"
 	"time"
 
@@ -30,7 +30,7 @@ func init() {
 		DisableLevelTruncation: true,
 	})
 
-	onexit := func () {
+	onexit := func() {
 		fmt.Printf("Lightwalletd died with a Fatal error. Check logfile for details.\n")
 	}
 
@@ -82,22 +82,22 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 }
 
 type Options struct {
-	bindAddr      string  `json:"bind_address,omitempty"`
-	dbPath        string  `json:"db_path"`
-	tlsCertPath   string  `json:"tls_cert_path,omitempty"`
-	tlsKeyPath    string  `json:"tls_cert_key,omitempty"`
-	logLevel      uint64  `json:"log_level,omitempty"`
-	logPath       string  `json:"log_file,omitempty"`
-	zcashConfPath string  `json:"zcash_conf,omitempty"`
-	veryInsecure  bool    `json:"very_insecure,omitempty"`
+	bindAddr      string `json:"bind_address,omitempty"`
+	dbPath        string `json:"db_path"`
+	tlsCertPath   string `json:"tls_cert_path,omitempty"`
+	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
+	logLevel      uint64 `json:"log_level,omitempty"`
+	logPath       string `json:"log_file,omitempty"`
+	zcashConfPath string `json:"zcash_conf,omitempty"`
+	veryInsecure  bool   `json:"very_insecure,omitempty"`
 }
 
 func fileExists(filename string) bool {
-    info, err := os.Stat(filename)
-    if os.IsNotExist(err) {
-        return false
-    }
-    return !info.IsDir()
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
 
 func main() {
@@ -114,7 +114,7 @@ func main() {
 	// TODO support config from file and env vars
 	flag.Parse()
 
-	filesThatShouldExist := []string {
+	filesThatShouldExist := []string{
 		opts.dbPath,
 		opts.tlsCertPath,
 		opts.tlsKeyPath,
@@ -123,7 +123,10 @@ func main() {
 	}
 
 	for _, filename := range filesThatShouldExist {
-		if (opts.veryInsecure && (filename == opts.tlsCertPath || filename == opts.tlsKeyPath)) {
+		if !fileExists(opts.logPath) {
+			os.OpenFile(opts.logPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+		}
+		if opts.veryInsecure && (filename == opts.tlsCertPath || filename == opts.tlsKeyPath) {
 			continue
 		}
 		if !fileExists(filename) {
@@ -152,9 +155,9 @@ func main() {
 	// gRPC initialization
 	var server *grpc.Server
 
-    if opts.veryInsecure {
-        server = grpc.NewServer(LoggingInterceptor())
-    } else {
+	if opts.veryInsecure {
+		server = grpc.NewServer(LoggingInterceptor())
+	} else {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
@@ -164,7 +167,7 @@ func main() {
 			}).Fatal("couldn't load TLS credentials")
 		}
 		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
-    }
+	}
 
 	// Enable reflection for debugging
 	if opts.logLevel >= uint64(logrus.WarnLevel) {
