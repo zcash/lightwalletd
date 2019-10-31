@@ -1,6 +1,6 @@
 
-[![pipeline status](https://gitlab.com/mdr0id/lightwalletd/badges/master/pipeline.svg)](https://gitlab.com/mdr0id/lightwalletd/commits/master)
-[![coverage report](https://gitlab.com/mdr0id/lightwalletd/badges/master/coverage.svg)](https://gitlab.com/mdr0id/lightwalletd/commits/master)
+[![pipeline status](https://gitlab.com/zcash/lightwalletd/badges/master/pipeline.svg)](https://gitlab.com/zcash/lightwalletd/commits/master)
+[![coverage report](https://gitlab.com/zcash/lightwalletd/badges/master/coverage.svg)](https://gitlab.com/zcash/lightwalletd/commits/master)
 
 # Overview
 
