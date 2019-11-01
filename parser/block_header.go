@@ -227,3 +227,14 @@ func (hdr *blockHeader) GetEncodableHash() []byte {
 
 	return digest[:]
 }
+
+func (hdr *blockHeader) GetDisplayPrevHash() []byte {
+	rhash := make([]byte, len(hdr.HashPrevBlock))
+	copy(rhash, hdr.HashPrevBlock)
+	// Reverse byte order
+	for i := 0; i < len(rhash)/2; i++ {
+		j := len(rhash) - 1 - i
+		rhash[i], rhash[j] = rhash[j], rhash[i]
+	}
+	return rhash
+}
