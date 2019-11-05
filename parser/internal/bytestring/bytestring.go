@@ -117,6 +117,9 @@ func (s *String) ReadCompactSize(size *int) bool {
 	if lenLen > 0 {
 		// expect little endian uint of varying size
 		lenBytes := s.read(lenLen)
+		if len(lenBytes) < lenLen {
+			return false
+		}
 		for i := lenLen - 1; i >= 0; i-- {
 			length <<= 8
 			length = length | uint64(lenBytes[i])
