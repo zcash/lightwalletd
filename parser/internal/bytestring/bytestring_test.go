@@ -193,13 +193,15 @@ var readCompactSizeTests = []struct {
 	/* 03 */ {String{253, 1, 0}, false, 0}, // 1 < minSize (253)
 	/* 04 */ {String{253, 252, 0}, false, 0}, // 252 < minSize (253)
 	/* 05 */ {String{253, 253, 0}, true, 253},
-	/* 06 */ {String{253, 255, 255}, true, 0xffff},
-	/* 07 */ {String{254, 0xff, 0xff, 0, 0}, false, 0}, // 0xffff < minSize
-	/* 08 */ {String{254, 0, 0, 1, 0}, true, 0x00010000},
-	/* 09 */ {String{254, 7, 0, 1, 0}, true, 0x00010007},
-	/* 10 */ {String{254, 0, 0, 0, 2}, true, 0x02000000},
+	/* 06 */ {String{253, 254, 0}, true, 254},
+	/* 07 */ {String{253, 254}, false, 0}, // insufficient length bytes
+	/* 08 */ {String{253, 255, 255}, true, 0xffff},
+	/* 09 */ {String{254, 0xff, 0xff, 0, 0}, false, 0}, // 0xffff < minSize
+	/* 10 */ {String{254, 0, 0, 1, 0}, true, 0x00010000},
+	/* 11 */ {String{254, 7, 0, 1, 0}, true, 0x00010007},
+	/* 12 */ {String{254, 0, 0, 0, 2}, true, 0x02000000},
 	/* 11 */ {String{254, 1, 0, 0, 2}, false, 0}, // > maxCompactSize
-	/* 12 */ {String{255, 0, 0, 0, 2, 0, 0, 0, 0}, false, 0},
+	/* 14 */ {String{255, 0, 0, 0, 2, 0, 0, 0, 0}, false, 0},
 }
 
 func TestString_ReadCompactSize(t *testing.T) {
@@ -207,10 +209,10 @@ func TestString_ReadCompactSize(t *testing.T) {
 		var expected int
 		ok := tt.s.ReadCompactSize(&expected)
 		if ok != tt.ok {
-			t.Fatalf("ReadCompactSize case %d: want: %v, have: %v", i, tt.ok, ok)
+			t.Errorf("ReadCompactSize case %d: want: %v, have: %v", i, tt.ok, ok)
 		}
 		if expected != tt.expected {
-			t.Fatalf("ReadCompactSize case %d: want: %v, have: %v", i, tt.expected, expected)
+			t.Errorf("ReadCompactSize case %d: want: %v, have: %v", i, tt.expected, expected)
 		}
 	}
 }
@@ -526,10 +528,10 @@ var readScriptInt64Tests = []struct {
 	/* 05 */ {String{0x5f}, true, 0x0f},
 	/* 06 */ {String{0x60}, true, 0x10},
 	/* 07 */ {String{0x01}, false, 0}, // should be one byte following count 0x01
-	/* 07 */ {String{0x01, 0xbd}, true, 0xbd},
-	/* 07 */ {String{0x02, 0xbd, 0xac}, true, 0xacbd},
-	/* 07 */ {String{0x08, 0xbd, 0xac, 0x12, 0x34, 0x56, 0x78, 0x9a, 0x44}, true, 0x449a78563412acbd},
-	/* 07 */ {String{0x08, 0xbd, 0xac, 0x12, 0x34, 0x56, 0x78, 0x9a, 0x94}, true, -7738740698046616387},
+	/* 08 */ {String{0x01, 0xbd}, true, 0xbd},
+	/* 09 */ {String{0x02, 0xbd, 0xac}, true, 0xacbd},
+	/* 10 */ {String{0x08, 0xbd, 0xac, 0x12, 0x34, 0x56, 0x78, 0x9a, 0x44}, true, 0x449a78563412acbd},
+	/* 11 */ {String{0x08, 0xbd, 0xac, 0x12, 0x34, 0x56, 0x78, 0x9a, 0x94}, true, -7738740698046616387},
 }
 
 func TestString_ReadScriptInt64(t *testing.T) {
@@ -537,14 +539,14 @@ func TestString_ReadScriptInt64(t *testing.T) {
 		var v int64
 		ok := tt.s.ReadScriptInt64(&v)
 		if ok != tt.ok {
-			t.Fatalf("ReadScriptInt64 case %d: want: %v, have: %v", i, tt.ok, ok)
+			t.Errorf("ReadScriptInt64 case %d: want: %v, have: %v", i, tt.ok, ok)
 		}
 		if v != tt.expected {
-			t.Fatalf("ReadScriptInt64 case %d: want: %v, have: %v", i, tt.expected, v)
+			t.Errorf("ReadScriptInt64 case %d: want: %v, have: %v", i, tt.expected, v)
 		}
 		// there should be no bytes remaining
 		if ok && len(tt.s) != 0 {
-			t.Fatalf("ReadScriptInt64 case %d: stream mispositioned", i)
+			t.Errorf("ReadScriptInt64 case %d: stream mispositioned", i)
 		}
 	}
 }

@@ -62,8 +62,7 @@ type blockHeader struct {
 	targetThreshold *big.Int
 }
 
-func CompactLengthPrefixedLen(val []byte) int {
-	length := len(val)
+func CompactLengthPrefixedLen(length int) int {
 	if length < 253 {
 		return 1 + length
 	} else if length <= 0xffff {
@@ -75,29 +74,28 @@ func CompactLengthPrefixedLen(val []byte) int {
 	}
 }
 
-func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) error {
-	length := len(val)
+func WriteCompactLengthPrefixedLen(buf *bytes.Buffer, length int) {
 	if length < 253 {
 		binary.Write(buf, binary.LittleEndian, uint8(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	} else if length <= 0xffff {
 		binary.Write(buf, binary.LittleEndian, byte(253))
 		binary.Write(buf, binary.LittleEndian, uint16(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	} else if length <= 0xffffffff {
 		binary.Write(buf, binary.LittleEndian, byte(254))
 		binary.Write(buf, binary.LittleEndian, uint32(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	} else {
 		binary.Write(buf, binary.LittleEndian, byte(255))
 		binary.Write(buf, binary.LittleEndian, uint64(length))
-		binary.Write(buf, binary.LittleEndian, val)
 	}
-	return nil
+}
+
+func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) {
+	WriteCompactLengthPrefixedLen(buf, len(val))
+	binary.Write(buf, binary.LittleEndian, val)
 }
 
 func (hdr *rawBlockHeader) GetSize() int {
-	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(hdr.Solution)
+	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(len(hdr.Solution))
 }
 
 func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
