@@ -131,5 +131,9 @@ func TestBlockHeader(t *testing.T) {
 				t.Errorf("Hash lacked leading zeros: %x", hash)
 			}
 		}
+		// XXX make this a comparison
+		if len(blockHeader.GetDisplayPrevHash()) != 32 {
+			t.Error("unexpected prevhash length")
+		}
 	}
 }
