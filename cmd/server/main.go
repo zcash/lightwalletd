@@ -90,6 +90,7 @@ type Options struct {
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
 	veryInsecure  bool   `json:"very_insecure,omitempty"`
+	wantVersion   bool
 }
 
 func fileExists(filename string) bool {
@@ -110,9 +111,15 @@ func main() {
 	flag.StringVar(&opts.logPath, "log-file", "./server.log", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "./zcash.conf", "conf file to pull RPC creds from")
 	flag.BoolVar(&opts.veryInsecure, "very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
+	flag.BoolVar(&opts.wantVersion, "version", false, "version (major.minor.patch)")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
+
+	if opts.wantVersion {
+		fmt.Println("lightwalletd ingest version v0.1.0")
+		return
+	}
 
 	filesThatShouldExist := []string{
 		opts.dbPath,
