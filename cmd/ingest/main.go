@@ -31,6 +31,7 @@ type Options struct {
 	logLevel      uint64
 	logPath       string
 	zcashConfPath string
+	wantVersion   bool
 }
 
 func main() {
@@ -39,10 +40,15 @@ func main() {
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "", "conf file to pull RPC creds from")
+	flag.BoolVar(&opts.wantVersion, "version", false, "version (major.minor.patch)")
 	// TODO prod metrics
 	// TODO support config from file and env vars
 	flag.Parse()
 
+	if opts.wantVersion {
+		fmt.Println("lightwalletd ingest version v0.1.0")
+		return
+	}
 	if opts.dbPath == "" {
 		flag.Usage()
 		os.Exit(1)
