@@ -41,7 +41,7 @@ build:build-ingester-linux:
   artifacts:
     paths:
     - ./ingest
-    - ./vendor
+    - $GOPATH/pkg/mod 
 
 build:build-server-linux:
   stage: build
@@ -50,7 +50,7 @@ build:build-server-linux:
   artifacts:
     paths:
     - ./server
-    - ./vendor
+    - $GOPATH/pkg/mod 
 
 .build-windows:
   stage: build
