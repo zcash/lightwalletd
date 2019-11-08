@@ -18,16 +18,6 @@ stages:
   - deploy
   - monitor
 
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  cache:
-    paths:
-    - /apt-cache
-    - /go/src/github.com
-    - /go/src/golang.org
-    - /go/src/google.golang.org
-    - /go/src/gopkg.in
-
 before_script:
   - apk update && apk add make git gcc musl-dev curl bash
 
