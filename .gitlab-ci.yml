@@ -43,7 +43,7 @@ build:build-ingester-linux:
     - ./ingest
 
 build:build-server-linux:
-  stage: build-ingester
+  stage: build-server
   script:
     - make build_server
   artifacts:
