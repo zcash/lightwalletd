@@ -51,6 +51,7 @@ build:build-ingester-linux:
   artifacts:
     paths:
     - ./ingest
+    - ./vendor
 
 build:build-server-linux:
   stage: build
@@ -59,6 +60,7 @@ build:build-server-linux:
   artifacts:
     paths:
     - ./server
+    - ./vendor
 
 .build-windows:
   stage: build

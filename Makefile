@@ -96,7 +96,7 @@ build_ingester:
 build_server:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
 
-build: build_ingest build_server
+build: build_ingester build_server
 
 build_rel:
 	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/ingest
