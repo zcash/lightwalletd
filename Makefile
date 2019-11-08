@@ -90,7 +90,7 @@ dep:
 	@go get -v -d ./...
 
 # Build binary
-build_ingest:
+build_ingester:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/ingest
 
 build_server:
