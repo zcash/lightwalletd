@@ -14,7 +14,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v '*_test.go'
 GO_TEST_FILES := $(shell find . -name '*_test.go' -type f | rev | cut -d "/" -f2- | rev | sort -u)
 GO_BUILD_FILES := $(shell find . -name 'main.go')
 
-.PHONY: all dep build clean test coverage coverhtml lint
+.PHONY: all dep build clean test coverage coverhtml lint build_ingest build_server
 
 all: build
 
@@ -90,9 +90,13 @@ dep:
 	@go get -v -d ./...
 
 # Build binary
-build:
+build_ingest:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/ingest
+
+build_server:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
+
+build: build_ingest build_server
 
 build_rel:
 	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/ingest

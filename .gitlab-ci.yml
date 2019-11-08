@@ -34,14 +34,21 @@ before_script:
   script:
     - made docs
 
-build:build-linux:
-  stage: build
+build:build-ingester-linux:
+  stage: build-ingester
   script:
-    - make
+    - make build_ingester
+  artifacts:
+    paths:
+    - ./ingest
+
+build:build-server-linux:
+  stage: build-ingester
+  script:
+    - make build_server
   artifacts:
     paths:
     - ./server
-    - ./ingest
 
 .build-windows:
   stage: build
@@ -67,7 +74,8 @@ build:build-linux:
 test:test-unittest:
   stage: test
   dependencies:
-    - build:build-linux
+    - build:build-ingester-linux
+    - build:build-server-linux
   script:
     - make test
   after_script:
