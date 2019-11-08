@@ -35,7 +35,7 @@ before_script:
     - made docs
 
 build:build-ingester-linux:
-  stage: build-ingester
+  stage: build
   script:
     - make build_ingester
   artifacts:
@@ -43,7 +43,7 @@ build:build-ingester-linux:
     - ./ingest
 
 build:build-server-linux:
-  stage: build-server
+  stage: build
   script:
     - make build_server
   artifacts:
