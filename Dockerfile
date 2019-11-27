@@ -10,7 +10,7 @@
  #  To run container: make docker_image_run
  #  
  #  This will place you into the container where you can run zcashd, zcash-cli, 
- #  lightwalletd ingester, and lightwalletd server etc..
+ #  lightwalletd server etc..
  #
  #  First you need to get zcashd sync to current height on testnet, from outside container:
  #  make docker_img_run_zcashd
@@ -18,8 +18,7 @@
  #  Sometimes you need to manually start zcashd for the first time, from insdie the container:
  #  zcashd -printtoconsole   
  #
- #  Once the block height is atleast 280,000 you can go ahead and start lightwalletd components
- #  make docker_img_run_lightwalletd_ingest
+ #  Once the block height is atleast 280,000 you can go ahead and start lightwalletd
  #  make docker_img_run_lightwalletd_insecure_server
  #  
  #  If you need a random bash session in the container, use:
@@ -57,7 +56,7 @@ RUN git clone ${LIGHTWALLETD_URL}
 #ADD . /home
 
 RUN cd ./lightwalletd && make
-RUN /usr/bin/install -c /home/lightwalletd/ingest /home/lightwalletd/server /usr/bin/
+RUN /usr/bin/install -c /home/lightwalletd/server /usr/bin/
 
 # Setup layer for zcashd and zcash-cli binary
 FROM golang:1.11 AS zcash_builder
@@ -95,8 +94,8 @@ RUN mkdir -p /home/$ZCASHD_USER/.zcash/ && \
 USER $ZCASHD_USER
 WORKDIR /home/$ZCASHD_USER/
 
-# Use lightwallet server and ingest binaries from prior layer
-COPY --from=lightwalletd_base /usr/bin/ingest /usr/bin/server /usr/bin/
+# Use lightwallet server binary from prior layer
+COPY --from=lightwalletd_base /usr/bin/server /usr/bin/
 COPY --from=zcash_builder /usr/bin/zcashd /usr/bin/zcash-cli /usr/bin/
 COPY --from=zcash_builder /root/.zcash-params/ /home/$ZCASHD_USER/.zcash-params/
 

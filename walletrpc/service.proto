@@ -27,9 +27,11 @@ message TxFilter {
      bytes hash = 3;
 }
 
-// RawTransaction contains the complete transaction data.
+// RawTransaction contains the complete transaction data. It also optionally includes 
+// the block height in which the transaction was included
 message RawTransaction {
     bytes data = 1;
+    uint64 height = 2;
 }
 
 message SendResponse {
@@ -52,12 +54,27 @@ message LightdInfo {
     uint64 blockHeight = 7;
 }
 
+message TransparentAddress {
+    string address = 1;
+}
+
+message TransparentAddressBlockFilter {
+    string address = 1;
+    BlockRange range = 2;
+}
+
 service CompactTxStreamer {
+    // Compact Blocks
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
     rpc GetBlock(BlockID) returns (CompactBlock) {}
     rpc GetBlockRange(BlockRange) returns (stream CompactBlock) {}
+
+    // Transactions
     rpc GetTransaction(TxFilter) returns (RawTransaction) {}
     rpc SendTransaction(RawTransaction) returns (SendResponse) {}
+
+    // t-Address support
+    rpc GetAddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
 
     // Misc
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}

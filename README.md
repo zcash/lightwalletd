@@ -6,7 +6,7 @@
 
 [lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
 
-lightwalletd consists of three loosely coupled components: an "ingester", a "frontend", and an arbitrary storage layer (such as a SQL database) that connects the two. The ingester receives raw block data, parses out the transactions and block metadata, then stores them in a format convenient for the frontend to serve to clients. Thus, these components can operate and scale independently of each other and are connected only by a shared storage convention.
+lightwalletd is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain for mobile and other wallets, such as [Zecwallet](https://github.com/adityapk00/zecwallet-lite-lib).
 
 Lightwalletd has not yet undergone audits or been subject to rigorous testing. It lacks some affordances necessary for production-level reliability. We do not recommend using it to handle customer funds at this time (October 2019).
 
@@ -18,24 +18,16 @@ To view detailed [Codecov](https://codecov.io/gh/zcash-hackworks/lightwalletd) r
 
 First, ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed. Once your go environment is setup correctly, you can build/run the below components.
 
-To build ingest and server, run `make`.
+To build the server, run `make`.
 
-This will build the ingest and server binaries, where you can use the below commands to configure how they run.
-
-## To run INGESTER
-
-Assuming you used `make` to build INGESTER
-
-```
-./ingest --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/ingest.log
-```
+This will build the server binary, where you can use the below commands to configure how it runs.
 
 ## To run SERVER
 
 Assuming you used `make` to build SERVER:
 
 ```
-./server --very-insecure=true --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/server.log --bind-addr 127.0.0.1:18232
+./server --no-tls-very-insecure=true --conf-file /home/zcash/.zcash/zcash.conf --log-file /logs/server.log --bind-addr 127.0.0.1:18232
 ```
 
 # Production Usage
@@ -66,20 +58,12 @@ certbot certonly --standalone --preferred-challenges http -d some.forward.dns.co
 ```
 5) Pass the resulting certificate and key to frontend using the -tls-cert and -tls-key options.
 
-## To run production INGESTER
-
-Example using ingest binary built from Makefile:
-
-```
-./ingest --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/ingest.log
-```
-
 ## To run production SERVER
 
 Example using server binary built from Makefile:
 
 ```
-./server --tls-cert cert.pem --tls-key key.pem --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/server.log --bind-addr 127.0.0.1:18232
+./server --tls-cert cert.pem --tls-key key.pem --conf-file /home/zcash/.zcash/zcash.conf --log-file /logs/server.log --bind-addr 127.0.0.1:18232
 ```
 
 # Pull Requests
