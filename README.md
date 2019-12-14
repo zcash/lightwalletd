@@ -11,7 +11,7 @@ lightwalletd consists of three loosely coupled components: an "ingester", a "fro
 Lightwalletd has not yet undergone audits or been subject to rigorous testing. It lacks some affordances necessary for production-level reliability. We do not recommend using it to handle customer funds at this time (October 2019).
 
 To view status of [CI pipeline](https://gitlab.com/mdr0id/lightwalletd/pipelines)
-
+RANDOM
 To view detailed [Codecov](https://codecov.io/gh/zcash-hackworks/lightwalletd) report
 
 # Local/Developer Usage
