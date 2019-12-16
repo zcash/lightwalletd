@@ -37,7 +37,7 @@ Assuming you used `make` to build SERVER:
 ```
 ./server --very-insecure=true --conf-file /home/zcash/.zcash/zcash.conf --db-path /db/sql.db --log-file /logs/server.log --bind-addr 127.0.0.1:18232
 ```
-
+hello
 # Production Usage
 
 Ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed.
