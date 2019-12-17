@@ -17,7 +17,7 @@ To view detailed [Codecov](https://codecov.io/gh/zcash-hackworks/lightwalletd) r
 # Local/Developer Usage
 
 First, ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed. Once your go environment is setup correctly, you can build/run the below components.
-
+wow
 To build ingest and server, run `make`.
 
 This will build the ingest and server binaries, where you can use the below commands to configure how they run.
