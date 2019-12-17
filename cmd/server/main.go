@@ -193,7 +193,7 @@ func main() {
 	}
 
 	// Compact transaction service initialization
-	service, err := frontend.NewSQLiteStreamer(opts.dbPath, rpcClient)
+	service, err := frontend.NewSQLiteStreamer(opts.dbPath, rpcClient, log)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"db_path": opts.dbPath,

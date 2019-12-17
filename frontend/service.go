@@ -17,6 +17,8 @@ import (
 	// blank import for sqlite driver support
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/sirupsen/logrus"
+	"github.com/zcash-hackworks/lightwalletd/common"
 	"github.com/zcash-hackworks/lightwalletd/storage"
 	"github.com/zcash-hackworks/lightwalletd/walletrpc"
 )
@@ -29,9 +31,10 @@ var (
 type SqlStreamer struct {
 	db     *sql.DB
 	client *rpcclient.Client
+	log    *logrus.Entry
 }
 
-func NewSQLiteStreamer(dbPath string, client *rpcclient.Client) (walletrpc.CompactTxStreamerServer, error) {
+func NewSQLiteStreamer(dbPath string, client *rpcclient.Client, log *logrus.Entry) (walletrpc.CompactTxStreamerServer, error) {
 	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?_busy_timeout=10000&cache=shared", dbPath))
 	db.SetMaxOpenConns(1)
 	if err != nil {
@@ -44,7 +47,7 @@ func NewSQLiteStreamer(dbPath string, client *rpcclient.Client) (walletrpc.Compa
 		return nil, err
 	}
 
-	return &SqlStreamer{db, client}, nil
+	return &SqlStreamer{db, client, log}, nil
 }
 
 func (s *SqlStreamer) GracefulStop() error {
@@ -151,6 +154,30 @@ func (s *SqlStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		return nil, err
 	}
 	return &walletrpc.RawTransaction{Data: txBytes}, nil
+}
+
+// GetLightdInfo gets the LightWalletD (this server) info
+func (s *SqlStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
+	saplingHeight, blockHeight, chainName, consensusBranchId, err := common.GetSaplingInfo(s.client)
+
+	if err != nil {
+		s.log.WithFields(logrus.Fields{
+			"error": err,
+		}).Warn("Unable to get sapling activation height")
+		return nil, err
+	}
+
+	// TODO these are called Error but they aren't at the moment.
+	// A success will return code 0 and message txhash.
+	return &walletrpc.LightdInfo{
+		Version:                 "0.2.0",
+		Vendor:                  "ECC LightWalletD",
+		TaddrSupport:            true,
+		ChainName:               chainName,
+		SaplingActivationHeight: uint64(saplingHeight),
+		ConsensusBranchId:       consensusBranchId,
+		BlockHeight:             uint64(blockHeight),
+	}, nil
 }
 
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
