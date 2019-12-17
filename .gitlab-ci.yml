@@ -41,7 +41,6 @@ build:build-linux:
   artifacts:
     paths:
     - ./server
-    - ./ingest
 
 .build-windows:
   stage: build
