@@ -40,10 +40,25 @@ message SendResponse {
 // Empty placeholder. Someday we may want to specify e.g. a particular chain fork.
 message ChainSpec {}
 
+message Empty {}
+
+message LightdInfo {
+    string version = 1;
+    string vendor = 2;
+    bool   taddrSupport = 3;
+    string chainName = 4;
+    uint64 saplingActivationHeight = 5;
+    string consensusBranchId = 6;   // This should really be u32 or []byte, but string for readability
+    uint64 blockHeight = 7;
+}
+
 service CompactTxStreamer {
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
     rpc GetBlock(BlockID) returns (CompactBlock) {}
     rpc GetBlockRange(BlockRange) returns (stream CompactBlock) {}
     rpc GetTransaction(TxFilter) returns (RawTransaction) {}
     rpc SendTransaction(RawTransaction) returns (SendResponse) {}
+
+    // Misc
+    rpc GetLightdInfo(Empty) returns (LightdInfo) {}
 }
