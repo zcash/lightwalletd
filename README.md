@@ -23,7 +23,7 @@ To build ingest and server, run `make`.
 This will build the ingest and server binaries, where you can use the below commands to configure how they run.
 
 ## To run INGESTER
-
+test
 Assuming you used `make` to build INGESTER
 
 ```
