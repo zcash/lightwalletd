@@ -5,7 +5,7 @@
 # Overview
 
 [lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
-
+rwerwerw
 lightwalletd consists of three loosely coupled components: an "ingester", a "frontend", and an arbitrary storage layer (such as a SQL database) that connects the two. The ingester receives raw block data, parses out the transactions and block metadata, then stores them in a format convenient for the frontend to serve to clients. Thus, these components can operate and scale independently of each other and are connected only by a shared storage convention.
 
 Lightwalletd has not yet undergone audits or been subject to rigorous testing. It lacks some affordances necessary for production-level reliability. We do not recommend using it to handle customer funds at this time (October 2019).
