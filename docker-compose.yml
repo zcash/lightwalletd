@@ -1,0 +1,80 @@
+---
+version: '2'
+
+services:
+  lightwalletd:
+    build: .
+    env_file:
+      - .env
+    #entrypoint: ["/bin/bash", "-c", "sleep infinity"]
+    command:
+      - -bind-addr=0.0.0.0:$LWD_PORT
+      - -cache-size=80000
+      - -conf-file=$ZCASHD_CONF_PATH
+      - -log-file=/dev/stdout
+      - -log-level=7
+      - -tls-cert=./cert.pem
+      - -tls-key=./cert.key
+    ports:
+      - "$LWD_PORT:$LWD_PORT"
+    volumes:
+      - ./docker/:/srv/lightwalletd
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
+
+  zcashd:
+    image: gcr.io/zcash-web/zcashd:latest
+    volumes:
+      - $ZCASHD_DATADIR:/srv/zcashd/.zcash
+      - $ZCASHD_PARMDIR:/srv/zcashd/.zcash-params
+    env_file:
+      - .env
+    mem_limit: 4G
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
+
+  grafana:
+    image: grafana/grafana:6.4.3
+    entrypoint:
+      - bash
+      - -c
+      - grafana-cli plugins install grafana-piechart-panel && /run.sh
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      - ./docker/grafana/provisioning/:/etc/grafana/provisioning/
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
+
+  prometheus:
+    image: prom/prometheus:v2.13.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/config.yml:/etc/prometheus/prometheus.yml
+      - promethus_data:/promethus_data
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
+
+  loki:
+    image: grafana/loki:master
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
+
+volumes:
+  promethus_data:
