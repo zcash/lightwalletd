@@ -37,6 +37,23 @@ services:
       options:
         loki-url: 'http://localhost:3100/api/prom/push'
 
+  zcashd_exporter:
+    image: gcr.io/zcash-web/zcashd_exporter
+    environment:
+      - ZCASHD_RPCUSER=$ZCASHD_RPCUSER
+      - ZCASHD_RPCPASSWORD=$ZCASHD_RPCPASSWORD
+    command:
+      - --rpc.host=zcashd
+      - --rpc.port=$ZCASHD_RPCPORT
+      - --rpc.user=$ZCASHD_RPCUSER
+      - --rpc.password=$ZCASHD_RPCPASSWORD
+    ports:
+      - "9101:9100"
+    logging:
+      driver: loki
+      options:
+        loki-url: 'http://localhost:3100/api/prom/push'
+
   grafana:
     image: grafana/grafana:6.4.3
     entrypoint:
