@@ -16,7 +16,7 @@ services:
       - -tls-cert=./cert.pem
       - -tls-key=./cert.key
     ports:
-      - "$LWD_PORT:$LWD_PORT"
+      - "127.0.0.1:$LWD_PORT:$LWD_PORT"
     volumes:
       - ./docker/:/srv/lightwalletd
     logging:
@@ -48,7 +48,7 @@ services:
       - --rpc.user=$ZCASHD_RPCUSER
       - --rpc.password=$ZCASHD_RPCPASSWORD
     ports:
-      - "9101:9100"
+      - "127.0.0.1:9100:9100"
     logging:
       driver: loki
       options:
@@ -61,7 +61,7 @@ services:
       - -c
       - grafana-cli plugins install grafana-piechart-panel && /run.sh
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     env_file:
       - .env
     volumes:
@@ -74,7 +74,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.13.1
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./docker/prometheus/config.yml:/etc/prometheus/prometheus.yml
       - promethus_data:/promethus_data
@@ -86,7 +86,7 @@ services:
   loki:
     image: grafana/loki:master
     ports:
-      - '3100:3100'
+      - "127.0.0.1:3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     logging:
       driver: loki
