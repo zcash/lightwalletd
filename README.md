@@ -14,6 +14,10 @@ To view status of [CI pipeline](https://gitlab.com/mdr0id/lightwalletd/pipelines
 
 To view detailed [Codecov](https://codecov.io/gh/zcash-hackworks/lightwalletd) report
 
+# Local/Developer docker-compose Usage
+
+[docs/docker-compose-setup.md](./docs/docker-compose-setup.md)
+
 # Local/Developer Usage
 
 First, ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed. Once your go environment is setup correctly, you can build/run the below components.
