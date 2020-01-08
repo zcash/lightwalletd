@@ -119,7 +119,7 @@ func main() {
 	flag.Parse()
 
 	if opts.wantVersion {
-		fmt.Println("lightwalletd version v0.2.0")
+		fmt.Println("lightwalletd version v0.3.0")
 		return
 	}
 
