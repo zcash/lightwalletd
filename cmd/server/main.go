@@ -5,11 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -43,11 +47,6 @@ func init() {
 }
 
 // TODO stream logging
-
-func LoggingInterceptor() grpc.ServerOption {
-	return grpc.UnaryInterceptor(logInterceptor)
-}
-
 func logInterceptor(
 	ctx context.Context,
 	req interface{},
@@ -164,7 +163,7 @@ func main() {
 	var server *grpc.Server
 
 	if opts.veryInsecure {
-		server = grpc.NewServer(LoggingInterceptor())
+		server = grpc.NewServer(grpc.UnaryInterceptor(logInterceptor))
 	} else {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
 		if err != nil {
@@ -174,9 +173,19 @@ func main() {
 				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
+		server = grpc.NewServer(
+			grpc.Creds(transportCreds),
+			grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+				logInterceptor,
+				grpc_prometheus.UnaryServerInterceptor),
+			))
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(server)
 	}
 
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(":2112", nil)
 	// Enable reflection for debugging
 	if opts.logLevel >= uint64(logrus.WarnLevel) {
 		reflection.Register(server)
