@@ -41,71 +41,23 @@
  # ************************************************************************/
 
 # Create layer in case you want to modify local lightwalletd code
-FROM golang:1.11 AS lightwalletd_base
+FROM golang:1.13 AS lightwalletd_base
 
-ENV ZCASH_CONF=/root/.zcash/zcash.conf
-ENV LIGHTWALLETD_URL=https://github.com/zcash-hackworks/lightwalletd.git
+ADD . /go/src/github.com/zcash-hackworks/lightwalletd
+WORKDIR /go/src/github.com/zcash-hackworks/lightwalletd
+RUN make \
+  && /usr/bin/install -c ./server /usr/bin/
 
-RUN apt-get update && apt-get install make git gcc
-WORKDIR /home
+ARG LWD_USER=lightwalletd
+ARG LWD_UID=2002
 
-# Comment out line below to use local lightwalletd repo changes
-RUN git clone ${LIGHTWALLETD_URL}
+RUN useradd --home-dir /srv/$LWD_USER \
+            --shell /bin/bash \
+            --create-home \
+            --uid $LWD_UID\
+            $LWD_USER
+USER $LWD_USER
+WORKDIR /srv/$LWD_USER
 
-# To add local changes to container uncomment this line
-#ADD . /home
-
-RUN cd ./lightwalletd && make
-RUN /usr/bin/install -c /home/lightwalletd/server /usr/bin/
-
-# Setup layer for zcashd and zcash-cli binary
-FROM golang:1.11 AS zcash_builder
-
-ENV ZCASH_URL=https://github.com/zcash/zcash.git
-
-RUN apt-get update && apt-get install \
-    build-essential pkg-config libc6-dev m4 g++-multilib \
-    autoconf libtool ncurses-dev unzip git python python-zmq \
-    zlib1g-dev wget curl bsdmainutils automake python-pip -y
-
-WORKDIR /build
-RUN git clone ${ZCASH_URL}
-
-RUN ./zcash/zcutil/build.sh -j$(nproc)
-RUN bash ./zcash/zcutil/fetch-params.sh
-RUN /usr/bin/install -c /build/zcash/src/zcashd /build/zcash/src/zcash-cli /usr/bin/
-
-# Create layer for lightwalletd and zcash binaries to reduce image size
-FROM golang:1.11 AS zcash_runner
-
-ARG ZCASH_VERSION=2.0.7+3
-ARG ZCASHD_USER=zcash
-ARG ZCASHD_UID=1001
-ARG ZCASH_CONF=/home/$ZCASHD_USER/.zcash/zcash.conf
-
-RUN useradd -s /bin/bash -u $ZCASHD_UID $ZCASHD_USER
-
-RUN mkdir -p /home/$ZCASHD_USER/.zcash/ && \
-    mkdir -p /home/$ZCASHD_USER/.zcash-params/ && \
-    chown -R $ZCASHD_USER /home/$ZCASHD_USER/.zcash/ && \
-    mkdir /logs/ && \
-    mkdir /db/
-
-USER $ZCASHD_USER
-WORKDIR /home/$ZCASHD_USER/
-
-# Use lightwallet server binary from prior layer
-COPY --from=lightwalletd_base /usr/bin/server /usr/bin/
-COPY --from=zcash_builder /usr/bin/zcashd /usr/bin/zcash-cli /usr/bin/
-COPY --from=zcash_builder /root/.zcash-params/ /home/$ZCASHD_USER/.zcash-params/
-
-# Configure zcash.conf
-RUN echo "testnet=1" >> ${ZCASH_CONF} && \
-    echo "addnode=testnet.z.cash" >> ${ZCASH_CONF} && \
-    echo "rpcbind=127.0.0.1" >> ${ZCASH_CONF} && \
-    echo "rpcport=18232" >> ${ZCASH_CONF} && \
-    echo "rpcuser=lwd" >> ${ZCASH_CONF} && \
-    echo "rpcpassword=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo ''`" >> ${ZCASH_CONF}
- 
-VOLUME [/home/$ZCASH_USER/.zcash]
-VOLUME [/home/$ZCASH_USER/.zcash-params]
+ENTRYPOINT ["server"]
+CMD ["--help"]
