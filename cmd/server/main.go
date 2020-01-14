@@ -105,12 +105,11 @@ func fileExists(filename string) bool {
 func main() {
 	opts := &Options{}
 	flag.StringVar(&opts.bindAddr, "bind-addr", "127.0.0.1:9067", "the address to listen on")
-	flag.StringVar(&opts.tlsCertPath, "tls-cert", "./cert.pem", "the path to a TLS certificate")
-	flag.StringVar(&opts.tlsKeyPath, "tls-key", "./cert.key", "the path to a TLS key file")
+	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate")
+	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "./server.log", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "./zcash.conf", "conf file to pull RPC creds from")
-	flag.BoolVar(&opts.veryInsecure, "no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	flag.BoolVar(&opts.wantVersion, "version", false, "version (major.minor.patch)")
 	flag.IntVar(&opts.cacheSize, "cache-size", 80000, "number of blocks to hold in the cache")
 
@@ -124,19 +123,16 @@ func main() {
 	}
 
 	filesThatShouldExist := []string{
-		opts.tlsCertPath,
-		opts.tlsKeyPath,
-		opts.logPath,
 		opts.zcashConfPath,
+	}
+	if opts.tlsCertPath != "" {
+		filesThatShouldExist = append(filesThatShouldExist, opts.tlsCertPath)
+	}
+	if opts.tlsKeyPath != "" {
+		filesThatShouldExist = append(filesThatShouldExist, opts.tlsKeyPath)
 	}
 
 	for _, filename := range filesThatShouldExist {
-		if !fileExists(opts.logPath) {
-			os.OpenFile(opts.logPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
-		}
-		if opts.veryInsecure && (filename == opts.tlsCertPath || filename == opts.tlsKeyPath) {
-			continue
-		}
 		if !fileExists(filename) {
 			os.Stderr.WriteString(fmt.Sprintf("\n  ** File does not exist: %s\n\n", filename))
 			flag.Usage()
@@ -162,11 +158,15 @@ func main() {
 
 	// gRPC initialization
 	var server *grpc.Server
+	var transportCreds credentials.TransportCredentials
+	var err error
 
-	if opts.veryInsecure {
-		server = grpc.NewServer(LoggingInterceptor())
+	if (opts.tlsCertPath == "") && (opts.tlsKeyPath == "") {
+		log.Warning("Certificate and key not provided, generating self signed values")
+		tlsCert := common.GenerateCerts()
+		transportCreds = credentials.NewServerTLSFromCert(tlsCert)
 	} else {
-		transportCreds, err := credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
+		transportCreds, err = credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"cert_file": opts.tlsCertPath,
@@ -174,8 +174,8 @@ func main() {
 				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 	}
+	server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 
 	// Enable reflection for debugging
 	if opts.logLevel >= uint64(logrus.WarnLevel) {
