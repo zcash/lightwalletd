@@ -82,7 +82,8 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 }
 
 type Options struct {
-	bindAddr      string `json:"bind_address,omitempty"`
+	grpcBindAddr  string `json:"grpc_bind_address,omitempty"`
+	httpBindAddr  string `json:"http_bind_address,omitempty"`
 	tlsCertPath   string `json:"tls_cert_path,omitempty"`
 	tlsKeyPath    string `json:"tls_cert_key,omitempty"`
 	logLevel      uint64 `json:"log_level,omitempty"`
@@ -103,7 +104,8 @@ func fileExists(filename string) bool {
 
 func main() {
 	opts := &Options{}
-	flag.StringVar(&opts.bindAddr, "bind-addr", "127.0.0.1:9067", "the address to listen on")
+	flag.StringVar(&opts.grpcBindAddr, "grpc-bind-addr", "127.0.0.1:9067", "the address to listen on for grpc")
+	flag.StringVar(&opts.httpBindAddr, "http-bind-addr", "127.0.0.1:9068", "the address to listen on for http")
 	flag.StringVar(&opts.tlsCertPath, "tls-cert", "", "the path to a TLS certificate")
 	flag.StringVar(&opts.tlsKeyPath, "tls-key", "", "the path to a TLS key file")
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -176,7 +178,9 @@ func main() {
 	}
 	server = grpc.NewServer(
 		grpc.Creds(transportCreds),
-		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+			grpc_prometheus.StreamServerInterceptor),
+		),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			logInterceptor,
 			grpc_prometheus.UnaryServerInterceptor),
@@ -184,8 +188,11 @@ func main() {
 	grpc_prometheus.EnableHandlingTimeHistogram()
 	grpc_prometheus.Register(server)
 
-	http.Handle("/metrics", promhttp.Handler())
-	go http.ListenAndServe(":2112", nil)
+	// Start the HTTP server endpoint
+	go func() {
+		startHTTPServer(opts)
+	}()
+
 	// Enable reflection for debugging
 	if opts.logLevel >= uint64(logrus.WarnLevel) {
 		reflection.Register(server)
@@ -230,12 +237,12 @@ func main() {
 	walletrpc.RegisterCompactTxStreamerServer(server, service)
 
 	// Start listening
-	listener, err := net.Listen("tcp", opts.bindAddr)
+	listener, err := net.Listen("tcp", opts.grpcBindAddr)
 	if err != nil {
 		log.WithFields(logrus.Fields{
-			"bind_addr": opts.bindAddr,
+			"bind_addr": opts.grpcBindAddr,
 			"error":     err,
-		}).Fatal("couldn't create listener")
+		}).Fatal("couldn't create grpc listener")
 	}
 
 	// Signal handler for graceful stops
@@ -249,7 +256,7 @@ func main() {
 		os.Exit(1)
 	}()
 
-	log.Infof("Starting gRPC server on %s", opts.bindAddr)
+	log.Infof("Starting gRPC server on %s", opts.grpcBindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
@@ -257,4 +264,9 @@ func main() {
 			"error": err,
 		}).Fatal("gRPC server exited")
 	}
+}
+
+func startHTTPServer(opts *Options) {
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(opts.httpBindAddr, nil)
 }
