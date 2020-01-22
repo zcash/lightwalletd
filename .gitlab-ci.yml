@@ -40,7 +40,7 @@ build:build-linux:
     - make
   artifacts:
     paths:
-    - ./server
+    - ./lightwalletd
 
 .build-windows:
   stage: build
