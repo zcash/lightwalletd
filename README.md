@@ -1,6 +1,6 @@
 
 [![pipeline status](https://gitlab.com/zcash/lightwalletd/badges/master/pipeline.svg)](https://gitlab.com/zcash/lightwalletd/commits/master)
-[![coverage report](https://gitlab.com/zcash/lightwalletd/badges/master/coverage.svg)](https://gitlab.com/zcash/lightwalletd/commits/master)
+[![codecov](https://codecov.io/gh/zcash/lightwalletd/branch/master/graph/badge.svg)](https://codecov.io/gh/zcash/lightwalletd)
 
 # Disclaimer
 This is an alpha build and is currently under active development. Please be advised of the following:
