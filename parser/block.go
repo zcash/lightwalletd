@@ -4,12 +4,12 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
 type Block struct {
-	hdr    *blockHeader
+	hdr    *BlockHeader
 	vtx    []*Transaction
 	height int
 }
@@ -56,7 +56,7 @@ func (b *Block) HasSaplingTransactions() bool {
 	return false
 }
 
-// see https://github.com/zcash-hackworks/lightwalletd/issues/17#issuecomment-467110828
+// see https://github.com/zcash/lightwalletd/issues/17#issuecomment-467110828
 const genesisTargetDifficulty = 520617983
 
 // GetHeight() extracts the block height from the coinbase transaction. See

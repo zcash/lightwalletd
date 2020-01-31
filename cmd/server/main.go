@@ -16,12 +16,11 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/zcash-hackworks/lightwalletd/common"
-	"github.com/zcash-hackworks/lightwalletd/frontend"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/frontend"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
-var log *logrus.Entry
 var logger = logrus.New()
 
 func init() {
@@ -32,10 +31,10 @@ func init() {
 	})
 
 	onexit := func() {
-		fmt.Printf("Lightwalletd died with a Fatal error. Check logfile for details.\n")
+		fmt.Println("Lightwalletd died with a Fatal error. Check logfile for details.")
 	}
 
-	log = logger.WithFields(logrus.Fields{
+	common.Log = logger.WithFields(logrus.Fields{
 		"app": "frontend-grpc",
 	})
 
@@ -48,12 +47,7 @@ func LoggingInterceptor() grpc.ServerOption {
 	return grpc.UnaryInterceptor(logInterceptor)
 }
 
-func logInterceptor(
-	ctx context.Context,
-	req interface{},
-	info *grpc.UnaryServerInfo,
-	handler grpc.UnaryHandler,
-) (interface{}, error) {
+func logInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	reqLog := loggerFromContext(ctx)
 	start := time.Now()
 
@@ -77,9 +71,9 @@ func logInterceptor(
 func loggerFromContext(ctx context.Context) *logrus.Entry {
 	// TODO: anonymize the addresses. cryptopan?
 	if peerInfo, ok := peer.FromContext(ctx); ok {
-		return log.WithFields(logrus.Fields{"peer_addr": peerInfo.Addr})
+		return common.Log.WithFields(logrus.Fields{"peer_addr": peerInfo.Addr})
 	}
-	return log.WithFields(logrus.Fields{"peer_addr": "unknown"})
+	return common.Log.WithFields(logrus.Fields{"peer_addr": "unknown"})
 }
 
 type Options struct {
@@ -89,7 +83,6 @@ type Options struct {
 	logLevel      uint64 `json:"log_level,omitempty"`
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
-	veryInsecure  bool   `json:"very_insecure,omitempty"`
 	cacheSize     int    `json:"cache_size,omitempty"`
 	wantVersion   bool
 }
@@ -122,6 +115,23 @@ func main() {
 		return
 	}
 
+	// production (unlike unit tests) use the real sleep function
+	common.Sleep = time.Sleep
+
+	if opts.logPath != "" {
+		// instead write parsable logs for logstash/splunk/etc
+		output, err := os.OpenFile(opts.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("Cannot open log file %s: %v\n",
+				opts.logPath, err))
+			os.Exit(1)
+		}
+		defer output.Close()
+		logger.SetOutput(output)
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
+	logger.SetLevel(logrus.Level(opts.logLevel))
+
 	filesThatShouldExist := []string{
 		opts.zcashConfPath,
 	}
@@ -134,27 +144,13 @@ func main() {
 
 	for _, filename := range filesThatShouldExist {
 		if !fileExists(filename) {
-			os.Stderr.WriteString(fmt.Sprintf("\n  ** File does not exist: %s\n\n", filename))
-			flag.Usage()
+			common.Log.WithFields(logrus.Fields{
+				"filename": filename,
+			}).Error("cannot open required file")
+			os.Stderr.WriteString("Cannot open required file: " + filename + "\n")
 			os.Exit(1)
 		}
 	}
-
-	if opts.logPath != "" {
-		// instead write parsable logs for logstash/splunk/etc
-		output, err := os.OpenFile(opts.logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"error": err,
-				"path":  opts.logPath,
-			}).Fatal("couldn't open log file")
-		}
-		defer output.Close()
-		logger.SetOutput(output)
-		logger.SetFormatter(&logrus.JSONFormatter{})
-	}
-
-	logger.SetLevel(logrus.Level(opts.logLevel))
 
 	// gRPC initialization
 	var server *grpc.Server
@@ -162,13 +158,13 @@ func main() {
 	var err error
 
 	if (opts.tlsCertPath == "") && (opts.tlsKeyPath == "") {
-		log.Warning("Certificate and key not provided, generating self signed values")
+		common.Log.Warning("Certificate and key not provided, generating self signed values")
 		tlsCert := common.GenerateCerts()
 		transportCreds = credentials.NewServerTLSFromCert(tlsCert)
 	} else {
 		transportCreds, err = credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			common.Log.WithFields(logrus.Fields{
 				"cert_file": opts.tlsCertPath,
 				"key_path":  opts.tlsKeyPath,
 				"error":     err,
@@ -188,15 +184,18 @@ func main() {
 
 	rpcClient, err := frontend.NewZRPCFromConf(opts.zcashConfPath)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"error": err,
 		}).Fatal("setting up RPC connection to zcashd")
 	}
 
+	// indirect function for test mocking (so unit tests can talk to stub functions)
+	common.RawRequest = rpcClient.RawRequest
+
 	// Get the sapling activation height from the RPC
 	// (this first RPC also verifies that we can communicate with zcashd)
-	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo(rpcClient, log)
-	log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
+	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo()
+	common.Log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
 
 	// Initialize the cache
 	cache := common.NewBlockCache(opts.cacheSize)
@@ -207,12 +206,13 @@ func main() {
 		cacheStart = saplingHeight
 	}
 
-	go common.BlockIngestor(rpcClient, cache, log, cacheStart)
+	// The last argument, repetition count, is only nonzero for testing
+	go common.BlockIngestor(cache, cacheStart, 0)
 
 	// Compact transaction service initialization
-	service, err := frontend.NewLwdStreamer(rpcClient, cache, log)
+	service, err := frontend.NewLwdStreamer(cache)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"error": err,
 		}).Fatal("couldn't create backend")
 	}
@@ -223,7 +223,7 @@ func main() {
 	// Start listening
 	listener, err := net.Listen("tcp", opts.bindAddr)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"bind_addr": opts.bindAddr,
 			"error":     err,
 		}).Fatal("couldn't create listener")
@@ -234,17 +234,18 @@ func main() {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		s := <-signals
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
+		os.Stderr.WriteString("Caught signal: " + s.String() + "\n")
 		os.Exit(1)
 	}()
 
-	log.Infof("Starting gRPC server on %s", opts.bindAddr)
+	common.Log.Infof("Starting gRPC server on %s", opts.bindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"error": err,
 		}).Fatal("gRPC server exited")
 	}

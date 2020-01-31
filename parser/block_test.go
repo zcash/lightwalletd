@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -190,6 +191,9 @@ func TestCompactBlocks(t *testing.T) {
 		if hex.EncodeToString(block.GetDisplayPrevHash()) != test.PrevHash {
 			t.Errorf("incorrect block prevhash in testnet block %x", test.BlockHash)
 			continue
+		}
+		if !bytes.Equal(block.GetPrevHash(), block.hdr.HashPrevBlock) {
+			t.Error("block and block header prevhash don't match")
 		}
 
 		compact := block.ToCompact()
