@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 )
 
 // "Human-readable" version of joinSplit struct defined in transaction.go.
@@ -161,9 +161,8 @@ func TestSproutTransactionParser(t *testing.T) {
 	defer testData.Close()
 
 	// Parse the raw transactions file
-	rawTxData := make([][]byte, len(zip143tests))
+	rawTxData := [][]byte{}
 	scan := bufio.NewScanner(testData)
-	count := 0
 	for scan.Scan() {
 		dataLine := scan.Text()
 		// Skip the comments
@@ -175,9 +174,7 @@ func TestSproutTransactionParser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		rawTxData[count] = txData
-		count++
+		rawTxData = append(rawTxData, txData)
 	}
 
 	for i, tt := range zip143tests {
@@ -672,9 +669,8 @@ func TestSaplingTransactionParser(t *testing.T) {
 	defer testData.Close()
 
 	// Parse the raw transactions file
-	rawTxData := make([][]byte, len(zip243tests))
+	rawTxData := [][]byte{}
 	scan := bufio.NewScanner(testData)
-	count := 0
 	for scan.Scan() {
 		dataLine := scan.Text()
 		// Skip the comments
@@ -686,9 +682,7 @@ func TestSaplingTransactionParser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-
-		rawTxData[count] = txData
-		count++
+		rawTxData = append(rawTxData, txData)
 	}
 
 	for i, tt := range zip243tests {
@@ -703,6 +697,20 @@ func TestSaplingTransactionParser(t *testing.T) {
 		if len(rest) != 0 {
 			t.Errorf("Test %d: did not consume entire buffer", i)
 			continue
+		}
+
+		// If the transaction is shorter than it should be, parsing
+		// should fail gracefully
+		for j := 0; j < len(rawTxData[i]); j++ {
+			_, err := tx.ParseFromSlice(rawTxData[i][0:j])
+			if err == nil {
+				t.Errorf("Test %d: Parsing transaction unexpected succeeded", i)
+				break
+			}
+			if len(rest) > 0 {
+				t.Errorf("Test %d: Parsing transaction unexpected rest", i)
+				break
+			}
 		}
 
 		// Transaction metadata

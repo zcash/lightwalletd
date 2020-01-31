@@ -19,7 +19,7 @@ Note: Please replace `your_username`, with your actual GitHub username
 git clone git@github.com:your_username/lightwalletd.git
 cd lightwalletd
 git remote set-url origin git@github.com:your_username/lightwalletd.git
-git remote add upstream git@github.com:zcash-hackworks/lightwalletd.git
+git remote add upstream git@github.com:zcash/lightwalletd.git
 git remote set-url --push upstream DISABLED
 git fetch upstream
 git branch -u upstream/master master
@@ -39,7 +39,7 @@ After issuing the above commands, your `.git/config` file should look similar to
 	remote = upstream
 	merge = refs/heads/master
 [remote "upstream"]
-	url = git@github.com:zcash-hackworks/lightalletd.git
+	url = git@github.com:zcash/lightalletd.git
 	fetch = +refs/heads/*:refs/remotes/upstream/*
 	pushurl = DISABLED
 ```
@@ -64,7 +64,7 @@ To checkout an existing branch (assuming you are in `lightwalletd` directory):
 ```bash
 git checkout [existing_branch_name]
 ```
-If you are fixing a bug or implementing a new feature, you likely will want to create a new branch. If you are reviewing code or working on existing branches, you likely will checkout an existing branch. To view the list of current Lightwalletd GitHub issues, click [here](https://github.com/zcash-hackworks/lightwalletd/issues). 
+If you are fixing a bug or implementing a new feature, you likely will want to create a new branch. If you are reviewing code or working on existing branches, you likely will checkout an existing branch. To view the list of current Lightwalletd GitHub issues, click [here](https://github.com/zcash/lightwalletd/issues). 
 
 ## Make & Commit Changes
 If you have created a new branch or checked out an existing one, it is time to make changes to your local source code. Below are some formalities for commits:
@@ -83,7 +83,7 @@ git remote -v
 ```bash
 origin    git@github.com:your_username/lightwalletd.git (fetch)
 origin    git@github.com:your_username/lightwalletd.git (push)
-upstream    git@github.com:zcash-hackworks/lightwalletd.git (fetch)
+upstream    git@github.com:zcash/lightwalletd.git (fetch)
 upstream    DISABLED (push)
 ```
 This output should be consistent with your `.git/config`:
@@ -96,7 +96,7 @@ This output should be consistent with your `.git/config`:
 	url = git@github.com:your_username/lightwalletd.git
 	fetch = +refs/heads/*:refs/remotes/origin/*
 [remote "upstream"]
-	url = git@github.com:zcash-hackworks/lightwalletd.git
+	url = git@github.com:zcash/lightwalletd.git
 	fetch = +refs/heads/*:refs/remotes/upstream/*
 	pushurl = DISABLED
 ```

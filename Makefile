@@ -20,14 +20,14 @@ all: build
 
 # Lint golang files
 lint:
-	@golint -set_exit_status
+	golint -set_exit_status
 
 show_tests:
 	@echo ${GO_TEST_FILES}
 
 # Run unittests
 test:
-	@go test -v -coverprofile=coverage.txt -covermode=atomic ./...
+	go test -v ./...
 
 # Run data race detector
 race:
@@ -35,19 +35,21 @@ race:
 
 # Run memory sanitizer (need to ensure proper build flag is set)
 msan:
-	@go test -v -msan -short ${GO_TEST_FILES}
+	go test -v -msan -short ${GO_TEST_FILES}
 
-# Generate global code coverage report
+# Generate global code coverage report, ignore generated *.pb.go files
+
 coverage:
-	@go test -coverprofile=coverage.out -covermode=atomic ./...
+	go test -coverprofile=coverage.out ./...
+	sed -i '/\.pb\.go/d' coverage.out
 
 # Generate code coverage report
-coverage_report:
-	@go tool cover -func=coverage.out 
+coverage_report: coverage
+	go tool cover -func=coverage.out 
 
 # Generate code coverage report in HTML
-coverage_html: 
-	@go tool cover -html=coverage.out -o coverage.html
+coverage_html: coverage
+	go tool cover -html=coverage.out
 
 # Generate documents
 docs:

@@ -17,7 +17,7 @@ The Lightwalletd Server is experimental and a work in progress. Use it at your o
 
 # Overview
 
-[lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
+[lightwalletd](https://github.com/zcash/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
 
 lightwalletd is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain for mobile and other wallets, such as [Zecwallet](https://github.com/adityapk00/zecwallet-lite-lib).
 
@@ -25,7 +25,7 @@ Lightwalletd has not yet undergone audits or been subject to rigorous testing. I
 
 To view status of [CI pipeline](https://gitlab.com/mdr0id/lightwalletd/pipelines)
 
-To view detailed [Codecov](https://codecov.io/gh/zcash-hackworks/lightwalletd) report
+To view detailed [Codecov](https://codecov.io/gh/zcash/lightwalletd) report
 
 # Local/Developer docker-compose Usage
 
