@@ -83,6 +83,7 @@ type Options struct {
 	logLevel      uint64 `json:"log_level,omitempty"`
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
+	veryInsecure  bool   `json:"very_insecure,omitempty"`
 	cacheSize     int    `json:"cache_size,omitempty"`
 	wantVersion   bool
 }
@@ -103,6 +104,7 @@ func main() {
 	flag.Uint64Var(&opts.logLevel, "log-level", uint64(logrus.InfoLevel), "log level (logrus 1-7)")
 	flag.StringVar(&opts.logPath, "log-file", "./server.log", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "./zcash.conf", "conf file to pull RPC creds from")
+	flag.BoolVar(&opts.veryInsecure, "no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	flag.BoolVar(&opts.wantVersion, "version", false, "version (major.minor.patch)")
 	flag.IntVar(&opts.cacheSize, "cache-size", 80000, "number of blocks to hold in the cache")
 
@@ -154,24 +156,28 @@ func main() {
 
 	// gRPC initialization
 	var server *grpc.Server
-	var transportCreds credentials.TransportCredentials
 	var err error
 
-	if (opts.tlsCertPath == "") && (opts.tlsKeyPath == "") {
-		common.Log.Warning("Certificate and key not provided, generating self signed values")
-		tlsCert := common.GenerateCerts()
-		transportCreds = credentials.NewServerTLSFromCert(tlsCert)
+	if opts.veryInsecure {
+		server = grpc.NewServer(LoggingInterceptor())
 	} else {
-		transportCreds, err = credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
-		if err != nil {
-			common.Log.WithFields(logrus.Fields{
-				"cert_file": opts.tlsCertPath,
-				"key_path":  opts.tlsKeyPath,
-				"error":     err,
-			}).Fatal("couldn't load TLS credentials")
+		var transportCreds credentials.TransportCredentials
+		if (opts.tlsCertPath == "") && (opts.tlsKeyPath == "") {
+			common.Log.Warning("Certificate and key not provided, generating self signed values")
+			tlsCert := common.GenerateCerts()
+			transportCreds = credentials.NewServerTLSFromCert(tlsCert)
+		} else {
+			transportCreds, err = credentials.NewServerTLSFromFile(opts.tlsCertPath, opts.tlsKeyPath)
+			if err != nil {
+				common.Log.WithFields(logrus.Fields{
+					"cert_file": opts.tlsCertPath,
+					"key_path":  opts.tlsKeyPath,
+					"error":     err,
+				}).Fatal("couldn't load TLS credentials")
+			}
 		}
+		server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 	}
-	server = grpc.NewServer(grpc.Creds(transportCreds), LoggingInterceptor())
 
 	// Enable reflection for debugging
 	if opts.logLevel >= uint64(logrus.WarnLevel) {
