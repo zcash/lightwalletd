@@ -6,13 +6,16 @@ import (
     "os"
     "fmt"
     "bufio"
+	//"github.com/zcash/lightwalletd/parser"
 )
 
 func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
-    blockHeight := 1000
-    saplingActivation := 999
+    startingBlockHeight := 1000
+    saplingActivation := startingBlockHeight
     chainName := "main"
     branchID := "2bb40e60"
+
+	//block_header := parser.NewBlockHeader()
 
     switch method {
     case "getblockchaininfo":
