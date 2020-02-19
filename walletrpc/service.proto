@@ -86,6 +86,13 @@ message PingResponse {
     int64 exit = 2;
 }
 
+message EvilLightwalletdState {
+    int32 startHeight = 1;
+    int32 saplingActivation = 2;
+    string branchID = 3;
+    string chainName = 4;
+    repeated string blocks = 5;
+}
 service CompactTxStreamer {
     // Return the height of the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -106,4 +113,8 @@ service CompactTxStreamer {
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
     // Testing-only
     rpc Ping(Duration) returns (PingResponse) {}
+
+    // Evil
+    rpc EvilGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
+    rpc EvilSetState(EvilLightwalletdState) returns (Empty) {}
 }
