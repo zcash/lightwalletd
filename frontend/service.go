@@ -255,3 +255,67 @@ func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	response.Exit = atomic.AddInt64(&concurrent, -1)
 	return &response, nil
 }
+
+// Evil
+func (s *LwdStreamer) EvilGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.CompactTxStreamer_EvilGetIncomingTransactionsServer) error {
+	// Get all of the new incoming transactions evil zcashd has accepted.
+	result, rpcErr := common.RawRequest("x_getincomingtransactions", nil)
+
+	var new_txs []string
+	if rpcErr != nil {
+		return rpcErr
+	}
+	err := json.Unmarshal(result, &new_txs)
+
+	if err != nil {
+		return err
+	}
+
+	for _, tx_str := range new_txs {
+		tx_bytes, err := hex.DecodeString(tx_str)
+		if err != nil {
+			return err
+		}
+		err = resp.Send(&walletrpc.RawTransaction{Data: tx_bytes, Height: 0})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *LwdStreamer) EvilSetState(ctx context.Context, state *walletrpc.EvilLightwalletdState) (*walletrpc.Empty, error) {
+	match, err := regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(state.BranchID))
+	if err != nil || !match {
+		return nil, errors.New("Invalid branch ID")
+	}
+
+	match, err = regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(state.ChainName))
+	if err != nil || !match {
+		return nil, errors.New("Invalid chain name")
+	}
+
+	st := "{" +
+		"\"start_height\": " + strconv.Itoa(int(state.StartHeight)) +
+		", \"sapling_activation\": " + strconv.Itoa(int(state.SaplingActivation)) +
+		", \"branch_id\": \"" + state.BranchID + "\"" +
+		", \"chain_name\": \"" + state.ChainName + "\"" +
+		", \"blocks\": ["
+
+	for i, block := range state.Blocks {
+		st += "\"" + block + "\""
+		if i < len(state.Blocks) - 1 {
+			st += ", "
+		}
+	}
+
+	st += "]}"
+
+	params := make([]json.RawMessage, 1)
+	params[0] = json.RawMessage(st)
+
+	_, rpcErr := common.RawRequest("x_setstate", params)
+
+	return &walletrpc.Empty{}, rpcErr
+}
