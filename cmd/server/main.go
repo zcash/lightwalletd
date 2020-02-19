@@ -84,6 +84,7 @@ type Options struct {
 	logPath       string `json:"log_file,omitempty"`
 	zcashConfPath string `json:"zcash_conf,omitempty"`
 	veryInsecure  bool   `json:"very_insecure,omitempty"`
+	darkSide      bool   `json:"very_insecure,omitempty"`
 	cacheSize     int    `json:"cache_size,omitempty"`
 	wantVersion   bool
 }
@@ -105,6 +106,7 @@ func main() {
 	flag.StringVar(&opts.logPath, "log-file", "./server.log", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "./zcash.conf", "conf file to pull RPC creds from")
 	flag.BoolVar(&opts.veryInsecure, "no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
+	flag.BoolVar(&opts.darkSide, "darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing")
 	flag.BoolVar(&opts.wantVersion, "version", false, "version (major.minor.patch)")
 	flag.IntVar(&opts.cacheSize, "cache-size", 80000, "number of blocks to hold in the cache")
 
@@ -134,9 +136,11 @@ func main() {
 	}
 	logger.SetLevel(logrus.Level(opts.logLevel))
 
-	filesThatShouldExist := []string{
-		opts.zcashConfPath,
-	}
+	filesThatShouldExist := []string{ }
+
+    if !opts.darkSide {
+		filesThatShouldExist = append(filesThatShouldExist, opts.zcashConfPath)
+    }
 	if opts.tlsCertPath != "" {
 		filesThatShouldExist = append(filesThatShouldExist, opts.tlsCertPath)
 	}
@@ -184,19 +188,23 @@ func main() {
 		reflection.Register(server)
 	}
 
-	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
-	// sending transactions, but in the future it could back a different type
-	// of block streamer.
+    if opts.darkSide {
+        common.RawRequest = common.DarkSideRawRequest
+    } else {
+        // Initialize Zcash RPC client. Right now (Jan 2018) this is only for
+        // sending transactions, but in the future it could back a different type
+        // of block streamer.
 
-	rpcClient, err := frontend.NewZRPCFromConf(opts.zcashConfPath)
-	if err != nil {
-		common.Log.WithFields(logrus.Fields{
-			"error": err,
-		}).Fatal("setting up RPC connection to zcashd")
-	}
+        rpcClient, err := frontend.NewZRPCFromConf(opts.zcashConfPath)
+        if err != nil {
+            common.Log.WithFields(logrus.Fields{
+                "error": err,
+            }).Fatal("setting up RPC connection to zcashd")
+        }
 
-	// indirect function for test mocking (so unit tests can talk to stub functions)
-	common.RawRequest = rpcClient.RawRequest
+        // indirect function for test mocking (so unit tests can talk to stub functions)
+	    common.RawRequest = rpcClient.RawRequest
+    }
 
 	// Get the sapling activation height from the RPC
 	// (this first RPC also verifies that we can communicate with zcashd)
