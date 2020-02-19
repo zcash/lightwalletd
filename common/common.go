@@ -152,8 +152,8 @@ func BlockIngestor(cache *BlockCache, startHeight int, rep int) {
 			// will work; this is probably a good balance.
 			height -= 2
 			reorgCount++
-			if reorgCount > 10 {
-				Log.Fatal("Reorg exceeded max of 100 blocks! Help!")
+			if reorgCount > 50 {
+				Log.Fatal("Reorg exceeded maximum number of sequential reorgs! Help!")
 			}
 			Log.WithFields(logrus.Fields{
 				"height": height,
@@ -162,8 +162,9 @@ func BlockIngestor(cache *BlockCache, startHeight int, rep int) {
 				"reorg":  reorgCount,
 			}).Warn("REORG")
 			continue
+		} else {
+			reorgCount = 0
 		}
-		reorgCount = 0
 		height++
 	}
 }
