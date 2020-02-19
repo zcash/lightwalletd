@@ -63,6 +63,14 @@ message TransparentAddressBlockFilter {
     BlockRange range = 2;
 }
 
+message EvilLightwalletdState {
+    int32 startHeight = 1;
+    int32 saplingActivation = 2;
+    string branchID = 3;
+    string chainName = 4;
+    repeated string blocks = 5;
+}
+
 service CompactTxStreamer {
     // Compact Blocks
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -78,4 +86,8 @@ service CompactTxStreamer {
 
     // Misc
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
+
+    // Evil
+    rpc EvilGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
+    rpc EvilSetState(EvilLightwalletdState) returns (Empty) {}
 }
