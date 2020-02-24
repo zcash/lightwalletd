@@ -6,11 +6,9 @@ import (
     "os"
     "bufio"
     "strconv"
+    "time"
 	//"github.com/zcash/lightwalletd/parser"
 )
-
-// Log as a global variable simplifies logging
-//var Log *logrus.Entry
 
 type DarksideZcashdState struct {
     start_height int
@@ -20,10 +18,10 @@ type DarksideZcashdState struct {
     // Should always be nonempty. Index 0 is the block at height start_height.
     blocks []string
     incoming_transactions []string
+    server_start time.Time
 }
 
 // TODO
-// 0. Code to make the server crash if it's running darkside mode for too long.
 // 1. RPC for setting state.blocks
 // 2. RPC for setting other chain state data
 // 3. RPC for accesssing incoming_transactions
@@ -40,6 +38,7 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
             chain_name: "main",
             blocks: make([]string, 0),
             incoming_transactions: make([]string, 0),
+            server_start: time.Now(),
         }
 
         testBlocks, err := os.Open("./testdata/blocks")
@@ -51,6 +50,10 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
             block := scan.Bytes()
             state.blocks = append(state.blocks, string(block))
         }
+    }
+
+    if time.Now().Sub(state.server_start).Minutes() >= 30 {
+        Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
     }
 
     switch method {

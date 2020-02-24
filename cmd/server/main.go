@@ -106,7 +106,7 @@ func main() {
 	flag.StringVar(&opts.logPath, "log-file", "./server.log", "log file to write to")
 	flag.StringVar(&opts.zcashConfPath, "conf-file", "./zcash.conf", "conf file to pull RPC creds from")
 	flag.BoolVar(&opts.veryInsecure, "no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
-	flag.BoolVar(&opts.darkSide, "darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing")
+	flag.BoolVar(&opts.darkSide, "darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
 	flag.BoolVar(&opts.wantVersion, "version", false, "version (major.minor.patch)")
 	flag.IntVar(&opts.cacheSize, "cache-size", 80000, "number of blocks to hold in the cache")
 
