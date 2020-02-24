@@ -4,30 +4,66 @@ import (
     "errors"
     "encoding/json"
     "os"
-    "fmt"
     "bufio"
+    "strconv"
 	//"github.com/zcash/lightwalletd/parser"
 )
 
-func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
-    startingBlockHeight := 1000
-    saplingActivation := startingBlockHeight
-    chainName := "main"
-    branchID := "2bb40e60"
+// Log as a global variable simplifies logging
+//var Log *logrus.Entry
 
-	//block_header := parser.NewBlockHeader()
+type DarksideZcashdState struct {
+    start_height int
+    sapling_activation int
+    branch_id string
+    chain_name string
+    // Should always be nonempty. Index 0 is the block at height start_height.
+    blocks []string
+    incoming_transactions []string
+}
+
+// TODO
+// 0. Code to make the server crash if it's running darkside mode for too long.
+// 1. RPC for setting state.blocks
+// 2. RPC for setting other chain state data
+// 3. RPC for accesssing incoming_transactions
+
+var state *DarksideZcashdState = nil
+
+func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
+
+    if state == nil {
+        state = &DarksideZcashdState{
+            start_height: 1000,
+            sapling_activation: 1000,
+            branch_id: "2bb40e60",
+            chain_name: "main",
+            blocks: make([]string, 0),
+            incoming_transactions: make([]string, 0),
+        }
+
+        testBlocks, err := os.Open("./testdata/blocks")
+        if err != nil {
+            Log.Fatal("Error loading testdata blocks")
+        }
+        scan := bufio.NewScanner(testBlocks)
+        for scan.Scan() { // each line (block)
+            block := scan.Bytes()
+            state.blocks = append(state.blocks, string(block))
+        }
+    }
 
     switch method {
     case "getblockchaininfo":
-        // TODO: there has got to be a better way!
+        // TODO: there has got to be a better way to construct this!
         data := make(map[string]interface{})
-        data["chain"] = chainName
+        data["chain"] = state.chain_name
         data["upgrades"] = make(map[string]interface{})
         data["upgrades"].(map[string]interface{})["76b809bb"] = make(map[string]interface{})
-        data["upgrades"].(map[string]interface{})["76b809bb"].(map[string]interface{})["activationheight"] = saplingActivation
-        data["headers"] = blockHeight
+        data["upgrades"].(map[string]interface{})["76b809bb"].(map[string]interface{})["activationheight"] = state.sapling_activation
+        data["headers"] = state.start_height + len(state.blocks) - 1
         data["consensus"] = make(map[string]interface{})
-        data["consensus"].(map[string]interface{})["nextblock"] = branchID
+        data["consensus"].(map[string]interface{})["nextblock"] = state.branch_id
 
         return json.Marshal(data)
 
@@ -37,34 +73,26 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
         if err != nil {
 		    return nil, errors.New("Failed to parse getblock request.")
         }
-        //var verbosity string
-        //err = json.Unmarshal(params[1], &verbosity)
-        //if err != nil {
-		//    return nil, errors.New("Failed to parse getblock request.")
-        //}
 
-        //print(verbosity)
-        //if verbosity != "0" {
-		//    return nil, errors.New(verbosity)
-        //}
-
-        testBlocks, err := os.Open("./testdata/blocks")
+        height_i, err := strconv.Atoi(height)
         if err != nil {
-            os.Stderr.WriteString(fmt.Sprint("Error:", err))
-            os.Exit(1)
+            return nil, errors.New("Error parsing height as integer.")
         }
-        scan := bufio.NewScanner(testBlocks)
-        var blocks [][]byte
-        for scan.Scan() { // each line (block)
-            block := scan.Bytes()
-            // Enclose the hex string in quotes (to make it json, to match what's
-            // returned by the RPC)
-            block = []byte("\"" + string(block) + "\"")
-            blocks = append(blocks, block)
+        index := height_i - state.start_height
+
+        if index == len(state.blocks) {
+            // The current ingestor keeps going until it sees this error, 
+            // meaning it's up to the latest height.
+            return nil, errors.New("-8:")
         }
 
-        // TODO: return the block at height 'height' from the local store
-		return blocks[0], nil
+        if index < 0 || index > len(state.blocks) {
+            // If an integration test can reach this, it's a bug, so
+            // crash the entire lightwalletd to make it obvious.
+            Log.Fatal("getblock request made for out-of-range height")
+        }
+
+        return []byte("\"" + state.blocks[index] + "\""), nil
 
     case "getaddresstxids":
         // Not required for minimal reorg testing.
@@ -75,7 +103,12 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return nil, errors.New("Not implemented yet.")
 
     case "sendrawtransaction":
-        // TODO: save the transaction to a buffer the test client can access
+        var rawtx string
+        err := json.Unmarshal(params[0], &rawtx)
+        if err != nil {
+		    return nil, errors.New("Failed to parse sendrawtransaction JSON.")
+        }
+        state.incoming_transactions = append(state.incoming_transactions, rawtx)
 		return nil, errors.New("Not implemented yet.")
 
     default:
