@@ -14,9 +14,9 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v '*_test.go'
 GO_TEST_FILES := $(shell find . -name '*_test.go' -type f | rev | cut -d "/" -f2- | rev | sort -u)
 GO_BUILD_FILES := $(shell find . -name 'main.go')
 
-.PHONY: all dep build clean test coverage coverhtml lint
+.PHONY: all dep build clean test coverage coverhtml lint doc
 
-all: build
+all: build doc
 
 # Lint golang files
 lint:
@@ -52,8 +52,10 @@ coverage_html: coverage
 	go tool cover -html=coverage.out
 
 # Generate documents
-docs:
-	@echo "Generating docs..."
+doc: lwd-api.html
+
+lwd-api.html: walletrpc/compact_formats.proto walletrpc/service.proto
+	./docgen.sh $^ >lwd-api.html
 
 # Generate docker image
 docker_img:

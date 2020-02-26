@@ -5,15 +5,14 @@ option swift_prefix = "";
 import "compact_formats.proto";
 
 // A BlockID message contains identifiers to select a block: a height or a
-// hash. If the hash is present it takes precedence.
+// hash. Specification by hash is not implemented, but may be in the future.
 message BlockID {
      uint64 height = 1;
      bytes hash = 2;
 }
 
-// BlockRange technically allows ranging from hash to hash etc but this is not
-// currently intended for support, though there is no reason you couldn't do
-// it. Further permutations are left as an exercise.
+// BlockRange specifies a series of blocks from start to end inclusive.
+// Both BlockIDs must be heights; specification by hash is not yet supported.
 message BlockRange {
     BlockID start = 1;
     BlockID end = 2;
@@ -21,6 +20,7 @@ message BlockRange {
 
 // A TxFilter contains the information needed to identify a particular
 // transaction: either a block and an index, or a direct transaction hash.
+// Currently, only specification by hash is supported.
 message TxFilter {
      BlockID block = 1;
      uint64 index = 2;
@@ -34,30 +34,34 @@ message RawTransaction {
     uint64 height = 2;
 }
 
+// A SendResponse encodes an error code and a string. It is currently used
+// only by SendTransaction(). If error code is zero, the operation was
+// successful; if non-zero, it and the message specify the failure.
 message SendResponse {
     int32 errorCode = 1;
     string errorMessage = 2;
 }
 
-// Empty placeholder. Someday we may want to specify e.g. a particular chain fork.
+// Chainspec is a placeholder to allow specification of a particular chain fork.
 message ChainSpec {}
 
+// Empty is for gRPCs that take no arguments, currently only GetLightdInfo.
 message Empty {}
 
+// The LightdInfo returns various information about this lightwalletd instance
+// and the state of the blockchain.
 message LightdInfo {
     string version = 1;
     string vendor = 2;
     bool   taddrSupport = 3;
     string chainName = 4;
     uint64 saplingActivationHeight = 5;
-    string consensusBranchId = 6;   // This should really be u32 or []byte, but string for readability
+    string consensusBranchId = 6;
     uint64 blockHeight = 7;
 }
 
-message TransparentAddress {
-    string address = 1;
-}
-
+// TransparentAddressBlockFilter restricts the results to the given address
+// or block range.
 message TransparentAddressBlockFilter {
     string address = 1;
     BlockRange range = 2;
