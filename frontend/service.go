@@ -18,7 +18,6 @@ var (
 	ErrUnspecified = errors.New("request for unspecified identifier")
 )
 
-// the service type
 type LwdStreamer struct {
 	cache *common.BlockCache
 }
@@ -27,6 +26,7 @@ func NewLwdStreamer(cache *common.BlockCache) (walletrpc.CompactTxStreamerServer
 	return &LwdStreamer{cache}, nil
 }
 
+// GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *LwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestHeight()
 
@@ -38,7 +38,9 @@ func (s *LwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil
 }
 
-func (s *LwdStreamer) GetAddressTxids( addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
+// GetAddressTxids is a streaming RPC that returns transaction IDs that have
+// the given transparent address (taddr) as either an input or output.
+func (s *LwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
 	// Test to make sure Address is a single t address
 	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(addressBlockFilter.Address))
 	if err != nil || !match {
@@ -90,6 +92,8 @@ func (s *LwdStreamer) GetAddressTxids( addressBlockFilter *walletrpc.Transparent
 	return nil
 }
 
+// GetBlock returns the compact block at the requested height. Requesting a
+// block by hash is not yet supported.
 func (s *LwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
 	if id.Height == 0 && id.Hash == nil {
 		return nil, ErrUnspecified
@@ -109,6 +113,9 @@ func (s *LwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	return cBlock, err
 }
 
+// GetBlockRange is a streaming RPC that returns blocks, in compact form,
+// (as also returned by GetBlock) from the block height 'start' to height
+// 'end' inclusively.
 func (s *LwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
@@ -129,6 +136,8 @@ func (s *LwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	}
 }
 
+// GetTransaction returns the raw transaction bytes that are returned
+// by the zcashd 'getrawtransaction' RPC.
 func (s *LwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	if txf.Hash != nil {
 		txid := txf.Hash
@@ -167,7 +176,8 @@ func (s *LwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 	return nil, errors.New("Please call GetTransaction with txid")
 }
 
-// GetLightdInfo gets the LightWalletD (this server) info
+// GetLightdInfo gets the LightWalletD (this server) info, and includes information
+// it gets from its backend zcashd.
 func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
 	saplingHeight, blockHeight, chainName, consensusBranchId := common.GetSaplingInfo()
 

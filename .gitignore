@@ -1,8 +1,5 @@
-*.conf
-*.config
-*.log
-*.sqlite
-*.pem
-*.key
-*.elf
-coverage.*
+server
+server.log
+coverage.out
+test-log
+lwd-api.html
