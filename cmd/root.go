@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 			CacheSize:         viper.GetInt("cache-size"),
 		}
 
-		fmt.Printf("Options: %#v", opts)
+		log.Debugf("Options: %#v\n", opts)
 
 		filesThatShouldExist := []string{
 			opts.TLSCertPath,
@@ -102,6 +102,8 @@ func startServer(opts *common.Options) error {
 	var server *grpc.Server
 
 	if opts.NoTLSVeryInsecure {
+		log.Warningln("Starting insecure server")
+		fmt.Println("Starting insecure server")
 		server = grpc.NewServer(logging.LoggingInterceptor())
 	} else {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.TLSCertPath, opts.TLSKeyPath)
