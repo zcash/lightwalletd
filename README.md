@@ -27,6 +27,7 @@ To view status of [CI pipeline](https://gitlab.com/mdr0id/lightwalletd/pipelines
 
 To view detailed [Codecov](https://codecov.io/gh/zcash/lightwalletd) report
 
+Documentation for lightwalletd clients (the gRPC interface) is in `docs/rtd/index.html`. The current version of this file corresponds to the two `.proto` files; if you change these files, please regenerate the documentation by running `make doc`, which requires docker to be installed. 
 # Local/Developer docker-compose Usage
 
 [docs/docker-compose-setup.md](./docs/docker-compose-setup.md)
