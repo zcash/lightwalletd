@@ -256,8 +256,10 @@ func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	return &response, nil
 }
 
-// Evil
-func (s *LwdStreamer) EvilGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.CompactTxStreamer_EvilGetIncomingTransactionsServer) error {
+
+// Darkside
+
+func (s *LwdStreamer) DarksideGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.CompactTxStreamer_DarksideGetIncomingTransactionsServer) error {
 	// Get all of the new incoming transactions evil zcashd has accepted.
 	result, rpcErr := common.RawRequest("x_getincomingtransactions", nil)
 
@@ -285,7 +287,7 @@ func (s *LwdStreamer) EvilGetIncomingTransactions(in *walletrpc.Empty, resp wall
 	return nil
 }
 
-func (s *LwdStreamer) EvilSetState(ctx context.Context, state *walletrpc.EvilLightwalletdState) (*walletrpc.Empty, error) {
+func (s *LwdStreamer) DarksideSetState(ctx context.Context, state *walletrpc.DarksideLightwalletdState) (*walletrpc.Empty, error) {
 	match, err := regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(state.BranchID))
 	if err != nil || !match {
 		return nil, errors.New("Invalid branch ID")
