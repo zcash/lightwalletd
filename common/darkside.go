@@ -36,9 +36,9 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
             server_start: time.Now(),
         }
 
-        testBlocks, err := os.Open("./testdata/blocks")
+        testBlocks, err := os.Open("./testdata/default-darkside-blocks")
         if err != nil {
-            Log.Fatal("Error loading testdata blocks")
+            Log.Fatal("Error loading default darksidewalletd blocks")
         }
         scan := bufio.NewScanner(testBlocks)
         for scan.Scan() { // each line (block)

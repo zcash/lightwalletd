@@ -122,6 +122,21 @@ func NewBlockHeader() *BlockHeader {
 	}
 }
 
+func BlockHeaderFromParts(version int32, prevhash []byte, merkleroot []byte, saplingroot []byte, time uint32, nbitsbytes []byte, nonce []byte, solution []byte) *BlockHeader {
+	return &BlockHeader{
+		rawBlockHeader: &rawBlockHeader{
+			Version: version,
+			HashPrevBlock: prevhash,
+			HashMerkleRoot: merkleroot,
+			HashFinalSaplingRoot: saplingroot,
+			Time: time,
+			NBitsBytes: nbitsbytes,
+			Nonce: nonce,
+			Solution: solution,
+		},
+	}
+}
+
 // ParseFromSlice parses the block header struct from the provided byte slice,
 // advancing over the bytes read. If successful it returns the rest of the
 // slice, otherwise it returns the input slice unaltered along with an error.

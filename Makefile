@@ -90,6 +90,7 @@ dep:
 # Build binary
 build:
 	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
+	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/genblocks
 
 build_rel:
 	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/server
