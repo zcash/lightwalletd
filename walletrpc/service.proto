@@ -63,7 +63,7 @@ message TransparentAddressBlockFilter {
     BlockRange range = 2;
 }
 
-message EvilLightwalletdState {
+message DarksideLightwalletdState {
     int32 startHeight = 1;
     int32 saplingActivation = 2;
     string branchID = 3;
@@ -87,7 +87,7 @@ service CompactTxStreamer {
     // Misc
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
 
-    // Evil
-    rpc EvilGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
-    rpc EvilSetState(EvilLightwalletdState) returns (Empty) {}
+    // Darkside
+    rpc DarksideGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
+    rpc DarksideSetState(DarksideLightwalletdState) returns (Empty) {}
 }
