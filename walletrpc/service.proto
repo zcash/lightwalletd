@@ -86,13 +86,14 @@ message PingResponse {
     int64 exit = 2;
 }
 
-message EvilLightwalletdState {
+message DarksideLightwalletdState {
     int32 startHeight = 1;
     int32 saplingActivation = 2;
     string branchID = 3;
     string chainName = 4;
     repeated string blocks = 5;
 }
+
 service CompactTxStreamer {
     // Return the height of the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -114,7 +115,7 @@ service CompactTxStreamer {
     // Testing-only
     rpc Ping(Duration) returns (PingResponse) {}
 
-    // Evil
-    rpc EvilGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
-    rpc EvilSetState(EvilLightwalletdState) returns (Empty) {}
+    // Darkside
+    rpc DarksideGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
+    rpc DarksideSetState(DarksideLightwalletdState) returns (Empty) {}
 }
