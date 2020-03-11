@@ -218,11 +218,19 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.Duration"><span class="badge">M</span>Duration</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.Empty"><span class="badge">M</span>Empty</a>
                 </li>
               
                 <li>
                   <a href="#cash.z.wallet.sdk.rpc.LightdInfo"><span class="badge">M</span>LightdInfo</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.PingResponse"><span class="badge">M</span>PingResponse</a>
                 </li>
               
                 <li>
@@ -530,6 +538,30 @@ in a pure-Sapling context, the fee will be calculable as:
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.Duration">Duration</h3>
+        <p>Duration is currently used only for testing, so that the Ping rpc</p><p>can simulate a delay, to create many simultaneous connections. Units</p><p>are microseconds.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>intervalUs</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.Empty">Empty</h3>
         <p>Empty is for gRPCs that take no arguments, currently only GetLightdInfo.</p>
 
@@ -538,7 +570,7 @@ in a pure-Sapling context, the fee will be calculable as:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.LightdInfo">LightdInfo</h3>
-        <p>The LightdInfo returns various information about this lightwalletd instance</p><p>and the state of the blockchain.</p>
+        <p>LightdInfo returns various information about this lightwalletd instance</p><p>and the state of the blockchain.</p>
 
         
           <table class="field-table">
@@ -592,6 +624,37 @@ in a pure-Sapling context, the fee will be calculable as:
                 <tr>
                   <td>blockHeight</td>
                   <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.PingResponse">PingResponse</h3>
+        <p>PingResponse is used to indicate concurrency, how many Ping rpcs</p><p>are executing upon entry and upon exit (after the delay).</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>entry</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>exit</td>
+                  <td><a href="#int64">int64</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -795,6 +858,13 @@ in a pure-Sapling context, the fee will be calculable as:
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.LightdInfo">LightdInfo</a></td>
                 <td><p>Misc</p></td>
+              </tr>
+            
+              <tr>
+                <td>Ping</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Duration">Duration</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.PingResponse">PingResponse</a></td>
+                <td><p></p></td>
               </tr>
             
           </tbody>
