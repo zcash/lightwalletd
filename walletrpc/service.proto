@@ -52,7 +52,7 @@ message ChainSpec {}
 // Empty is for gRPCs that take no arguments, currently only GetLightdInfo.
 message Empty {}
 
-// The LightdInfo returns various information about this lightwalletd instance
+// LightdInfo returns various information about this lightwalletd instance
 // and the state of the blockchain.
 message LightdInfo {
     string version = 1;
@@ -71,6 +71,20 @@ message TransparentAddressBlockFilter {
     BlockRange range = 2;
 }
 
+// Duration is currently used only for testing, so that the Ping rpc
+// can simulate a delay, to create many simultaneous connections. Units
+// are microseconds.
+message Duration {
+    int64 intervalUs = 1;
+}
+
+// PingResponse is used to indicate concurrency, how many Ping rpcs
+// are executing upon entry and upon exit (after the delay).
+message PingResponse {
+    int64 entry = 1;
+    int64 exit = 2;
+}
+
 service CompactTxStreamer {
     // Compact Blocks
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -86,4 +100,5 @@ service CompactTxStreamer {
 
     // Misc
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
+    rpc Ping(Duration) returns (PingResponse) {}
 }

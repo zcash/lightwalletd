@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/zcash/lightwalletd/common"
@@ -242,4 +243,15 @@ func (s *LwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 		ErrorCode:    int32(errCode),
 		ErrorMessage: errMsg,
 	}, nil
+}
+
+// This rpc is used only for testing.
+var concurrent int64
+
+func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*walletrpc.PingResponse, error) {
+	var response walletrpc.PingResponse
+	response.Entry = atomic.AddInt64(&concurrent, 1)
+	time.Sleep(time.Duration(in.IntervalUs) * time.Microsecond)
+	response.Exit = atomic.AddInt64(&concurrent, -1)
+	return &response, nil
 }
