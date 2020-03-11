@@ -34,7 +34,27 @@ Documentation for lightwalletd clients (the gRPC interface) is in `docs/rtd/inde
 
 # Local/Developer Usage
 
-First, ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed. Once your go environment is setup correctly, you can build/run the below components.
+## Zcashd
+
+You must start a local instance of `zcashd`, and its `.zcash/zcash.conf` file must include the following entries:
+```
+txindex=1
+insightexplorer=1
+experimentalfeatures=1
+```
+
+It's necessary to run `zcashd --reindex` one time for these options to take effect. This typically takes several hours, and requires more space in the `.zcash` data directory.
+
+Lightwalletd uses the following `zcashd` RPCs:
+- `getblockchaininfo`
+- `getblock`
+- `getrawtransaction`
+- `getaddresstxids`
+- `sendrawtransaction`
+
+## Lightwalletd
+
+First, install [Go](https://golang.org/dl/#stable) version 1.11 or later. You can see your current version by running `go version`.
 
 To build the server, run `make`.
 
@@ -50,7 +70,8 @@ Assuming you used `make` to build SERVER:
 
 # Production Usage
 
-Ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed.
+Run a local instance of `zcashd` (see above).
+Ensure [Go](https://golang.org/dl/#stable) version 1.11 or later is installed.
 
 **x509 Certificates**
 You will need to supply an x509 certificate that connecting clients will have good reason to trust (hint: do not use a self-signed one, our SDK will reject those unless you distribute them to the client out-of-band). We suggest that you be sure to buy a reputable one from a supplier that uses a modern hashing algorithm (NOT md5 or sha1) and that uses Certificate Transparency (OID 1.3.6.1.4.1.11129.2.4.2 will be present in the certificate).
@@ -113,4 +134,4 @@ $ chmod +x .git/hooks/pre-commit
 ```
 
 Doing this will prevent commits that break the standard formatting. Simply run the
-`gofmt` command as indicated and rerun the `git commit` command.
+`gofmt` command as indicated and rerun the `git add` and `git commit` commands.
