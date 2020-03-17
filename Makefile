@@ -18,11 +18,22 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v '*_test.go'
 GO_TEST_FILES := $(shell find . -name '*_test.go' -type f | rev | cut -d "/" -f2- | rev | sort -u)
 GO_BUILD_FILES := $(shell find . -name 'main.go')
 
+# There are some files that are generated but are also in source control
+# (so that the average clone - build doesn't need the required tools)
+GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go
+
 PWD := $(shell pwd)
 
-.PHONY: all dep build clean test coverage coverhtml lint doc simpledoc
+.PHONY: all dep build clean test coverage lint doc simpledoc
 
-all: build
+all: first-make-timestamp build $(GENERATED_FILES)
+
+# Ensure that the generated files that are also in git source control are
+# initially more recent than the files they're generated from (so we don't try
+# to rebuild them); this isn't perfect because it depends on doing a make before
+# editing a .proto file; also, "make -jn" may trigger remake if n > 1.
+first-make-timestamp:
+	touch $(GENERATED_FILES) $@
 
 # Lint golang files
 lint:
@@ -62,6 +73,12 @@ doc: docs/rtd/index.html
 
 docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto
 	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/walletrpc:/protos pseudomuto/protoc-gen-doc
+
+walletrpc/compact_formats.pb.go: walletrpc/compact_formats.proto
+	cd walletrpc; protoc compact_formats.proto --go_out=plugins=grpc:.
+
+walletrpc/service.pb.go: walletrpc/service.proto
+	cd walletrpc; protoc service.proto --go_out=plugins=grpc:.
 
 # Generate documents using a very simple wrap-in-html approach (not ideal)
 simpledoc: lwd-api.html
