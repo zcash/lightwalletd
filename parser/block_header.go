@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"log"
 	"math/big"
 
 	"github.com/pkg/errors"
@@ -198,7 +197,6 @@ func (hdr *BlockHeader) GetDisplayHash() []byte {
 
 	serializedHeader, err := hdr.MarshalBinary()
 	if err != nil {
-		log.Fatalf("error marshaling block header: %v", err)
 		return nil
 	}
 
@@ -221,7 +219,6 @@ func (hdr *BlockHeader) GetEncodableHash() []byte {
 	serializedHeader, err := hdr.MarshalBinary()
 
 	if err != nil {
-		log.Fatalf("error marshaling block header: %v", err)
 		return nil
 	}
 
