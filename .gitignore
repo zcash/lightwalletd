@@ -1,4 +1,5 @@
-server
+first-make-timestamp
+lightwalletd
 server.log
 coverage.out
 test-log

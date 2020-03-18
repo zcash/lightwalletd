@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -15,14 +16,13 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/zcash-hackworks/lightwalletd/common"
-	"github.com/zcash-hackworks/lightwalletd/common/logging"
-	"github.com/zcash-hackworks/lightwalletd/frontend"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/common/logging"
+	"github.com/zcash/lightwalletd/frontend"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
 var cfgFile string
-var log *logrus.Entry
 var logger = logrus.New()
 
 // rootCmd represents the base command when called without any subcommands
@@ -43,7 +43,7 @@ var rootCmd = &cobra.Command{
 			CacheSize:         viper.GetInt("cache-size"),
 		}
 
-		log.Debugf("Options: %#v\n", opts)
+		common.Log.Debugf("Options: %#v\n", opts)
 
 		filesThatShouldExist := []string{
 			opts.TLSCertPath,
@@ -67,7 +67,7 @@ var rootCmd = &cobra.Command{
 
 		// Start server and block, or exit
 		if err := startServer(opts); err != nil {
-			log.WithFields(logrus.Fields{
+			common.Log.WithFields(logrus.Fields{
 				"error": err,
 			}).Fatal("couldn't create server")
 		}
@@ -87,7 +87,7 @@ func startServer(opts *common.Options) error {
 		// instead write parsable logs for logstash/splunk/etc
 		output, err := os.OpenFile(opts.LogFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			common.Log.WithFields(logrus.Fields{
 				"error": err,
 				"path":  opts.LogFile,
 			}).Fatal("couldn't open log file")
@@ -102,13 +102,13 @@ func startServer(opts *common.Options) error {
 	var server *grpc.Server
 
 	if opts.NoTLSVeryInsecure {
-		log.Warningln("Starting insecure server")
+		common.Log.Warningln("Starting insecure server")
 		fmt.Println("Starting insecure server")
 		server = grpc.NewServer(logging.LoggingInterceptor())
 	} else {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.TLSCertPath, opts.TLSKeyPath)
 		if err != nil {
-			log.WithFields(logrus.Fields{
+			common.Log.WithFields(logrus.Fields{
 				"cert_file": opts.TLSCertPath,
 				"key_path":  opts.TLSKeyPath,
 				"error":     err,
@@ -128,15 +128,17 @@ func startServer(opts *common.Options) error {
 
 	rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"error": err,
 		}).Fatal("setting up RPC connection to zcashd")
 	}
+	// Indirect function for test mocking (so unit tests can talk to stub functions).
+	common.RawRequest = rpcClient.RawRequest
 
 	// Get the sapling activation height from the RPC
 	// (this first RPC also verifies that we can communicate with zcashd)
-	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo(rpcClient, log)
-	log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
+	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo()
+	common.Log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
 
 	// Initialize the cache
 	cache := common.NewBlockCache(opts.CacheSize)
@@ -147,12 +149,12 @@ func startServer(opts *common.Options) error {
 		cacheStart = saplingHeight
 	}
 
-	go common.BlockIngestor(rpcClient, cache, log, cacheStart)
+	go common.BlockIngestor(cache, cacheStart, 0 /*loop forever*/)
 
 	// Compact transaction service initialization
-	service, err := frontend.NewLwdStreamer(rpcClient, cache, log)
+	service, err := frontend.NewLwdStreamer(cache)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"error": err,
 		}).Fatal("couldn't create backend")
 	}
@@ -163,7 +165,7 @@ func startServer(opts *common.Options) error {
 	// Start listening
 	listener, err := net.Listen("tcp", opts.BindAddr)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"bind_addr": opts.BindAddr,
 			"error":     err,
 		}).Fatal("couldn't create listener")
@@ -174,17 +176,17 @@ func startServer(opts *common.Options) error {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		s := <-signals
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
 		os.Exit(1)
 	}()
 
-	log.Infof("Starting gRPC server on %s", opts.BindAddr)
+	common.Log.Infof("Starting gRPC server on %s", opts.BindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
-		log.WithFields(logrus.Fields{
+		common.Log.WithFields(logrus.Fields{
 			"error": err,
 		}).Fatal("gRPC server exited")
 	}
@@ -240,11 +242,14 @@ func init() {
 		fmt.Printf("Lightwalletd died with a Fatal error. Check logfile for details.\n")
 	}
 
-	log = logger.WithFields(logrus.Fields{
+	common.Log = logger.WithFields(logrus.Fields{
 		"app": "lightwalletd",
 	})
 
 	logrus.RegisterExitHandler(onexit)
+
+	// Indirect function for test mocking (so unit tests can talk to stub functions)
+	common.Sleep = time.Sleep
 }
 
 // initConfig reads in config file and ENV variables if set.
