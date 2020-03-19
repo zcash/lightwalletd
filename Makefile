@@ -129,6 +129,15 @@ build_rel:
 install:
 	go install ./...
 
+# Update your protoc, protobufs, grpc, .pb.go files
+update-grpc:
+	go get -u github.com/golang/protobuf/proto
+	go get -u github.com/golang/protobuf/protoc-gen-go
+	go get -u google.golang.org/grpc
+	cd walletrpc; protoc compact_formats.proto --go_out=plugins=grpc:.
+	cd walletrpc; protoc service.proto --go_out=plugins=grpc:.
+	go mod tidy && go mod vendor
+
 clean:
 	@echo "clean project..."
 	#rm -f $(PROJECT_NAME)

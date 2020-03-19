@@ -291,7 +291,9 @@ func init() {
 	proto.RegisterType((*CompactOutput)(nil), "cash.z.wallet.sdk.rpc.CompactOutput")
 }
 
-func init() { proto.RegisterFile("compact_formats.proto", fileDescriptor_dce29fee3ee34899) }
+func init() {
+	proto.RegisterFile("compact_formats.proto", fileDescriptor_dce29fee3ee34899)
+}
 
 var fileDescriptor_dce29fee3ee34899 = []byte{
 	// 353 bytes of a gzipped FileDescriptorProto
