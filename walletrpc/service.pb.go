@@ -493,7 +493,9 @@ func init() {
 	proto.RegisterType((*TransparentAddressBlockFilter)(nil), "cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter")
 }
 
-func init() { proto.RegisterFile("service.proto", fileDescriptor_a0b84a42fa06f626) }
+func init() {
+	proto.RegisterFile("service.proto", fileDescriptor_a0b84a42fa06f626)
+}
 
 var fileDescriptor_a0b84a42fa06f626 = []byte{
 	// 641 bytes of a gzipped FileDescriptorProto
@@ -542,11 +544,11 @@ var fileDescriptor_a0b84a42fa06f626 = []byte{
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
-var _ grpc.ClientConn
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-const _ = grpc.SupportPackageIsVersion4
+const _ = grpc.SupportPackageIsVersion6
 
 // CompactTxStreamerClient is the client API for CompactTxStreamer service.
 //
@@ -566,10 +568,10 @@ type CompactTxStreamerClient interface {
 }
 
 type compactTxStreamerClient struct {
-	cc *grpc.ClientConn
+	cc grpc.ClientConnInterface
 }
 
-func NewCompactTxStreamerClient(cc *grpc.ClientConn) CompactTxStreamerClient {
+func NewCompactTxStreamerClient(cc grpc.ClientConnInterface) CompactTxStreamerClient {
 	return &compactTxStreamerClient{cc}
 }
 
