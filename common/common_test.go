@@ -192,7 +192,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		if sleepCount != 2 || sleepDuration != 11*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
-		// should re-request the same height
+		// Back up to 41.
 		if height != "380641" {
 			testT.Error("unexpected height", height)
 		}

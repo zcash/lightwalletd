@@ -33,6 +33,7 @@ type Options struct {
 	NoTLSVeryInsecure bool   `json:"no_tls_very_insecure,omitempty"`
 	Redownload        bool   `json:"redownload"`
 	DataDir           string `json:"data-dir"`
+	DarkSide          bool   `json:"darkside"`
 }
 
 // RawRequest points to the function to send a an RPC request to zcashd;
@@ -131,6 +132,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	if len(rest) != 0 {
 		return nil, errors.New("received overlong message")
 	}
+
 	// TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
 	if false && block.GetHeight() != height {
 		return nil, errors.New("received unexpected height block")
