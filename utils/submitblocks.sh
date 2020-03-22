@@ -8,4 +8,4 @@ JSON="{\"startHeight\": $1, \"saplingActivation\": $2, \"branchID\": \"2bb40e60\
 JSON="$JSON$(cat "$3" | sed 's/^/"/' | sed 's/$/"/' | sed '1s/^/[/;$!s/$/,/;$s/$/]/')"
 JSON="$JSON}"
 
-grpcurl -insecure -import-path ./walletrpc/ -proto service.proto -d "$JSON" localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/DarksideSetState
+grpcurl -plaintext -import-path ./walletrpc/ -proto service.proto -d "$JSON" localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/DarksideSetState

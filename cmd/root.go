@@ -48,6 +48,7 @@ var rootCmd = &cobra.Command{
 			NoTLSVeryInsecure: viper.GetBool("no-tls-very-insecure"),
 			DataDir:           viper.GetString("data-dir"),
 			Redownload:        viper.GetBool("redownload"),
+			DarkSide:          viper.GetBool("darkside-very-insecure"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -56,12 +57,14 @@ var rootCmd = &cobra.Command{
 			opts.TLSCertPath,
 			opts.TLSKeyPath,
 			opts.LogFile,
-			opts.ZcashConfPath,
 		}
-
 		if !fileExists(opts.LogFile) {
 			os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 		}
+		if !opts.DarkSide {
+			filesThatShouldExist = append(filesThatShouldExist, opts.ZcashConfPath)
+		}
+
 		for _, filename := range filesThatShouldExist {
 			if opts.NoTLSVeryInsecure && (filename == opts.TLSCertPath || filename == opts.TLSKeyPath) {
 				continue
@@ -159,14 +162,18 @@ func startServer(opts *common.Options) error {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
-	rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
-	if err != nil {
-		common.Log.WithFields(logrus.Fields{
-			"error": err,
-		}).Fatal("setting up RPC connection to zcashd")
+	if opts.DarkSide {
+		common.RawRequest = common.DarkSideRawRequest
+	} else {
+		rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("setting up RPC connection to zcashd")
+		}
+		// Indirect function for test mocking (so unit tests can talk to stub functions).
+		common.RawRequest = rpcClient.RawRequest
 	}
-	// Indirect function for test mocking (so unit tests can talk to stub functions).
-	common.RawRequest = rpcClient.RawRequest
 
 	// Get the sapling activation height from the RPC
 	// (this first RPC also verifies that we can communicate with zcashd)
@@ -249,6 +256,7 @@ func init() {
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
+	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
@@ -270,6 +278,8 @@ func init() {
 	viper.SetDefault("redownload", false)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))
 	viper.SetDefault("data-dir", "/var/lib/lightwalletd")
+	viper.BindPFlag("darkside-very-insecure", rootCmd.Flags().Lookup("darkside-very-insecure"))
+	viper.SetDefault("darkside-very-insecure", false)
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,

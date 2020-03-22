@@ -256,9 +256,7 @@ func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	return &response, nil
 }
 
-
 // Darkside
-
 func (s *LwdStreamer) DarksideGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.CompactTxStreamer_DarksideGetIncomingTransactionsServer) error {
 	// Get all of the new incoming transactions evil zcashd has accepted.
 	result, rpcErr := common.RawRequest("x_getincomingtransactions", nil)
@@ -307,7 +305,7 @@ func (s *LwdStreamer) DarksideSetState(ctx context.Context, state *walletrpc.Dar
 
 	for i, block := range state.Blocks {
 		st += "\"" + block + "\""
-		if i < len(state.Blocks) - 1 {
+		if i < len(state.Blocks)-1 {
 			st += ", "
 		}
 	}
