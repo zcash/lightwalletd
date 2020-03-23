@@ -1,0 +1,27 @@
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TaskRun
+metadata:
+  generateName: lightwalletd-dockerbuild-
+spec:
+  serviceAccountName: zcashsysadmin-service
+  taskRef:
+    name: build-docker-image-from-git-source
+  inputs:
+    resources:
+      - name: docker-source
+        resourceRef:
+          name: lightwalletd-git
+    params:
+      - name: pathToDockerFile
+        value: /workspace/docker-source/Dockerfile
+      - name: pathToContext
+        value: /workspace/docker-source/
+  outputs:
+    resources:
+      - name: builtImage
+        resourceRef:
+          name: lightwalletd-image
+      - name: notification
+        resourceRef:
+          name: event-to-cloudlog

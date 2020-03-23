@@ -1,0 +1,22 @@
+---
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: lightwalletd-image
+spec:
+  type: image
+  params:
+    - name: url
+      value: electriccoinco/lightwalletd
+---
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: lightwalletd-git
+spec:
+  type: git
+  params:
+    - name: revision
+      value: master
+    - name: url
+      value: https://github.com/zcash/lightwalletd.git

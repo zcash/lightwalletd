@@ -46,7 +46,7 @@ FROM golang:1.13 AS lightwalletd_base
 ADD . /go/src/github.com/zcash/lightwalletd
 WORKDIR /go/src/github.com/zcash/lightwalletd
 RUN make \
-  && /usr/bin/install -c ./server /usr/bin/
+  && /usr/bin/install -c ./lightwalletd /usr/local/bin/
 
 ARG LWD_USER=lightwalletd
 ARG LWD_UID=2002
@@ -59,5 +59,5 @@ RUN useradd --home-dir /srv/$LWD_USER \
 USER $LWD_USER
 WORKDIR /srv/$LWD_USER
 
-ENTRYPOINT ["server"]
+ENTRYPOINT ["lightwalletd"]
 CMD ["--help"]
