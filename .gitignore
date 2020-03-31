@@ -4,3 +4,4 @@ server.log
 coverage.out
 test-log
 lwd-api.html
+*.orig

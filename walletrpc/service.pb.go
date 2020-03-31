@@ -181,7 +181,7 @@ func (m *TxFilter) GetHash() []byte {
 }
 
 // RawTransaction contains the complete transaction data. It also optionally includes
-// the block height in which the transaction was included
+// the block height in which the transaction was included.
 type RawTransaction struct {
 	Data                 []byte   `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	Height               uint64   `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
@@ -525,6 +525,7 @@ func (m *Duration) GetIntervalUs() int64 {
 
 // PingResponse is used to indicate concurrency, how many Ping rpcs
 // are executing upon entry and upon exit (after the delay).
+// This rpc is used for testing only.
 type PingResponse struct {
 	Entry                int64    `protobuf:"varint,1,opt,name=entry,proto3" json:"entry,omitempty"`
 	Exit                 int64    `protobuf:"varint,2,opt,name=exit,proto3" json:"exit,omitempty"`
@@ -651,17 +652,21 @@ const _ = grpc.SupportPackageIsVersion6
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type CompactTxStreamerClient interface {
-	// Compact Blocks
+	// Return the height of the tip of the best chain
 	GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockID, error)
+	// Return the compact block corresponding to the given block identifier
 	GetBlock(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*CompactBlock, error)
+	// Return a list of consecutive compact blocks
 	GetBlockRange(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error)
-	// Transactions
+	// Return the requested full (not compact) transaction (as from zcashd)
 	GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*RawTransaction, error)
+	// Submit the given transaction to the zcash network
 	SendTransaction(ctx context.Context, in *RawTransaction, opts ...grpc.CallOption) (*SendResponse, error)
-	// t-Address support
+	// Return the txids corresponding to the given t-address within the given block range
 	GetAddressTxids(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressTxidsClient, error)
-	// Misc
+	// Return information about this lightwalletd instance and the blockchain
 	GetLightdInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*LightdInfo, error)
+	// Testing-only
 	Ping(ctx context.Context, in *Duration, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
@@ -793,17 +798,21 @@ func (c *compactTxStreamerClient) Ping(ctx context.Context, in *Duration, opts .
 
 // CompactTxStreamerServer is the server API for CompactTxStreamer service.
 type CompactTxStreamerServer interface {
-	// Compact Blocks
+	// Return the height of the tip of the best chain
 	GetLatestBlock(context.Context, *ChainSpec) (*BlockID, error)
+	// Return the compact block corresponding to the given block identifier
 	GetBlock(context.Context, *BlockID) (*CompactBlock, error)
+	// Return a list of consecutive compact blocks
 	GetBlockRange(*BlockRange, CompactTxStreamer_GetBlockRangeServer) error
-	// Transactions
+	// Return the requested full (not compact) transaction (as from zcashd)
 	GetTransaction(context.Context, *TxFilter) (*RawTransaction, error)
+	// Submit the given transaction to the zcash network
 	SendTransaction(context.Context, *RawTransaction) (*SendResponse, error)
-	// t-Address support
+	// Return the txids corresponding to the given t-address within the given block range
 	GetAddressTxids(*TransparentAddressBlockFilter, CompactTxStreamer_GetAddressTxidsServer) error
-	// Misc
+	// Return information about this lightwalletd instance and the blockchain
 	GetLightdInfo(context.Context, *Empty) (*LightdInfo, error)
+	// Testing-only
 	Ping(context.Context, *Duration) (*PingResponse, error)
 }
 

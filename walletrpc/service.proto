@@ -26,16 +26,16 @@ message BlockRange {
 // transaction: either a block and an index, or a direct transaction hash.
 // Currently, only specification by hash is supported.
 message TxFilter {
-     BlockID block = 1;
-     uint64 index = 2;
-     bytes hash = 3;
+     BlockID block = 1;     // block identifier, height or hash
+     uint64 index = 2;      // index within the block
+     bytes hash = 3;        // transaction ID (hash, txid)
 }
 
 // RawTransaction contains the complete transaction data. It also optionally includes 
-// the block height in which the transaction was included
+// the block height in which the transaction was included.
 message RawTransaction {
-    bytes data = 1;
-    uint64 height = 2;
+    bytes data = 1;     // exact data returned by zcash 'getrawtransaction'
+    uint64 height = 2;  // height that the transaction was mined (or -1)
 }
 
 // A SendResponse encodes an error code and a string. It is currently used
@@ -57,18 +57,18 @@ message Empty {}
 message LightdInfo {
     string version = 1;
     string vendor = 2;
-    bool   taddrSupport = 3;
-    string chainName = 4;
-    uint64 saplingActivationHeight = 5;
-    string consensusBranchId = 6;
-    uint64 blockHeight = 7;
+    bool   taddrSupport = 3;            // true
+    string chainName = 4;               // either "main" or "test"
+    uint64 saplingActivationHeight = 5; // depends on mainnet or testnet
+    string consensusBranchId = 6;       // protocol identifier, see consensus/upgrades.cpp
+    uint64 blockHeight = 7;             // latest block on the best chain
 }
 
 // TransparentAddressBlockFilter restricts the results to the given address
 // or block range.
 message TransparentAddressBlockFilter {
-    string address = 1;
-    BlockRange range = 2;
+    string address = 1;     // t-address
+    BlockRange range = 2;   // start, end heights
 }
 
 // Duration is currently used only for testing, so that the Ping rpc
@@ -80,25 +80,30 @@ message Duration {
 
 // PingResponse is used to indicate concurrency, how many Ping rpcs
 // are executing upon entry and upon exit (after the delay).
+// This rpc is used for testing only.
 message PingResponse {
     int64 entry = 1;
     int64 exit = 2;
 }
 
 service CompactTxStreamer {
-    // Compact Blocks
+    // Return the height of the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
+    // Return the compact block corresponding to the given block identifier
     rpc GetBlock(BlockID) returns (CompactBlock) {}
+    // Return a list of consecutive compact blocks
     rpc GetBlockRange(BlockRange) returns (stream CompactBlock) {}
 
-    // Transactions
+    // Return the requested full (not compact) transaction (as from zcashd)
     rpc GetTransaction(TxFilter) returns (RawTransaction) {}
+    // Submit the given transaction to the zcash network
     rpc SendTransaction(RawTransaction) returns (SendResponse) {}
 
-    // t-Address support
+    // Return the txids corresponding to the given t-address within the given block range
     rpc GetAddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
 
-    // Misc
+    // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
+    // Testing-only
     rpc Ping(Duration) returns (PingResponse) {}
 }
