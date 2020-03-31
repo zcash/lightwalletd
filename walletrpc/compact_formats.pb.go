@@ -111,9 +111,9 @@ func (m *CompactBlock) GetVtx() []*CompactTx {
 	return nil
 }
 
-// Index and hash will allow the receiver to call out to chain
-// explorers or other data structures to retrieve more information
-// about this transaction.
+// CompactTx contains the minimum information for a wallet to know if this transaction
+// is relevant to it (either pays to it or spends from it) via shielded elements
+// only. This message will not encode a transparent-to-transparent transaction.
 type CompactTx struct {
 	Index uint64 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
 	Hash  []byte `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
@@ -190,6 +190,8 @@ func (m *CompactTx) GetOutputs() []*CompactOutput {
 	return nil
 }
 
+// CompactSpend is a Sapling Spend Description as described in 7.3 of the Zcash
+// protocol specification.
 type CompactSpend struct {
 	Nf                   []byte   `protobuf:"bytes,1,opt,name=nf,proto3" json:"nf,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
@@ -229,6 +231,8 @@ func (m *CompactSpend) GetNf() []byte {
 	return nil
 }
 
+// output is a Sapling Output Description as described in section 7.4 of the
+// Zcash protocol spec. Total size is 948.
 type CompactOutput struct {
 	Cmu                  []byte   `protobuf:"bytes,1,opt,name=cmu,proto3" json:"cmu,omitempty"`
 	Epk                  []byte   `protobuf:"bytes,2,opt,name=epk,proto3" json:"epk,omitempty"`

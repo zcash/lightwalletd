@@ -299,21 +299,21 @@
                   <td>hash</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>the ID (hash) of this block, same as in block explorers </p></td>
                 </tr>
               
                 <tr>
                   <td>prevHash</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>the ID (hash) of this block&#39;s predecessor </p></td>
                 </tr>
               
                 <tr>
                   <td>time</td>
                   <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>Unix epoch time when the block was mined </p></td>
                 </tr>
               
                 <tr>
@@ -327,7 +327,7 @@
                   <td>vtx</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.CompactTx">CompactTx</a></td>
                   <td>repeated</td>
-                  <td><p>compact transactions from this block </p></td>
+                  <td><p>zero or more compact transactions from this block </p></td>
                 </tr>
               
             </tbody>
@@ -338,7 +338,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactOutput">CompactOutput</h3>
-        <p></p>
+        <p>output is a Sapling Output Description as described in section 7.4 of the</p><p>Zcash protocol spec. Total size is 948.</p>
 
         
           <table class="field-table">
@@ -351,21 +351,21 @@
                   <td>cmu</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>note commitment u-coordinate </p></td>
                 </tr>
               
                 <tr>
                   <td>epk</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>ephemeral public key </p></td>
                 </tr>
               
                 <tr>
                   <td>ciphertext</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>ciphertext and zkproof </p></td>
                 </tr>
               
             </tbody>
@@ -376,7 +376,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactSpend">CompactSpend</h3>
-        <p></p>
+        <p>CompactSpend is a Sapling Spend Description as described in 7.3 of the Zcash</p><p>protocol specification.</p>
 
         
           <table class="field-table">
@@ -389,7 +389,7 @@
                   <td>nf</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>nullifier (see the Zcash protocol specification) </p></td>
                 </tr>
               
             </tbody>
@@ -400,7 +400,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactTx">CompactTx</h3>
-        <p>Index and hash will allow the receiver to call out to chain</p><p>explorers or other data structures to retrieve more information</p><p>about this transaction.</p>
+        <p>CompactTx contains the minimum information for a wallet to know if this transaction</p><p>is relevant to it (either pays to it or spends from it) via shielded elements</p><p>only. This message will not encode a transparent-to-transparent transaction.</p>
 
         
           <table class="field-table">
@@ -413,14 +413,14 @@
                   <td>index</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>the index within the full block </p></td>
                 </tr>
               
                 <tr>
                   <td>hash</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>the ID (hash) of this transaction, same as in block explorers </p></td>
                 </tr>
               
                 <tr>
@@ -438,14 +438,14 @@ in a pure-Sapling context, the fee will be calculable as:
                   <td>spends</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.CompactSpend">CompactSpend</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>inputs </p></td>
                 </tr>
               
                 <tr>
                   <td>outputs</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.CompactOutput">CompactOutput</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>outputs </p></td>
                 </tr>
               
             </tbody>
@@ -597,35 +597,35 @@ in a pure-Sapling context, the fee will be calculable as:
                   <td>taddrSupport</td>
                   <td><a href="#bool">bool</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>true </p></td>
                 </tr>
               
                 <tr>
                   <td>chainName</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>either &#34;main&#34; or &#34;test&#34; </p></td>
                 </tr>
               
                 <tr>
                   <td>saplingActivationHeight</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>depends on mainnet or testnet </p></td>
                 </tr>
               
                 <tr>
                   <td>consensusBranchId</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>protocol identifier, see consensus/upgrades.cpp </p></td>
                 </tr>
               
                 <tr>
                   <td>blockHeight</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>latest block on the best chain </p></td>
                 </tr>
               
             </tbody>
@@ -636,7 +636,7 @@ in a pure-Sapling context, the fee will be calculable as:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.PingResponse">PingResponse</h3>
-        <p>PingResponse is used to indicate concurrency, how many Ping rpcs</p><p>are executing upon entry and upon exit (after the delay).</p>
+        <p>PingResponse is used to indicate concurrency, how many Ping rpcs</p><p>are executing upon entry and upon exit (after the delay).</p><p>This rpc is used for testing only.</p>
 
         
           <table class="field-table">
@@ -667,7 +667,7 @@ in a pure-Sapling context, the fee will be calculable as:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</h3>
-        <p>RawTransaction contains the complete transaction data. It also optionally includes </p><p>the block height in which the transaction was included</p>
+        <p>RawTransaction contains the complete transaction data. It also optionally includes </p><p>the block height in which the transaction was included.</p>
 
         
           <table class="field-table">
@@ -680,14 +680,14 @@ in a pure-Sapling context, the fee will be calculable as:
                   <td>data</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>exact data returned by zcash &#39;getrawtransaction&#39; </p></td>
                 </tr>
               
                 <tr>
                   <td>height</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>height that the transaction was mined (or -1) </p></td>
                 </tr>
               
             </tbody>
@@ -742,14 +742,14 @@ in a pure-Sapling context, the fee will be calculable as:
                   <td>address</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>t-address </p></td>
                 </tr>
               
                 <tr>
                   <td>range</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.BlockRange">BlockRange</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>start, end heights </p></td>
                 </tr>
               
             </tbody>
@@ -773,21 +773,21 @@ in a pure-Sapling context, the fee will be calculable as:
                   <td>block</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>block identifier, height or hash </p></td>
                 </tr>
               
                 <tr>
                   <td>index</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>index within the block </p></td>
                 </tr>
               
                 <tr>
                   <td>hash</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>transaction ID (hash, txid) </p></td>
                 </tr>
               
             </tbody>
@@ -815,56 +815,56 @@ in a pure-Sapling context, the fee will be calculable as:
                 <td>GetLatestBlock</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.ChainSpec">ChainSpec</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
-                <td><p>Compact Blocks</p></td>
+                <td><p>Return the height of the tip of the best chain</p></td>
               </tr>
             
               <tr>
                 <td>GetBlock</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</a></td>
-                <td><p></p></td>
+                <td><p>Return the compact block corresponding to the given block identifier</p></td>
               </tr>
             
               <tr>
                 <td>GetBlockRange</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockRange">BlockRange</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</a> stream</td>
-                <td><p></p></td>
+                <td><p>Return a list of consecutive compact blocks</p></td>
               </tr>
             
               <tr>
                 <td>GetTransaction</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TxFilter">TxFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a></td>
-                <td><p>Transactions</p></td>
+                <td><p>Return the requested full (not compact) transaction (as from zcashd)</p></td>
               </tr>
             
               <tr>
                 <td>SendTransaction</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.SendResponse">SendResponse</a></td>
-                <td><p></p></td>
+                <td><p>Submit the given transaction to the zcash network</p></td>
               </tr>
             
               <tr>
                 <td>GetAddressTxids</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p>t-Address support</p></td>
+                <td><p>Return the txids corresponding to the given t-address within the given block range</p></td>
               </tr>
             
               <tr>
                 <td>GetLightdInfo</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.LightdInfo">LightdInfo</a></td>
-                <td><p>Misc</p></td>
+                <td><p>Return information about this lightwalletd instance and the blockchain</p></td>
               </tr>
             
               <tr>
                 <td>Ping</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Duration">Duration</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.PingResponse">PingResponse</a></td>
-                <td><p></p></td>
+                <td><p>Testing-only</p></td>
               </tr>
             
           </tbody>
