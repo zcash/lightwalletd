@@ -18,6 +18,9 @@ import (
 
 // 'make build' will overwrite this string with the output of git-describe (tag)
 var Version = "v0.0.0.0-dev"
+var GitCommit = ""
+var BuildDate = ""
+var BuildUser = ""
 
 type Options struct {
 	BindAddr          string `json:"bind_address,omitempty"`

@@ -13,6 +13,10 @@ var versionCmd = &cobra.Command{
 	Short: "Dispaly lightwalletd version",
 	Long:  `Dispaly lightwalletd version.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("lightwalletd version", common.Version)
+		fmt.Println("lightwalletd version: ", common.Version)
+		fmt.Println("from commit: ", common.GitCommit)
+		fmt.Println("on: ", common.BuildDate)
+		fmt.Println("by: ", common.BuildUser)
+
 	},
 }
