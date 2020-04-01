@@ -18,6 +18,17 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v '*_test.go'
 GO_TEST_FILES := $(shell find . -name '*_test.go' -type f | rev | cut -d "/" -f2- | rev | sort -u)
 GO_BUILD_FILES := $(shell find . -name 'main.go')
 
+VERSION := `git describe --tags`
+GITCOMMIT := `git rev-parse HEAD`
+BUILDDATE := `date +%Y-%m-%d`
+BUILDUSER := `whoami`
+LDFLAGSSTRING :=-X github.com/zcash/lightwalletd/common.Version=$(VERSION)
+LDFLAGSSTRING +=-X github.com/zcash/lightwalletd/common.GitCommit=$(GITCOMMIT)
+LDFLAGSSTRING +=-X github.com/zcash/lightwalletd/common.Branch=$(BRANCH)
+LDFLAGSSTRING +=-X github.com/zcash/lightwalletd/common.BuildDate=$(BUILDDATE)
+LDFLAGSSTRING +=-X github.com/zcash/lightwalletd/common.BuildUser=$(BUILDUSER)
+LDFLAGS :=-ldflags "$(LDFLAGSSTRING)"
+
 # There are some files that are generated but are also in source control
 # (so that the average clone - build doesn't need the required tools)
 GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go
@@ -120,10 +131,10 @@ dep:
 
 # Build binary
 build:
-	GO111MODULE=on go build -ldflags="-X github.com/zcash/lightwalletd/common.Version=`git describe --tags`"
+	GO111MODULE=on go build $(LDFLAGS) 
 
 build_rel:
-	GO111MODULE=on GOOS=linux go build -ldflags="-X github.com/zcash/lightwalletd/common.Version=`git describe --tags`"
+	GO111MODULE=on GOOS=linux go build $(LDFLAGS) 
 
 # Install binaries into Go path
 install:
