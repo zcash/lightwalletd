@@ -182,7 +182,7 @@ func startServer(opts *common.Options) error {
 		os.Exit(1)
 	}()
 
-	common.Log.Infof("Starting gRPC server on %s", opts.BindAddr)
+	common.Log.Infof("Starting gRPC server version %s on %s", common.Version, opts.BindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {

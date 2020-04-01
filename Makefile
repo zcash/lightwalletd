@@ -120,10 +120,10 @@ dep:
 
 # Build binary
 build:
-	GO111MODULE=on go build
+	GO111MODULE=on go build -ldflags="-X github.com/zcash/lightwalletd/common.Version=`git describe --tags`"
 
 build_rel:
-	GO111MODULE=on GOOS=linux go build
+	GO111MODULE=on GOOS=linux go build -ldflags="-X github.com/zcash/lightwalletd/common.Version=`git describe --tags`"
 
 # Install binaries into Go path
 install:
