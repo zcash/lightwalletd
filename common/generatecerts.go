@@ -1,3 +1,6 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package common
 
 import (
@@ -7,14 +10,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
-	"log"
 	"math/big"
 	"time"
 )
 
 // GenerateCerts create self signed certificate for local development use
-func GenerateCerts() (cert *tls.Certificate) {
+// (and, if using grpcurl, specify the -insecure argument option)
+func GenerateCerts() *tls.Certificate {
 
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	publicKey := &privKey.PublicKey
@@ -22,7 +24,7 @@ func GenerateCerts() (cert *tls.Certificate) {
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		log.Fatalf("Failed to generate serial number: %s", err)
+		Log.Fatal("Failed to generate serial number:", err)
 	}
 
 	template := x509.Certificate{
@@ -43,18 +45,17 @@ func GenerateCerts() (cert *tls.Certificate) {
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey, privKey)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %s", err)
+		Log.Fatal("Failed to create certificate:", err)
 	}
 
 	// PEM encode the certificate (this is a standard TLS encoding)
 	b := pem.Block{Type: "CERTIFICATE", Bytes: certDER}
 	certPEM := pem.EncodeToMemory(&b)
-	fmt.Printf("%s\n", certPEM)
 
 	// PEM encode the private key
 	privBytes, err := x509.MarshalPKCS8PrivateKey(privKey)
 	if err != nil {
-		log.Fatalf("Unable to marshal private key: %v", err)
+		Log.Fatal("Unable to marshal private key:", err)
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{
 		Type: "RSA PRIVATE KEY", Bytes: privBytes,
@@ -63,10 +64,8 @@ func GenerateCerts() (cert *tls.Certificate) {
 	// Create a TLS cert using the private key and certificate
 	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
 	if err != nil {
-		log.Fatalf("invalid key pair: %v", err)
+		Log.Fatal("invalid key pair:", err)
 	}
 
-	cert = &tlsCert
-	return cert
-
+	return &tlsCert
 }

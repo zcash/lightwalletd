@@ -1,3 +1,6 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package common
 
 import (
@@ -5,33 +8,37 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
-type BlockCacheEntry struct {
+type blockCacheEntry struct {
 	data []byte
 	hash []byte
 }
 
+// BlockCache contains a set of recent compact blocks in marshalled form.
 type BlockCache struct {
 	MaxEntries int
 
 	// m[firstBlock..nextBlock) are valid
-	m          map[int]*BlockCacheEntry
+	m          map[int]*blockCacheEntry
 	firstBlock int
 	nextBlock  int
 
 	mutex sync.RWMutex
 }
 
+// NewBlockCache returns an instance of a block cache object.
 func NewBlockCache(maxEntries int) *BlockCache {
 	return &BlockCache{
 		MaxEntries: maxEntries,
-		m:          make(map[int]*BlockCacheEntry),
+		m:          make(map[int]*blockCacheEntry),
 	}
 }
 
-func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (error, bool) {
+// Add adds the given block to the cache at the given height, returning true
+// if a reorg was detected.
+func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (bool, error) {
 	// Invariant: m[firstBlock..nextBlock) are valid.
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -63,16 +70,15 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (error, bool
 
 	// Detect reorg, ingestor needs to handle it
 	if height > c.firstBlock && !bytes.Equal(block.PrevHash, c.m[height-1].hash) {
-		return nil, true
+		return true, nil
 	}
 
 	// Add the entry and update the counters
 	data, err := proto.Marshal(block)
 	if err != nil {
-		println("Error marshalling block!")
-		return err, false
+		return false, err
 	}
-	c.m[height] = &BlockCacheEntry{
+	c.m[height] = &blockCacheEntry{
 		data: data,
 		hash: block.GetHash(),
 	}
@@ -87,9 +93,11 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) (error, bool
 	}
 	// Invariant: m[firstBlock..nextBlock) are valid.
 
-	return nil, false
+	return false, nil
 }
 
+// Get returns the compact block at the requested height if it is
+// in the cache, else nil.
 func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -108,7 +116,9 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 	return serialized
 }
 
-func (c *BlockCache) GetLatestBlock() int {
+// GetLatestHeight returns the block with the greatest height, or nil
+// if the cache is empty.
+func (c *BlockCache) GetLatestHeight() int {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	if c.firstBlock == c.nextBlock {

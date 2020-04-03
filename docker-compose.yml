@@ -25,7 +25,7 @@ services:
         loki-url: 'http://localhost:3100/api/prom/push'
 
   zcashd:
-    image: gcr.io/zcash-web/zcashd:latest
+    image: electriccoinco/zcashd:latest
     volumes:
       - $ZCASHD_DATADIR:/srv/zcashd/.zcash
       - $ZCASHD_PARMDIR:/srv/zcashd/.zcash-params
@@ -38,7 +38,7 @@ services:
         loki-url: 'http://localhost:3100/api/prom/push'
 
   zcashd_exporter:
-    image: gcr.io/zcash-web/zcashd_exporter
+    image: electriccoinco/zcashd_exporter:latest
     environment:
       - ZCASHD_RPCUSER=$ZCASHD_RPCUSER
       - ZCASHD_RPCPASSWORD=$ZCASHD_RPCPASSWORD

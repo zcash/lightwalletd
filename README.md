@@ -17,7 +17,7 @@ The Lightwalletd Server is experimental and a work in progress. Use it at your o
 
 # Overview
 
-[lightwalletd](https://github.com/zcash-hackworks/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
+[lightwalletd](https://github.com/zcash/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version as its primary concern. The intended purpose of lightwalletd is to support the development of mobile-friendly shielded light wallets.
 
 lightwalletd is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain for mobile and other wallets, such as [Zecwallet](https://github.com/adityapk00/zecwallet-lite-lib).
 
@@ -25,15 +25,36 @@ Lightwalletd has not yet undergone audits or been subject to rigorous testing. I
 
 To view status of [CI pipeline](https://gitlab.com/mdr0id/lightwalletd/pipelines)
 
-To view detailed [Codecov](https://codecov.io/gh/zcash-hackworks/lightwalletd) report
+To view detailed [Codecov](https://codecov.io/gh/zcash/lightwalletd) report
 
+Documentation for lightwalletd clients (the gRPC interface) is in `docs/rtd/index.html`. The current version of this file corresponds to the two `.proto` files; if you change these files, please regenerate the documentation by running `make doc`, which requires docker to be installed. 
 # Local/Developer docker-compose Usage
 
 [docs/docker-compose-setup.md](./docs/docker-compose-setup.md)
 
 # Local/Developer Usage
 
-First, ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed. Once your go environment is setup correctly, you can build/run the below components.
+## Zcashd
+
+You must start a local instance of `zcashd`, and its `.zcash/zcash.conf` file must include the following entries:
+```
+txindex=1
+insightexplorer=1
+experimentalfeatures=1
+```
+
+It's necessary to run `zcashd --reindex` one time for these options to take effect. This typically takes several hours, and requires more space in the `.zcash` data directory.
+
+Lightwalletd uses the following `zcashd` RPCs:
+- `getblockchaininfo`
+- `getblock`
+- `getrawtransaction`
+- `getaddresstxids`
+- `sendrawtransaction`
+
+## Lightwalletd
+
+First, install [Go](https://golang.org/dl/#stable) version 1.11 or later. You can see your current version by running `go version`.
 
 To build the server, run `make`.
 
@@ -49,7 +70,8 @@ Assuming you used `make` to build SERVER:
 
 # Production Usage
 
-Ensure [Go >= 1.11](https://golang.org/dl/#stable) is installed.
+Run a local instance of `zcashd` (see above).
+Ensure [Go](https://golang.org/dl/#stable) version 1.11 or later is installed.
 
 **x509 Certificates**
 You will need to supply an x509 certificate that connecting clients will have good reason to trust (hint: do not use a self-signed one, our SDK will reject those unless you distribute them to the client out-of-band). We suggest that you be sure to buy a reputable one from a supplier that uses a modern hashing algorithm (NOT md5 or sha1) and that uses Certificate Transparency (OID 1.3.6.1.4.1.11129.2.4.2 will be present in the certificate).
@@ -112,4 +134,4 @@ $ chmod +x .git/hooks/pre-commit
 ```
 
 Doing this will prevent commits that break the standard formatting. Simply run the
-`gofmt` command as indicated and rerun the `git commit` command.
+`gofmt` command as indicated and rerun the `git add` and `git commit` commands.

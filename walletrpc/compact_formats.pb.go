@@ -111,10 +111,10 @@ func (m *CompactBlock) GetVtx() []*CompactTx {
 	return nil
 }
 
+// Index and hash will allow the receiver to call out to chain
+// explorers or other data structures to retrieve more information
+// about this transaction.
 type CompactTx struct {
-	// Index and hash will allow the receiver to call out to chain
-	// explorers or other data structures to retrieve more information
-	// about this transaction.
 	Index uint64 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
 	Hash  []byte `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`
 	// The transaction fee: present if server can provide. In the case of a
@@ -291,7 +291,9 @@ func init() {
 	proto.RegisterType((*CompactOutput)(nil), "cash.z.wallet.sdk.rpc.CompactOutput")
 }
 
-func init() { proto.RegisterFile("compact_formats.proto", fileDescriptor_dce29fee3ee34899) }
+func init() {
+	proto.RegisterFile("compact_formats.proto", fileDescriptor_dce29fee3ee34899)
+}
 
 var fileDescriptor_dce29fee3ee34899 = []byte{
 	// 353 bytes of a gzipped FileDescriptorProto

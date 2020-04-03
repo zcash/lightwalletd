@@ -5,6 +5,10 @@
  #  Description:  Used for local and container dev in CI deployments
  #  Usage: make <target_name>
  #
+ #  Copyright (c) 2020 The Zcash developers
+ #  Distributed under the MIT software license, see the accompanying
+ #  file COPYING or https://www.opensource.org/licenses/mit-license.php .
+ #
  #  Known bugs/missing features:
  #  1. make msan is not stable as of 9/20/2019
  #
@@ -14,20 +18,33 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v '*_test.go'
 GO_TEST_FILES := $(shell find . -name '*_test.go' -type f | rev | cut -d "/" -f2- | rev | sort -u)
 GO_BUILD_FILES := $(shell find . -name 'main.go')
 
-.PHONY: all dep build clean test coverage coverhtml lint
+# There are some files that are generated but are also in source control
+# (so that the average clone - build doesn't need the required tools)
+GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go
 
-all: build
+PWD := $(shell pwd)
+
+.PHONY: all dep build clean test coverage lint doc simpledoc
+
+all: first-make-timestamp build $(GENERATED_FILES)
+
+# Ensure that the generated files that are also in git source control are
+# initially more recent than the files they're generated from (so we don't try
+# to rebuild them); this isn't perfect because it depends on doing a make before
+# editing a .proto file; also, "make -jn" may trigger remake if n > 1.
+first-make-timestamp:
+	touch $(GENERATED_FILES) $@
 
 # Lint golang files
 lint:
-	@golint -set_exit_status
+	golint -set_exit_status
 
 show_tests:
 	@echo ${GO_TEST_FILES}
 
 # Run unittests
 test:
-	@go test -v -coverprofile=coverage.txt -covermode=atomic ./...
+	go test -v ./...
 
 # Run data race detector
 race:
@@ -35,23 +52,39 @@ race:
 
 # Run memory sanitizer (need to ensure proper build flag is set)
 msan:
-	@go test -v -msan -short ${GO_TEST_FILES}
+	go test -v -msan -short ${GO_TEST_FILES}
 
-# Generate global code coverage report
+# Generate global code coverage report, ignore generated *.pb.go files
+
 coverage:
-	@go test -coverprofile=coverage.out -covermode=atomic ./...
+	go test -coverprofile=coverage.out ./...
+	sed -i '/\.pb\.go/d' coverage.out
 
 # Generate code coverage report
-coverage_report:
-	@go tool cover -func=coverage.out 
+coverage_report: coverage
+	go tool cover -func=coverage.out 
 
 # Generate code coverage report in HTML
-coverage_html: 
-	@go tool cover -html=coverage.out -o coverage.html
+coverage_html: coverage
+	go tool cover -html=coverage.out
 
-# Generate documents
-docs:
-	@echo "Generating docs..."
+# Generate documents, requires docker, see https://github.com/pseudomuto/protoc-gen-doc
+doc: docs/rtd/index.html
+
+docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto
+	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/walletrpc:/protos pseudomuto/protoc-gen-doc
+
+walletrpc/compact_formats.pb.go: walletrpc/compact_formats.proto
+	cd walletrpc; protoc compact_formats.proto --go_out=plugins=grpc:.
+
+walletrpc/service.pb.go: walletrpc/service.proto
+	cd walletrpc; protoc service.proto --go_out=plugins=grpc:.
+
+# Generate documents using a very simple wrap-in-html approach (not ideal)
+simpledoc: lwd-api.html
+
+lwd-api.html: walletrpc/compact_formats.proto walletrpc/service.proto
+	./docgen.sh $^ >lwd-api.html
 
 # Generate docker image
 docker_img:
@@ -87,14 +120,23 @@ dep:
 
 # Build binary
 build:
-	GO111MODULE=on CGO_ENABLED=1 go build -i -v ./cmd/server
+	GO111MODULE=on go build
 
 build_rel:
-	GO111MODULE=on CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -i -v ./cmd/server
+	GO111MODULE=on GOOS=linux go build
 
 # Install binaries into Go path
 install:
 	go install ./...
+
+# Update your protoc, protobufs, grpc, .pb.go files
+update-grpc:
+	go get -u github.com/golang/protobuf/proto
+	go get -u github.com/golang/protobuf/protoc-gen-go
+	go get -u google.golang.org/grpc
+	cd walletrpc; protoc compact_formats.proto --go_out=plugins=grpc:.
+	cd walletrpc; protoc service.proto --go_out=plugins=grpc:.
+	go mod tidy && go mod vendor
 
 clean:
 	@echo "clean project..."
