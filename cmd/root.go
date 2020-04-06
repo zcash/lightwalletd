@@ -115,7 +115,7 @@ func startServer(opts *common.Options) error {
 					grpc_prometheus.StreamServerInterceptor),
 			),
 			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-
+				logging.LogInterceptor,
 				grpc_prometheus.UnaryServerInterceptor),
 			))
 	} else {
@@ -210,7 +210,7 @@ func startServer(opts *common.Options) error {
 		"gitCommit": common.GitCommit,
 		"buildDate": common.BuildDate,
 		"buildUser": common.BuildUser,
-	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.BindAddr)
+	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
