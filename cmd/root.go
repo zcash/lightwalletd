@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -10,6 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,7 +38,8 @@ var rootCmd = &cobra.Command{
          bandwidth-efficient interface to the Zcash blockchain`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := &common.Options{
-			BindAddr:          viper.GetString("bind-addr"),
+			GRPCBindAddr:      viper.GetString("grpc-bind-addr"),
+			HTTPBindAddr:      viper.GetString("http-bind-addr"),
 			TLSCertPath:       viper.GetString("tls-cert"),
 			TLSKeyPath:        viper.GetString("tls-key"),
 			LogLevel:          viper.GetUint64("log-level"),
@@ -106,7 +111,15 @@ func startServer(opts *common.Options) error {
 	if opts.NoTLSVeryInsecure {
 		common.Log.Warningln("Starting insecure server")
 		fmt.Println("Starting insecure server")
-		server = grpc.NewServer(logging.LoggingInterceptor())
+		server = grpc.NewServer(
+			grpc.StreamInterceptor(
+				grpc_middleware.ChainStreamServer(
+					grpc_prometheus.StreamServerInterceptor),
+			),
+			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+				logging.LogInterceptor,
+				grpc_prometheus.UnaryServerInterceptor),
+			))
 	} else {
 		transportCreds, err := credentials.NewServerTLSFromFile(opts.TLSCertPath, opts.TLSKeyPath)
 		if err != nil {
@@ -116,8 +129,19 @@ func startServer(opts *common.Options) error {
 				"error":     err,
 			}).Fatal("couldn't load TLS credentials")
 		}
-		server = grpc.NewServer(grpc.Creds(transportCreds), logging.LoggingInterceptor())
+		server = grpc.NewServer(
+			grpc.Creds(transportCreds),
+			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
+				grpc_prometheus.StreamServerInterceptor),
+			),
+			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+				logging.LogInterceptor,
+				grpc_prometheus.UnaryServerInterceptor),
+			))
 	}
+	grpc_prometheus.EnableHandlingTimeHistogram()
+	grpc_prometheus.Register(server)
+	go startHTTPServer(opts)
 
 	// Enable reflection for debugging
 	if opts.LogLevel >= uint64(logrus.WarnLevel) {
@@ -166,10 +190,10 @@ func startServer(opts *common.Options) error {
 	walletrpc.RegisterCompactTxStreamerServer(server, service)
 
 	// Start listening
-	listener, err := net.Listen("tcp", opts.BindAddr)
+	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
 	if err != nil {
 		common.Log.WithFields(logrus.Fields{
-			"bind_addr": opts.BindAddr,
+			"bind_addr": opts.GRPCBindAddr,
 			"error":     err,
 		}).Fatal("couldn't create listener")
 	}
@@ -190,7 +214,7 @@ func startServer(opts *common.Options) error {
 		"gitCommit": common.GitCommit,
 		"buildDate": common.BuildDate,
 		"buildUser": common.BuildUser,
-	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.BindAddr)
+	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
@@ -214,7 +238,8 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	cobra.OnInitialize(initConfig)
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is current directory, lightwalletd.yaml)")
-	rootCmd.Flags().String("bind-addr", "127.0.0.1:9067", "the address to listen on")
+	rootCmd.Flags().String("http-bind-addr", "127.0.0.1:9068", "the address to listen for http on")
+	rootCmd.Flags().String("grpc-bind-addr", "127.0.0.1:9067", "the address to listen for grpc on")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -224,8 +249,10 @@ func init() {
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 
-	viper.BindPFlag("bind-addr", rootCmd.Flags().Lookup("bind-addr"))
-	viper.SetDefault("bind-addr", "127.0.0.1:9067")
+	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
+	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
+	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
+	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))
 	viper.SetDefault("tls-cert", "./cert.pem")
 	viper.BindPFlag("tls-key", rootCmd.Flags().Lookup("tls-key"))
@@ -286,4 +313,9 @@ func initConfig() {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
+}
+
+func startHTTPServer(opts *common.Options) {
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(opts.HTTPBindAddr, nil)
 }

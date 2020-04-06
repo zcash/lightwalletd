@@ -23,7 +23,8 @@ var BuildDate = ""
 var BuildUser = ""
 
 type Options struct {
-	BindAddr          string `json:"bind_address,omitempty"`
+	GRPCBindAddr      string `json:"grpc_bind_address,omitempty"`
+	HTTPBindAddr      string `json:"http_bind_address,omitempty"`
 	TLSCertPath       string `json:"tls_cert_path,omitempty"`
 	TLSKeyPath        string `json:"tls_cert_key,omitempty"`
 	LogLevel          uint64 `json:"log_level,omitempty"`
