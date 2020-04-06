@@ -16,6 +16,12 @@ import (
 	"github.com/zcash/lightwalletd/walletrpc"
 )
 
+// 'make build' will overwrite this string with the output of git-describe (tag)
+var Version = "v0.0.0.0-dev"
+var GitCommit = ""
+var BuildDate = ""
+var BuildUser = ""
+
 type Options struct {
 	GRPCBindAddr      string `json:"grpc_bind_address,omitempty"`
 	HTTPBindAddr      string `json:"http_bind_address,omitempty"`

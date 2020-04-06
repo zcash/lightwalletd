@@ -188,7 +188,7 @@ func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 	saplingHeight, blockHeight, chainName, consensusBranchId := common.GetSaplingInfo()
 
 	return &walletrpc.LightdInfo{
-		Version:                 "0.2.1",
+		Version:                 common.Version,
 		Vendor:                  "ECC LightWalletD",
 		TaddrSupport:            true,
 		ChainName:               chainName,
