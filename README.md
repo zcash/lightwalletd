@@ -105,6 +105,29 @@ Example using server binary built from Makefile:
 ./server --tls-cert cert.pem --tls-key key.pem --conf-file /home/zcash/.zcash/zcash.conf --log-file /logs/server.log --bind-addr 127.0.0.1:18232
 ```
 
+## Block cache
+
+Lightwalletd caches all blocks from Sapling activation up to the
+most recent block, which takes about an hour the first time you run
+lightwalletd. During this syncing, lightwalletd is fully available; the
+only effect of being in download mode is that block fetches are slower.
+
+After syncing, lightwalletd will start almost immediately,
+because the blocks are cached in local files (by default, within
+`/var/lib/lightwalletd/db`; you can specify a different location using
+the `--data-dir` command-line option).
+
+Lightwalletd checks the consistency of these files at startup and during
+operation, as might be caused by an unclean shutdown, and if it detects
+corruption, it will recreate the cache by re-downloading all blocks
+from `zcashd` requiring an hour again, but this should occur extremely
+rarely.
+
+If lightwalletd detects corruption in these cache files, it will log
+a message containing the string `CORRUPTION` and also indicate the
+nature of the corruption.
+
+
 # Pull Requests
 
 We welcome pull requests! We like to keep our Go code neatly formatted in a standard way,
