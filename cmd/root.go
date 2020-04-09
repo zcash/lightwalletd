@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -40,7 +41,8 @@ var rootCmd = &cobra.Command{
 			LogFile:           viper.GetString("log-file"),
 			ZcashConfPath:     viper.GetString("zcash-conf-path"),
 			NoTLSVeryInsecure: viper.GetBool("no-tls-very-insecure"),
-			CacheSize:         viper.GetInt("cache-size"),
+			DataDir:           viper.GetString("data-dir"),
+			Redownload:        viper.GetBool("redownload"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -52,10 +54,10 @@ var rootCmd = &cobra.Command{
 			opts.ZcashConfPath,
 		}
 
+		if !fileExists(opts.LogFile) {
+			os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+		}
 		for _, filename := range filesThatShouldExist {
-			if !fileExists(opts.LogFile) {
-				os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
-			}
 			if opts.NoTLSVeryInsecure && (filename == opts.TLSCertPath || filename == opts.TLSKeyPath) {
 				continue
 			}
@@ -138,18 +140,19 @@ func startServer(opts *common.Options) error {
 	// Get the sapling activation height from the RPC
 	// (this first RPC also verifies that we can communicate with zcashd)
 	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo()
-	common.Log.Info("Got sapling height ", saplingHeight, " chain ", chainName, " branchID ", branchID)
+	common.Log.Info("Got sapling height ", saplingHeight, " block height ", blockHeight, " chain ", chainName, " branchID ", branchID)
 
-	// Initialize the cache
-	cache := common.NewBlockCache(opts.CacheSize)
-
-	// Start the block cache importer at cacheSize blocks before current height
-	cacheStart := blockHeight - opts.CacheSize
-	if cacheStart < saplingHeight {
-		cacheStart = saplingHeight
+	if err := os.MkdirAll(opts.DataDir, 0755); err != nil {
+		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create data directory: %s\n\n", opts.DataDir))
+		os.Exit(1)
 	}
-
-	go common.BlockIngestor(cache, cacheStart, 0 /*loop forever*/)
+	dbPath := filepath.Join(opts.DataDir, "db")
+	if err := os.MkdirAll(dbPath, 0755); err != nil {
+		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create db directory: %s\n\n", dbPath))
+		os.Exit(1)
+	}
+	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, opts.Redownload)
+	go common.BlockIngestor(cache, 0 /*loop forever*/)
 
 	// Compact transaction service initialization
 	service, err := frontend.NewLwdStreamer(cache)
@@ -176,6 +179,7 @@ func startServer(opts *common.Options) error {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		s := <-signals
+		cache.Sync()
 		common.Log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
@@ -217,7 +221,8 @@ func init() {
 	rootCmd.Flags().String("log-file", "./server.log", "log file to write to")
 	rootCmd.Flags().String("zcash-conf-path", "./zcash.conf", "conf file to pull RPC creds from")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
-	rootCmd.Flags().Int("cache-size", 80000, "number of blocks to hold in the cache")
+	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
+	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 
 	viper.BindPFlag("bind-addr", rootCmd.Flags().Lookup("bind-addr"))
 	viper.SetDefault("bind-addr", "127.0.0.1:9067")
@@ -233,8 +238,10 @@ func init() {
 	viper.SetDefault("zcash-conf-path", "./zcash.conf")
 	viper.BindPFlag("no-tls-very-insecure", rootCmd.Flags().Lookup("no-tls-very-insecure"))
 	viper.SetDefault("no-tls-very-insecure", false)
-	viper.BindPFlag("cache-size", rootCmd.Flags().Lookup("cache-size"))
-	viper.SetDefault("cache-size", 80000)
+	viper.BindPFlag("redownload", rootCmd.Flags().Lookup("redownload"))
+	viper.SetDefault("redownload", false)
+	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))
+	viper.SetDefault("data-dir", "/var/lib/lightwalletd")
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,
