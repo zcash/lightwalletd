@@ -160,64 +160,102 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 	step++
 	switch step {
 	case 1:
-		if height != "20" {
+		if height != "380640" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
 		return blocks[0], nil
 	case 2:
-		if height != "21" {
+		if height != "380641" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
 		return blocks[1], nil
 	case 3:
-		if height != "22" {
-			testT.Error("unexpected height")
+		if height != "380642" {
+			testT.Error("unexpected height", height)
 		}
-		// This should cause one sleep (then retry)
+		// Simulate that we're synced (caught up);
+		// this should cause one 10s sleep (then retry).
 		return nil, errors.New("-8: Block height out of range")
 	case 4:
 		if sleepCount != 1 || sleepDuration != 10*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
-		// should re-request the same height
-		if height != "22" {
-			testT.Error("unexpected height")
+		if height != "380642" {
+			testT.Error("unexpected height", height)
 		}
-		// Back to sunny-day
-		return blocks[2], nil
+		// Simulate that we're still caught up; this should cause a 1s
+		// wait then a check for reorg to shorter chain (back up one).
+		return nil, errors.New("-8: Block height out of range")
 	case 5:
-		if height != "23" {
-			testT.Error("unexpected height")
-		}
-		// Simulate a reorg (it doesn't matter which block we return here, as
-		// long as its prevhash doesn't match the latest block's hash)
-		return blocks[2], nil
-	case 6:
-		// When a reorg occurs, the ingestor backs up 2 blocks
-		if height != "21" { // 23 - 2
-			testT.Error("unexpected height")
-		}
-		return blocks[1], nil
-	case 7:
-		if height != "22" {
-			testT.Error("unexpected height")
-		}
-		// Should fail to Unmarshal the block, sleep, retry
-		return nil, nil
-	case 8:
-		if sleepCount != 2 || sleepDuration != 20*time.Second {
+		if sleepCount != 2 || sleepDuration != 11*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
-		if height != "22" {
-			testT.Error("unexpected height")
+		// should re-request the same height
+		if height != "380641" {
+			testT.Error("unexpected height", height)
+		}
+		// Return the expected block (as normally happens, no actual reorg),
+		// ingestor will immediately re-request the next block (42).
+		return blocks[1], nil
+	case 6:
+		if sleepCount != 2 || sleepDuration != 11*time.Second {
+			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+		}
+		if height != "380642" {
+			testT.Error("unexpected height", height)
+		}
+		// Block 42 has now finally appeared, it will immediately ask for 43.
+		return blocks[2], nil
+	case 7:
+		if sleepCount != 2 || sleepDuration != 11*time.Second {
+			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+		}
+		if height != "380643" {
+			testT.Error("unexpected height", height)
+		}
+		// Simulate a reorg by modifying the block's hash temporarily,
+		// this causes a 1s sleep and then back up one block (to 42).
+		blocks[3][9]++ // first byte of the prevhash
+		return blocks[3], nil
+	case 8:
+		blocks[3][9]-- // repair first byte of the prevhash
+		if sleepCount != 3 || sleepDuration != 12*time.Second {
+			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+		}
+		if height != "380642" {
+			testT.Error("unexpected height ", height)
+		}
+		return blocks[2], nil
+	case 9:
+		if sleepCount != 3 || sleepDuration != 12*time.Second {
+			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+		}
+		if height != "380643" {
+			testT.Error("unexpected height ", height)
+		}
+		// Instead of returning expected (43), simulate block unmarshal
+		// failure, should cause 10s sleep, retry
+		return nil, nil
+	case 10:
+		if sleepCount != 4 || sleepDuration != 22*time.Second {
+			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+		}
+		if height != "380643" {
+			testT.Error("unexpected height ", height)
 		}
 		// Back to sunny-day
-		return blocks[2], nil
-	}
-	if height != "23" {
-		testT.Error("unexpected height")
+		return blocks[3], nil
+	case 11:
+		if sleepCount != 4 || sleepDuration != 22*time.Second {
+			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+		}
+		if height != "380644" {
+			testT.Error("unexpected height ", height)
+		}
+		// next block not ready
+		return nil, nil
 	}
 	testT.Error("getblockStub called too many times")
 	return nil, nil
@@ -227,25 +265,28 @@ func TestBlockIngestor(t *testing.T) {
 	testT = t
 	RawRequest = getblockStub
 	Sleep = sleepStub
-	testcache := NewBlockCache(4)
-	BlockIngestor(testcache, 20, 7)
-	if step != 7 {
+	os.RemoveAll(unitTestPath)
+	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, false)
+	BlockIngestor(testcache, 11)
+	if step != 11 {
 		t.Error("unexpected final step", step)
 	}
 	step = 0
 	sleepCount = 0
 	sleepDuration = 0
+	os.RemoveAll(unitTestPath)
 }
 
 func TestGetBlockRange(t *testing.T) {
 	testT = t
 	RawRequest = getblockStub
-	testcache := NewBlockCache(4)
+	os.RemoveAll(unitTestPath)
+	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, true)
 	blockChan := make(chan walletrpc.CompactBlock)
 	errChan := make(chan error)
-	go GetBlockRange(testcache, blockChan, errChan, 20, 22)
+	go GetBlockRange(testcache, blockChan, errChan, 380640, 380642)
 
-	// read in block 20
+	// read in block 380640
 	select {
 	case err := <-errChan:
 		// this will also catch context.DeadlineExceeded from the timeout
@@ -256,7 +297,7 @@ func TestGetBlockRange(t *testing.T) {
 		}
 	}
 
-	// read in block 21
+	// read in block 380641
 	select {
 	case err := <-errChan:
 		// this will also catch context.DeadlineExceeded from the timeout
@@ -267,7 +308,7 @@ func TestGetBlockRange(t *testing.T) {
 		}
 	}
 
-	// try to read in block 22, but this will fail (see case 3 above)
+	// try to read in block 380642, but this will fail (see case 3 above)
 	select {
 	case err := <-errChan:
 		// this will also catch context.DeadlineExceeded from the timeout
@@ -284,6 +325,7 @@ func TestGetBlockRange(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected err return")
 	}
+	os.RemoveAll(unitTestPath)
 }
 
 func TestGenerateCerts(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 )
 
 func LoggingInterceptor() grpc.ServerOption {
-	return grpc.UnaryInterceptor(logInterceptor)
+	return grpc.UnaryInterceptor(LogInterceptor)
 }
 
 func loggerFromContext(ctx context.Context) *logrus.Entry {
@@ -22,7 +22,7 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 	return log.WithFields(logrus.Fields{"peer_addr": "unknown"})
 }
 
-func logInterceptor(
+func LogInterceptor(
 	ctx context.Context,
 	req interface{},
 	info *grpc.UnaryServerInfo,

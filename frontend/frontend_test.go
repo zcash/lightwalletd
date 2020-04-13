@@ -26,11 +26,25 @@ var (
 	logger = logrus.New()
 	step   int
 
-	cache     *common.BlockCache
-	lwd       walletrpc.CompactTxStreamerServer
 	blocks    [][]byte // four test blocks
 	rawTxData [][]byte
 )
+
+const (
+	unitTestPath  = "unittestcache"
+	unitTestChain = "unittestnet"
+)
+
+func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
+	os.RemoveAll(unitTestPath)
+	cache := common.NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	lwd, err := NewLwdStreamer(cache)
+	if err != nil {
+		os.Stderr.WriteString(fmt.Sprint("NewLwdStreamer failed:", err))
+		os.Exit(1)
+	}
+	return lwd, cache
+}
 
 func TestMain(m *testing.M) {
 	output, err := os.OpenFile("test-log", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
@@ -43,13 +57,6 @@ func TestMain(m *testing.M) {
 		"app": "test",
 	})
 
-	cache = common.NewBlockCache(4)
-	lwd, err = NewLwdStreamer(cache)
-	if err != nil {
-		os.Stderr.WriteString(fmt.Sprint("NewLwdStreamer failed:", err))
-		os.Exit(1)
-	}
-
 	// Several tests need test blocks; read all 4 into memory just once
 	// (for efficiency).
 	testBlocks, err := os.Open("../testdata/blocks")
@@ -57,6 +64,7 @@ func TestMain(m *testing.M) {
 		os.Stderr.WriteString(fmt.Sprint("Error:", err))
 		os.Exit(1)
 	}
+	defer testBlocks.Close()
 	scan := bufio.NewScanner(testBlocks)
 	for scan.Scan() { // each line (block)
 		block := scan.Bytes()
@@ -97,12 +105,15 @@ func TestMain(m *testing.M) {
 
 	// cleanup
 	os.Remove("test-log")
+	os.RemoveAll(unitTestPath)
 
 	os.Exit(exitcode)
 }
 
 func TestGetTransaction(t *testing.T) {
 	// GetTransaction() will mostly be tested below via TestGetAddressTxids
+	lwd, _ := testsetup()
+
 	rawtx, err := lwd.GetTransaction(context.Background(),
 		&walletrpc.TxFilter{})
 	if err == nil {
@@ -135,7 +146,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 	if err != nil {
 		testT.Fatal("could not unmarshal height")
 	}
-	if height != "1234" {
+	if height != "380640" {
 		testT.Fatal("unexpected getblock height", height)
 	}
 
@@ -153,6 +164,8 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 func TestGetLatestBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
+	lwd, cache := testsetup()
+
 	// This argument is not used (it may be in the future)
 	req := &walletrpc.ChainSpec{}
 
@@ -168,22 +181,18 @@ func TestGetLatestBlock(t *testing.T) {
 	}
 
 	// This does zcashd rpc "getblock", calls getblockStub() above
-	block, err := common.GetBlock(cache, 1234)
+	block, err := common.GetBlock(cache, 380640)
 	if err != nil {
 		t.Fatal("getBlockFromRPC failed", err)
 	}
-	reorg, err := cache.Add(40, block)
-	if reorg {
-		t.Fatal("unexpected reorg")
-	}
-	if err != nil {
+	if err = cache.Add(380640, block); err != nil {
 		t.Fatal("cache.Add failed:", err)
 	}
 	blockID, err = lwd.GetLatestBlock(context.Background(), req)
 	if err != nil {
 		t.Fatal("lwd.GetLatestBlock failed", err)
 	}
-	if blockID.Height != 40 {
+	if blockID.Height != 380640 {
 		t.Fatal("unexpected blockID.height")
 	}
 	step = 0
@@ -265,6 +274,8 @@ func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
 func TestGetAddressTxids(t *testing.T) {
 	testT = t
 	common.RawRequest = zcashdrpcStub
+	lwd, _ := testsetup()
+
 	addressBlockFilter := &walletrpc.TransparentAddressBlockFilter{
 		Range: &walletrpc.BlockRange{
 			Start: &walletrpc.BlockID{Height: 20},
@@ -302,6 +313,8 @@ func TestGetAddressTxids(t *testing.T) {
 func TestGetBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
+	lwd, _ := testsetup()
+
 	_, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{})
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
@@ -317,7 +330,9 @@ func TestGetBlock(t *testing.T) {
 	if err.Error() != "GetBlock by Hash is not yet implemented" {
 		t.Fatal("GetBlock hash unimplemented error message failed")
 	}
-	block, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 1234})
+
+	// getblockStub() case 1: return error
+	block, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 380640})
 	if err != nil {
 		t.Fatal("GetBlock failed:", err)
 	}
@@ -325,7 +340,7 @@ func TestGetBlock(t *testing.T) {
 		t.Fatal("GetBlock returned unexpected block:", err)
 	}
 	// getblockStub() case 2: return error
-	block, err = lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 1234})
+	block, err = lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 380640})
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
 	}
@@ -350,9 +365,12 @@ func (tg *testgetbrange) Send(cb *walletrpc.CompactBlock) error {
 func TestGetBlockRange(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
+	common.RawRequest = getblockStub
+	lwd, _ := testsetup()
+
 	blockrange := &walletrpc.BlockRange{
-		Start: &walletrpc.BlockID{Height: 1234},
-		End:   &walletrpc.BlockID{Height: 1234},
+		Start: &walletrpc.BlockID{Height: 380640},
+		End:   &walletrpc.BlockID{Height: 380640},
 	}
 	// getblockStub() case 1 (success)
 	err := lwd.GetBlockRange(blockrange, &testgetbrange{})
@@ -376,6 +394,8 @@ func getblockchaininfoStub(method string, params []json.RawMessage) (json.RawMes
 func TestGetLightdInfo(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockchaininfoStub
+	lwd, _ := testsetup()
+
 	ldinfo, err := lwd.GetLightdInfo(context.Background(), &walletrpc.Empty{})
 	if err != nil {
 		t.Fatal("GetLightdInfo failed", err)
@@ -406,6 +426,7 @@ func sendrawtransactionStub(method string, params []json.RawMessage) (json.RawMe
 
 func TestSendTransaction(t *testing.T) {
 	testT = t
+	lwd, _ := testsetup()
 	common.RawRequest = sendrawtransactionStub
 	rawtx := walletrpc.RawTransaction{Data: []byte{7}}
 	sendresult, err := lwd.SendTransaction(context.Background(), &rawtx)

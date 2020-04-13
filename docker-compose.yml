@@ -8,15 +8,15 @@ services:
       - .env
     #entrypoint: ["/bin/bash", "-c", "sleep infinity"]
     command:
-      - -bind-addr=0.0.0.0:$LWD_PORT
-      - -cache-size=80000
+      - -grpc-bind-addr=0.0.0.0:$LWD_GRPC_PORT
+      - -http-bind-addr=0.0.0.0:$LWD_HTTP_PORT
+      - -cache-size=10
       - -conf-file=$ZCASHD_CONF_PATH
       - -log-file=/dev/stdout
-      - -log-level=7
-      - -tls-cert=./cert.pem
-      - -tls-key=./cert.key
+      - -log-level=2
     ports:
-      - "127.0.0.1:$LWD_PORT:$LWD_PORT"
+      - "127.0.0.1:$LWD_GRPC_PORT:$LWD_GRPC_PORT"
+      - "127.0.0.1:$LWD_HTTP_PORT:$LWD_HTTP_PORT"      
     volumes:
       - ./docker/:/srv/lightwalletd
     logging:
