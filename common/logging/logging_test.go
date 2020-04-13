@@ -41,7 +41,7 @@ func TestLogInterceptor(t *testing.T) {
 		"app": "test",
 	})
 	var req interface{}
-	resp, err := logInterceptor(peer.NewContext(context.Background(), &peer.Peer{}),
+	resp, err := LogInterceptor(peer.NewContext(context.Background(), &peer.Peer{}),
 		&req, &grpc.UnaryServerInfo{}, testhandler)
 	if err == nil {
 		t.Fatal("unexpected success")
@@ -49,7 +49,7 @@ func TestLogInterceptor(t *testing.T) {
 	if resp != nil {
 		t.Fatal("unexpected response", resp)
 	}
-	resp, err = logInterceptor(context.Background(), &req, &grpc.UnaryServerInfo{}, testhandler)
+	resp, err = LogInterceptor(context.Background(), &req, &grpc.UnaryServerInfo{}, testhandler)
 	if err != nil {
 		t.Fatal("unexpected error", err)
 	}
