@@ -105,6 +105,13 @@ func startServer(opts *common.Options) error {
 	}
 
 	logger.SetLevel(logrus.Level(opts.LogLevel))
+
+	common.Log.WithFields(logrus.Fields{
+		"gitCommit": common.GitCommit,
+		"buildDate": common.BuildDate,
+		"buildUser": common.BuildUser,
+	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
+
 	// gRPC initialization
 	var server *grpc.Server
 
@@ -209,12 +216,6 @@ func startServer(opts *common.Options) error {
 		}).Info("caught signal, stopping gRPC server")
 		os.Exit(1)
 	}()
-
-	common.Log.WithFields(logrus.Fields{
-		"gitCommit": common.GitCommit,
-		"buildDate": common.BuildDate,
-		"buildUser": common.BuildUser,
-	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
 
 	err = server.Serve(listener)
 	if err != nil {
