@@ -1,8 +1,7 @@
 first-make-timestamp
 lightwalletd
-db-*-blocks
-db-*-lengths
 server.log
+db/
 coverage.out
 test-log
 lwd-api.html
