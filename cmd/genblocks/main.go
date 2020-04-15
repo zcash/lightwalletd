@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 )
 
 type Options struct {
@@ -34,8 +35,20 @@ func main() {
 		}
 		scan := bufio.NewScanner(testBlocks)
 
-		// TODO: set the height in the scriptSig correctly
-		fake_coinbase := "0400008085202f89010000000000000000000000000000000000000000000000000000000000000000ffffffff0b0336880b006199a1d8062f000000000290cacd1d000000001976a91435978cec6669c24278c72a55d6d646226827d5a788ac405973070000000017a9141449535d5cb388b318343ca7a7fb1764a69f0ecd8700000000000000000000000000000000000000"
+		fake_coinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
+			"00000000000000ffffffff2a03d12c0c00043855975e464b8896790758f824ceac97836" +
+			"22c17ed38f1669b8a45ce1da857dbbe7950e2ffffffff02a0ebce1d000000001976a914" +
+			"7ed15946ec14ae0cd8fa8991eb6084452eb3f77c88ac405973070000000017a914e445cf" +
+			"a944b6f2bdacefbda904a81d5fdd26d77f8700000000000000000000000000000000000000"
+
+		// This coinbase transaction was pulled from block 797905, whose
+		// little-endian encoding is 0xD12C0C00. Replace it with the block
+		// number we want.
+		fake_coinbase = strings.ReplaceAll(fake_coinbase, "d12c0c00",
+			fmt.Sprintf("%02x", cur_height&0xFF)+
+				fmt.Sprintf("%02x", (cur_height>>8)&0xFF)+
+				fmt.Sprintf("%02x", (cur_height>>16)&0xFF)+
+				fmt.Sprintf("%02x", (cur_height>>24)&0xFF))
 
 		num_transactions := 1 // coinbase
 		all_transactions_hex := ""
