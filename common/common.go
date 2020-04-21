@@ -81,8 +81,12 @@ func GetSaplingInfo() (int, int, string, string) {
 	chainName := f.(map[string]interface{})["chain"].(string)
 
 	upgradeJSON := f.(map[string]interface{})["upgrades"]
-	saplingJSON := upgradeJSON.(map[string]interface{})["76b809bb"] // Sapling ID
-	saplingHeight := saplingJSON.(map[string]interface{})["activationheight"].(float64)
+
+	// If the sapling consensus branch doesn't exist, it must be regtest
+	saplingHeight := float64(0)
+	if saplingJSON, ok := upgradeJSON.(map[string]interface{})["76b809bb"]; ok { // Sapling ID
+		saplingHeight = saplingJSON.(map[string]interface{})["activationheight"].(float64)
+	}
 
 	blockHeight := f.(map[string]interface{})["headers"].(float64)
 
