@@ -1,3 +1,8 @@
+// Typical way to run this program:
+//     $ mkdir blocks
+//     $ touch blocks/{1000,1001,1002,1003,1004,1005}.txt
+//     $ go run testtools/genblocks/main.go >testdata/default-darkside-blocks
+
 package main
 
 import (
@@ -44,11 +49,11 @@ func main() {
 		// This coinbase transaction was pulled from block 797905, whose
 		// little-endian encoding is 0xD12C0C00. Replace it with the block
 		// number we want.
-		fake_coinbase = strings.ReplaceAll(fake_coinbase, "d12c0c00",
+		fake_coinbase = strings.Replace(fake_coinbase, "d12c0c00",
 			fmt.Sprintf("%02x", cur_height&0xFF)+
 				fmt.Sprintf("%02x", (cur_height>>8)&0xFF)+
 				fmt.Sprintf("%02x", (cur_height>>16)&0xFF)+
-				fmt.Sprintf("%02x", (cur_height>>24)&0xFF))
+				fmt.Sprintf("%02x", (cur_height>>24)&0xFF), 1)
 
 		num_transactions := 1 // coinbase
 		all_transactions_hex := ""
