@@ -303,7 +303,7 @@ func (tx *Transaction) Bytes() []byte {
 	return tx.rawBytes
 }
 
-func (tx *Transaction) HasSaplingTransactions() bool {
+func (tx *Transaction) HasSaplingElements() bool {
 	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
 }
 

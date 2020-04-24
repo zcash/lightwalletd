@@ -10,8 +10,8 @@ import (
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Dispaly lightwalletd version",
-	Long:  `Dispaly lightwalletd version.`,
+	Short: "Display lightwalletd version",
+	Long:  `Display lightwalletd version.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("lightwalletd version: ", common.Version)
 		fmt.Println("from commit: ", common.GitCommit)

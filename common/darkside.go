@@ -29,8 +29,8 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		state = &DarksideZcashdState{
 			start_height:          1000,
 			sapling_activation:    1000,
-			branch_id:             "2bb40e60",
-			chain_name:            "main",
+			branch_id:             "2bb40e60", // Blossom
+			chain_name:            "darkside",
 			blocks:                make([]string, 0),
 			incoming_transactions: make([][]byte, 0),
 			server_start:          time.Now(),
@@ -53,17 +53,28 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 
 	switch method {
 	case "getblockchaininfo":
-		// TODO: there has got to be a better way to construct this!
-		data := make(map[string]interface{})
-		data["chain"] = state.chain_name
-		data["upgrades"] = make(map[string]interface{})
-		data["upgrades"].(map[string]interface{})["76b809bb"] = make(map[string]interface{})
-		data["upgrades"].(map[string]interface{})["76b809bb"].(map[string]interface{})["activationheight"] = state.sapling_activation
-		data["headers"] = state.start_height + len(state.blocks) - 1
-		data["consensus"] = make(map[string]interface{})
-		data["consensus"].(map[string]interface{})["nextblock"] = state.branch_id
-
-		return json.Marshal(data)
+		type upgradeinfo struct {
+			// there are other fields that aren't needed here, omit them
+			ActivationHeight int `json:"activationheight"`
+		}
+		type consensus struct {
+			Nextblock string `json:"nextblock"`
+			Chaintip  string `json:"chaintip"`
+		}
+		blockchaininfo := struct {
+			Chain     string                 `json:"chain"`
+			Upgrades  map[string]upgradeinfo `json:"upgrades"`
+			Headers   int                    `json:"headers"`
+			Consensus consensus              `json:"consensus"`
+		}{
+			Chain: state.chain_name,
+			Upgrades: map[string]upgradeinfo{
+				"76b809bb": upgradeinfo{ActivationHeight: state.sapling_activation},
+			},
+			Headers:   state.start_height + len(state.blocks) - 1,
+			Consensus: consensus{state.branch_id, state.branch_id},
+		}
+		return json.Marshal(blockchaininfo)
 
 	case "getblock":
 		var height string

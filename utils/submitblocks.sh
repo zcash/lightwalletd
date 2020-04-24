@@ -7,5 +7,6 @@ set -e
 JSON="{\"startHeight\": $1, \"saplingActivation\": $2, \"branchID\": \"2bb40e60\", \"chainName\": \"main\", \"blocks\": "
 JSON="$JSON$(cat "$3" | sed 's/^/"/' | sed 's/$/"/' | sed '1s/^/[/;$!s/$/,/;$s/$/]/')"
 JSON="$JSON}"
+echo "$JSON"
 
 grpcurl -plaintext -import-path ./walletrpc/ -proto service.proto -d "$JSON" localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/DarksideSetState

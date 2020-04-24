@@ -56,7 +56,10 @@ func (c *BlockCache) HashMismatch(prevhash []byte) bool {
 // This should never increase the size of the cache, only decrease.
 // Caller should hold c.mutex.Lock().
 func (c *BlockCache) setDbFiles(height int) {
-	if height < c.nextBlock {
+	if height <= c.nextBlock {
+		if height < c.firstBlock {
+			height = c.firstBlock
+		}
 		index := height - c.firstBlock
 		if err := c.lengthsFile.Truncate(int64(index * 4)); err != nil {
 			Log.Fatal("truncate lengths file failed: ", err)
@@ -132,7 +135,7 @@ func (c *BlockCache) setLatestHash() {
 		// At least one block remains; get the last block's hash
 		block := c.readBlock(c.nextBlock - 1)
 		if block == nil {
-			c.recoverFromCorruption(c.nextBlock - 1)
+			c.recoverFromCorruption(c.nextBlock - 10000)
 			return
 		}
 		c.latestHash = make([]byte, len(block.Hash))
@@ -311,7 +314,7 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 		go func() {
 			// We hold only the read lock, need the exclusive lock.
 			c.mutex.Lock()
-			c.recoverFromCorruption(height)
+			c.recoverFromCorruption(height - 10000)
 			c.mutex.Unlock()
 		}()
 		return nil
