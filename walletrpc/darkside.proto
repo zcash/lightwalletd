@@ -1,0 +1,22 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+syntax = "proto3";
+package cash.z.wallet.sdk.rpc;
+option go_package = ".;walletrpc";
+option swift_prefix = "";
+import "service.proto";
+
+message DarksideLightwalletdState {
+    int32 startHeight = 1;
+    int32 saplingActivation = 2;
+    string branchID = 3;
+    string chainName = 4;
+    repeated string blocks = 5;
+}
+
+service DarksideStreamer {
+    rpc DarksideGetIncomingTransactions(Empty) returns (stream RawTransaction) {}
+    rpc DarksideSetState(DarksideLightwalletdState) returns (Empty) {}
+}

@@ -202,6 +202,25 @@
         
           
           <li>
+            <a href="#darkside.proto">darkside.proto</a>
+            <ul>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideLightwalletdState"><span class="badge">M</span>DarksideLightwalletdState</a>
+                </li>
+              
+              
+              
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideStreamer"><span class="badge">S</span>DarksideStreamer</a>
+                </li>
+              
+            </ul>
+          </li>
+        
+          
+          <li>
             <a href="#service.proto">service.proto</a>
             <ul>
               
@@ -461,6 +480,98 @@ in a pure-Sapling context, the fee will be calculable as:
       
 
       
+    
+      
+      <div class="file-heading">
+        <h2 id="darkside.proto">darkside.proto</h2><a href="#title">Top</a>
+      </div>
+      <p></p>
+
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideLightwalletdState">DarksideLightwalletdState</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>startHeight</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>saplingActivation</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>branchID</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>chainName</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>blocks</td>
+                  <td><a href="#string">string</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+
+      
+
+      
+
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideStreamer">DarksideStreamer</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>DarksideGetIncomingTransactions</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>DarksideSetState</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideLightwalletdState">DarksideLightwalletdState</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+
+        
     
       
       <div class="file-heading">

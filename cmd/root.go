@@ -48,7 +48,7 @@ var rootCmd = &cobra.Command{
 			NoTLSVeryInsecure: viper.GetBool("no-tls-very-insecure"),
 			DataDir:           viper.GetString("data-dir"),
 			Redownload:        viper.GetBool("redownload"),
-			DarkSide:          viper.GetBool("darkside-very-insecure"),
+			Darkside:          viper.GetBool("darkside-very-insecure"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -61,7 +61,7 @@ var rootCmd = &cobra.Command{
 		if !fileExists(opts.LogFile) {
 			os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 		}
-		if !opts.DarkSide {
+		if !opts.Darkside {
 			filesThatShouldExist = append(filesThatShouldExist, opts.ZcashConfPath)
 		}
 
@@ -162,7 +162,7 @@ func startServer(opts *common.Options) error {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
-	if opts.DarkSide {
+	if opts.Darkside {
 		common.RawRequest = common.DarkSideRawRequest
 	} else {
 		rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
@@ -180,11 +180,15 @@ func startServer(opts *common.Options) error {
 	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo()
 	common.Log.Info("Got sapling height ", saplingHeight, " block height ", blockHeight, " chain ", chainName, " branchID ", branchID)
 
+	dbPath := filepath.Join(opts.DataDir, "db")
+	if opts.Darkside {
+		os.RemoveAll(filepath.Join(dbPath, chainName))
+	}
+
 	if err := os.MkdirAll(opts.DataDir, 0755); err != nil {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create data directory: %s\n\n", opts.DataDir))
 		os.Exit(1)
 	}
-	dbPath := filepath.Join(opts.DataDir, "db")
 	if err := os.MkdirAll(dbPath, 0755); err != nil {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create db directory: %s\n\n", dbPath))
 		os.Exit(1)
@@ -193,15 +197,24 @@ func startServer(opts *common.Options) error {
 	go common.BlockIngestor(cache, 0 /*loop forever*/)
 
 	// Compact transaction service initialization
-	service, err := frontend.NewLwdStreamer(cache)
-	if err != nil {
-		common.Log.WithFields(logrus.Fields{
-			"error": err,
-		}).Fatal("couldn't create backend")
+	{
+		service, err := frontend.NewLwdStreamer(cache)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("couldn't create backend")
+		}
+		walletrpc.RegisterCompactTxStreamerServer(server, service)
 	}
-
-	// Register service
-	walletrpc.RegisterCompactTxStreamerServer(server, service)
+	if opts.Darkside {
+		service, err := frontend.NewDarksideStreamer(cache)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("couldn't create backend")
+		}
+		walletrpc.RegisterDarksideStreamerServer(server, service)
+	}
 
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)

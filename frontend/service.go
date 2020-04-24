@@ -32,6 +32,14 @@ func NewLwdStreamer(cache *common.BlockCache) (walletrpc.CompactTxStreamerServer
 	return &LwdStreamer{cache}, nil
 }
 
+type DarksideStreamer struct {
+	cache *common.BlockCache
+}
+
+func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerServer, error) {
+	return &DarksideStreamer{cache}, nil
+}
+
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *LwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestHeight()
@@ -257,7 +265,7 @@ func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 }
 
 // Darkside
-func (s *LwdStreamer) DarksideGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.CompactTxStreamer_DarksideGetIncomingTransactionsServer) error {
+func (s *DarksideStreamer) DarksideGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.DarksideStreamer_DarksideGetIncomingTransactionsServer) error {
 	// Get all of the new incoming transactions evil zcashd has accepted.
 	result, rpcErr := common.RawRequest("x_getincomingtransactions", nil)
 
@@ -285,7 +293,7 @@ func (s *LwdStreamer) DarksideGetIncomingTransactions(in *walletrpc.Empty, resp 
 	return nil
 }
 
-func (s *LwdStreamer) DarksideSetState(ctx context.Context, state *walletrpc.DarksideLightwalletdState) (*walletrpc.Empty, error) {
+func (s *DarksideStreamer) DarksideSetState(ctx context.Context, state *walletrpc.DarksideLightwalletdState) (*walletrpc.Empty, error) {
 	match, err := regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(state.BranchID))
 	if err != nil || !match {
 		return nil, errors.New("Invalid branch ID")

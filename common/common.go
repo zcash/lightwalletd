@@ -33,7 +33,7 @@ type Options struct {
 	NoTLSVeryInsecure bool   `json:"no_tls_very_insecure,omitempty"`
 	Redownload        bool   `json:"redownload"`
 	DataDir           string `json:"data-dir"`
-	DarkSide          bool   `json:"darkside"`
+	Darkside          bool   `json:"darkside"`
 }
 
 // RawRequest points to the function to send a an RPC request to zcashd;
@@ -146,10 +146,9 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 func BlockIngestor(c *BlockCache, rep int) {
 	lastLog := time.Now()
 	reorgCount := 0
-	lastHeightReported := 0
+	lastHeightLogged := 0
 	retryCount := 0
 	wait := true
-	logWaiting := false
 
 	// Start listening for new blocks
 	for i := 0; rep == 0 || i < rep; i++ {
@@ -178,8 +177,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 			if wait {
 				// Wait a bit then retry the same height.
 				c.Sync()
-				if !logWaiting {
-					logWaiting = true
+				if lastHeightLogged+1 != height {
 					Log.Info("Ingestor waiting for block: ", height)
 				}
 				Sleep(10 * time.Second)
@@ -224,9 +222,9 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Log.Fatal("Cache add failed:", err)
 		}
 		// Don't log these too often.
-		if time.Now().Sub(lastLog).Seconds() >= 4 && c.GetNextHeight() == height+1 && height != lastHeightReported {
+		if time.Now().Sub(lastLog).Seconds() >= 4 && c.GetNextHeight() == height+1 && height != lastHeightLogged {
 			lastLog = time.Now()
-			lastHeightReported = height
+			lastHeightLogged = height
 			Log.Info("Ingestor adding block to cache: ", height)
 		}
 	}
