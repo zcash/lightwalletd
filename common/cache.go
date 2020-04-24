@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -74,9 +75,40 @@ func (c *BlockCache) setDbFiles(height int) {
 	}
 }
 
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
+}
+
 // Caller should hold c.mutex.Lock().
 func (c *BlockCache) recoverFromCorruption(height int) {
 	Log.Warning("CORRUPTION detected in db blocks-cache files, height ", height, " redownloading")
+
+	// Save the corrupted files for post-mortem analysis.
+	save := c.lengthsName + "-corrupted"
+	if err := copyFile(c.lengthsName, save); err != nil {
+		Log.Warning("Could not copy db lengths file: ", err)
+	}
+	save = c.blocksName + "-corrupted"
+	if err := copyFile(c.blocksName, save); err != nil {
+		Log.Warning("Could not copy db lengths file: ", err)
+	}
+
 	c.setDbFiles(height)
 }
 
