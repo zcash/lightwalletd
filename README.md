@@ -132,6 +132,11 @@ If lightwalletd detects corruption in these cache files, it will log
 a message containing the string `CORRUPTION` and also indicate the
 nature of the corruption.
 
+## Darksidewalletd & Testing
+
+Lightwalletd now supports a mode that enables integration testing of itself and
+wallets that connect to it. See the [darksidewalletd
+docs](docs/darksidewalletd.md) for more information.
 
 # Pull Requests
 
