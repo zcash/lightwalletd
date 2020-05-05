@@ -1,7 +1,25 @@
-// Typical way to run this program:
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
+//
+// This tool reads a set of files, each containing a list of transactions
+// (one per line, can be empty), and writes to stdout a list of blocks,
+// one per input file, in hex format (same as zcash-cli getblock 12345 0),
+// each on a separate line. Each fake block contains a fake coinbase
+// transaction and all of the transactions in the corresponding file.
+
+// The default start height is 1000, so the program expects to find
+// files blocks/1000.txt, blocks/1001.txt, ...
+//
+// Typical way to run this program to create 6 blocks, all empty except
+// for the fifth, which contains one transaction:
 //     $ mkdir blocks
 //     $ touch blocks/{1000,1001,1002,1003,1004,1005}.txt
+//     $ echo "0400008085202f8901950521a79e89ed418a4b506f42e9829739b1ca516d4c590bddb4465b4b347bb2000000006a4730440220142920f2a9240c5c64406668c9a16d223bd01db33a773beada7f9c9b930cf02b0220171cbee9232f9c5684eb918db70918e701b86813732871e1bec6fbfb38194f53012102975c020dd223263d2a9bfff2fa6004df4c07db9f01c531967546ef941e2fcfbffeffffff026daf9b00000000001976a91461af073e7679f06677c83aa48f205e4b98feb8d188ac61760356100000001976a91406f6b9a7e1525ee12fd77af9b94a54179785011b88ac4c880b007f880b000000000000000000000000" > blocks/1004.txt
 //     $ go run testtools/genblocks/main.go >testdata/default-darkside-blocks
+//
+// Alternative way to create the empty files:
+//     $ seq 1000 1005 | while read i; do touch blocks/$i.txt; done
 
 package main
 
@@ -11,16 +29,17 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/zcash/lightwalletd/parser"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/zcash/lightwalletd/parser"
 )
 
 type Options struct {
-	startHeight int    `json:"start_height,omitempty"`
-	blocksDir   string `json:"start_height,omitempty"`
+	startHeight int
+	blocksDir   string
 }
 
 func main() {
@@ -91,7 +110,7 @@ func main() {
 
 		fmt.Println(hex.EncodeToString(header_bytes) + hex.EncodeToString(compactsize) + fake_coinbase + all_transactions_hex)
 
-		cur_height += 1
+		cur_height++
 		prevhash = block_header.GetEncodableHash()
 	}
 }

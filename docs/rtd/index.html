@@ -206,7 +206,19 @@
             <ul>
               
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideLightwalletdState"><span class="badge">M</span>DarksideLightwalletdState</a>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideBlock"><span class="badge">M</span>DarksideBlock</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideBlocksUrl"><span class="badge">M</span>DarksideBlocksUrl</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideMetaState"><span class="badge">M</span>DarksideMetaState</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideTx"><span class="badge">M</span>DarksideTx</a>
                 </li>
               
               
@@ -488,7 +500,7 @@ in a pure-Sapling context, the fee will be calculable as:
       <p></p>
 
       
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideLightwalletdState">DarksideLightwalletdState</h3>
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideBlock">DarksideBlock</h3>
         <p></p>
 
         
@@ -499,11 +511,52 @@ in a pure-Sapling context, the fee will be calculable as:
             <tbody>
               
                 <tr>
-                  <td>startHeight</td>
-                  <td><a href="#int32">int32</a></td>
+                  <td>block</td>
+                  <td><a href="#string">string</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideBlocksUrl">DarksideBlocksUrl</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideMetaState">DarksideMetaState</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
               
                 <tr>
                   <td>saplingActivation</td>
@@ -526,10 +579,34 @@ in a pure-Sapling context, the fee will be calculable as:
                   <td><p> </p></td>
                 </tr>
               
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideTx">DarksideTx</h3>
+        <p>A single transaction that should appear to be mined at the given height.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
                 <tr>
-                  <td>blocks</td>
+                  <td>height</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>transaction</td>
                   <td><a href="#string">string</a></td>
-                  <td>repeated</td>
+                  <td></td>
                   <td><p> </p></td>
                 </tr>
               
@@ -547,7 +624,7 @@ in a pure-Sapling context, the fee will be calculable as:
 
       
         <h3 id="cash.z.wallet.sdk.rpc.DarksideStreamer">DarksideStreamer</h3>
-        <p></p>
+        <p>This service implements the following rpc methods:</p><p>SetMetaState</p><p>SetBlocks</p><p>SetBlocksUrl</p><p>SetTx</p><p>GetIncomingTransactions</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -555,17 +632,67 @@ in a pure-Sapling context, the fee will be calculable as:
           <tbody>
             
               <tr>
-                <td>DarksideGetIncomingTransactions</td>
+                <td>SetMetaState</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideMetaState">DarksideMetaState</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p></p></td>
+                <td><p>Set (some of) the values that should be returned by GetLightdInfo()</p></td>
               </tr>
             
               <tr>
-                <td>DarksideSetState</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideLightwalletdState">DarksideLightwalletdState</a></td>
+                <td>SetBlocks</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlock">DarksideBlock</a> stream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p></p></td>
+                <td><p>SetBlocks() replaces the specified range of blocks (gaps not allowed);
+for example, you can set blocks 1000-1006, do some tests, then set blocks
+1003-1004. This preserves blocks 1000-1002, replaces blocks 1003-1004,
+and removes blocks 1005-1006. This can be used to simulate a chain reorg.
+Blocks are hex-encoded.</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetBlocksUrl</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlocksUrl">DarksideBlocksUrl</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>This is the same as SetBlocks(), except the blocks are fetched
+from the given URL. Blocks are one per line, hex-encoded (not JSON).</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetTx</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideTx">DarksideTx</a> stream</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>SetTx() allows the test coordinator to submit a list of transactions and
+for each indicate in which block it should appear.
+For example,
+  tx1, block=1001
+  tx2, block=1002
+  tx3, block=1002
+Then use Setblocks(1000-1005): block 1001 will include tx1 (plus
+any transactions were part of that block to begin with); tx2 and tx3
+will appear in block 1002. Blocks 1003-1005 will be returned as submitted.
+
+If you first set a range of blocks, then submit transactions within that
+range, it&#39;s too late for them to be included in those blocks. If blocks
+are resubmitted, then those transactions are included in those blocks.
+
+Calling GetTransaction() on tx1-3 will return those transactions, and
+GetTransaction() will also return any transactions that were part of
+the submitted blocks.
+
+Each call to SetTx() completely replaces the stored transaction set.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetIncomingTransactions</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
+                <td><p>Calls to SendTransaction() are accepted and stored; this method returns
+all transactions that were previously submitted. This enables the
+following kind of test, for example:
+  1. wallet submits a transaction
+  2. Test coordinator retrives the transaction using this interface
+  3. Test coordinator submits the transaction using SetTx()
+  4. Darksidewalletd simulates the transaction appearing in a mined block</p></td>
               </tr>
             
           </tbody>
@@ -674,7 +801,7 @@ in a pure-Sapling context, the fee will be calculable as:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.Empty">Empty</h3>
-        <p>Empty is for gRPCs that take no arguments, currently only GetLightdInfo.</p>
+        <p>Empty is for gRPCs that take no arguments or return no values.</p>
 
         
 

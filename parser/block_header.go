@@ -127,14 +127,14 @@ func NewBlockHeader() *BlockHeader {
 func BlockHeaderFromParts(version int32, prevhash []byte, merkleroot []byte, saplingroot []byte, time uint32, nbitsbytes []byte, nonce []byte, solution []byte) *BlockHeader {
 	return &BlockHeader{
 		rawBlockHeader: &rawBlockHeader{
-			Version: version,
-			HashPrevBlock: prevhash,
-			HashMerkleRoot: merkleroot,
+			Version:              version,
+			HashPrevBlock:        prevhash,
+			HashMerkleRoot:       merkleroot,
 			HashFinalSaplingRoot: saplingroot,
-			Time: time,
-			NBitsBytes: nbitsbytes,
-			Nonce: nonce,
-			Solution: solution,
+			Time:                 time,
+			NBitsBytes:           nbitsbytes,
+			Nonce:                nonce,
+			Solution:             solution,
 		},
 	}
 }

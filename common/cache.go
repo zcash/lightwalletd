@@ -370,7 +370,7 @@ func (c *BlockCache) Sync() {
 	c.blocksFile.Sync()
 }
 
-// Currently used only for testing.
+// Close is Currently used only for testing.
 func (c *BlockCache) Close() {
 	// Some operating system require you to close files before you can remove them.
 	if c.lengthsFile != nil {

@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,11 +18,8 @@ import (
 	"time"
 
 	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
-)
-
-var (
-	ErrUnspecified = errors.New("request for unspecified identifier")
 )
 
 type LwdStreamer struct {
@@ -32,6 +30,7 @@ func NewLwdStreamer(cache *common.BlockCache) (walletrpc.CompactTxStreamerServer
 	return &LwdStreamer{cache}, nil
 }
 
+// Darkside is for full-stack integration testing.
 type DarksideStreamer struct {
 	cache *common.BlockCache
 }
@@ -110,7 +109,7 @@ func (s *LwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 // block by hash is not yet supported.
 func (s *LwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
 	if id.Height == 0 && id.Hash == nil {
-		return nil, ErrUnspecified
+		return nil, errors.New("request for unspecified identifier")
 	}
 
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
@@ -221,6 +220,24 @@ func (s *LwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// Result:
 	// "hex"             (string) The transaction hash in hex
 
+	if common.DarksideIsEnabled() {
+		txbytes, err := hex.DecodeString(string(rawtx.Data))
+		common.DarksideSendTransaction(txbytes)
+		// Need to parse the transaction to return its hash, plus it's
+		// good error checking.
+		tx := parser.NewTransaction()
+		rest, err := tx.ParseFromSlice(txbytes)
+		if err != nil {
+			return nil, err
+		}
+		if len(rest) != 0 {
+			return nil, errors.New("transaction serialization is too long")
+		}
+		return &walletrpc.SendResponse{
+			ErrorCode:    0,
+			ErrorMessage: hex.EncodeToString(tx.GetDisplayHash()),
+		}, nil
+	}
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
 	txHexString := hex.EncodeToString(rawtx.Data)
@@ -264,66 +281,57 @@ func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	return &response, nil
 }
 
-// Darkside
-func (s *DarksideStreamer) DarksideGetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.DarksideStreamer_DarksideGetIncomingTransactionsServer) error {
-	// Get all of the new incoming transactions evil zcashd has accepted.
-	result, rpcErr := common.RawRequest("x_getincomingtransactions", nil)
-
-	var new_txs []string
-	if rpcErr != nil {
-		return rpcErr
-	}
-	err := json.Unmarshal(result, &new_txs)
-
-	if err != nil {
-		return err
-	}
-
-	for _, tx_str := range new_txs {
-		tx_bytes, err := hex.DecodeString(tx_str)
-		if err != nil {
-			return err
-		}
-		err = resp.Send(&walletrpc.RawTransaction{Data: tx_bytes, Height: 0})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (s *DarksideStreamer) DarksideSetState(ctx context.Context, state *walletrpc.DarksideLightwalletdState) (*walletrpc.Empty, error) {
-	match, err := regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(state.BranchID))
+func (s *DarksideStreamer) SetMetaState(ctx context.Context, ms *walletrpc.DarksideMetaState) (*walletrpc.Empty, error) {
+	match, err := regexp.Match("\\A[a-fA-F0-9]+\\z", []byte(ms.BranchID))
 	if err != nil || !match {
 		return nil, errors.New("Invalid branch ID")
 	}
 
-	match, err = regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(state.ChainName))
+	match, err = regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(ms.ChainName))
 	if err != nil || !match {
 		return nil, errors.New("Invalid chain name")
 	}
+	err = common.DarksideSetMetaState(ms.SaplingActivation, ms.BranchID, ms.ChainName)
+	if err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
+}
 
-	st := "{" +
-		"\"start_height\": " + strconv.Itoa(int(state.StartHeight)) +
-		", \"sapling_activation\": " + strconv.Itoa(int(state.SaplingActivation)) +
-		", \"branch_id\": \"" + state.BranchID + "\"" +
-		", \"chain_name\": \"" + state.ChainName + "\"" +
-		", \"blocks\": ["
+func (s *DarksideStreamer) SetBlocks(blocks walletrpc.DarksideStreamer_SetBlocksServer) error {
+	for {
+		b, err := blocks.Recv()
+		if err == io.EOF {
+			blocks.SendAndClose(&walletrpc.Empty{})
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		common.DarksideAddBlock(b.Block)
+	}
+}
 
-	for i, block := range state.Blocks {
-		st += "\"" + block + "\""
-		if i < len(state.Blocks)-1 {
-			st += ", "
+func (s *DarksideStreamer) SetBlocksURL(ctx context.Context, u *walletrpc.DarksideBlocksURL) (*walletrpc.Empty, error) {
+	if err := common.DarksideSetBlocksURL(u.Url); err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
+}
+func (s *DarksideStreamer) SetTx(tx walletrpc.DarksideStreamer_SetTxServer) error {
+	// My current thinking is that this should take a JSON array of {height, txid}, store them,
+	// then DarksideAddBlock() would "inject" transactions into blocks as its storing
+	// them (remembering to update the header so the block hash changes).
+	return errors.New("SetTx is not yet implemented")
+}
+
+func (s *DarksideStreamer) GetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.DarksideStreamer_GetIncomingTransactionsServer) error {
+	// Get all of the incoming transactions we're received via SendTransaction()
+	for _, tx_bytes := range common.DarksideGetIncomingTransactions() {
+		err := resp.Send(&walletrpc.RawTransaction{Data: tx_bytes, Height: 0})
+		if err != nil {
+			return err
 		}
 	}
-
-	st += "]}"
-
-	params := make([]json.RawMessage, 1)
-	params[0] = json.RawMessage(st)
-
-	_, rpcErr := common.RawRequest("x_setstate", params)
-
-	return &walletrpc.Empty{}, rpcErr
+	return nil
 }
