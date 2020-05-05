@@ -1,6 +1,7 @@
 // Copyright (c) 2019-2020 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
 package common
 
 import (
@@ -133,8 +134,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		return nil, errors.New("received overlong message")
 	}
 
-	// TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
-	if false && block.GetHeight() != height {
+	if block.GetHeight() != height {
 		return nil, errors.New("received unexpected height block")
 	}
 
@@ -190,7 +190,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 			// and there's no new block yet, but we want to back up
 			// so we detect a reorg in which the new chain is the
 			// same length or shorter.
-			reorgCount += 1
+			reorgCount++
 			if reorgCount > 100 {
 				Log.Fatal("Reorg exceeded max of 100 blocks! Help!")
 			}

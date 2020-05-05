@@ -163,7 +163,7 @@ func startServer(opts *common.Options) error {
 	// of block streamer.
 
 	if opts.Darkside {
-		common.RawRequest = common.DarkSideRawRequest
+		common.DarksideInit()
 	} else {
 		rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
 		if err != nil {

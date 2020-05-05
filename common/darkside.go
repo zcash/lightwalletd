@@ -5,49 +5,176 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/zcash/lightwalletd/parser"
 )
 
-type DarksideZcashdState struct {
-	start_height       int
-	sapling_activation int
-	branch_id          string
-	chain_name         string
+type darksideState struct {
+	startHeight       int
+	saplingActivation int
+	branchID          string
+	chainName         string
 	// Should always be nonempty. Index 0 is the block at height start_height.
-	blocks                []string
-	incoming_transactions [][]byte
-	server_start          time.Time
+	blocks               [][]byte // full blocks, binary, as from zcashd getblock rpc
+	incomingTransactions [][]byte // full transactions, binary, zcashd getrawtransaction txid
+	serverStart          time.Time
 }
 
-var state *DarksideZcashdState = nil
+var state darksideState
 
-func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
+func DarksideIsEnabled() bool {
+	return state.chainName != ""
+}
 
-	if state == nil {
-		state = &DarksideZcashdState{
-			start_height:          1000,
-			sapling_activation:    1000,
-			branch_id:             "2bb40e60", // Blossom
-			chain_name:            "darkside",
-			blocks:                make([]string, 0),
-			incoming_transactions: make([][]byte, 0),
-			server_start:          time.Now(),
-		}
+func DarksideInit() {
+	state = darksideState{
+		startHeight:          -1,
+		saplingActivation:    -1,
+		branchID:             "2bb40e60", // Blossom
+		chainName:            "darkside",
+		blocks:               make([][]byte, 0),
+		incomingTransactions: make([][]byte, 0),
+		serverStart:          time.Now(),
+	}
+	RawRequest = darksideRawRequest
+	f := "testdata/darkside/init-blocks"
+	testBlocks, err := os.Open(f)
+	if err != nil {
+		Log.Warn("Error opening default darksidewalletd blocks file", f)
+		return
+	}
+	if err = readBlocks(testBlocks); err != nil {
+		Log.Warn("Error loading default darksidewalletd blocks")
+	}
+}
 
-		testBlocks, err := os.Open("./testdata/default-darkside-blocks")
+// DarksideAddBlock adds a single block to the blocks list.
+func DarksideAddBlock(blockHex string) error {
+	if blockHex == "404: Not Found" {
+		// special case error (http resource not found, bad pathname)
+		return errors.New(blockHex)
+	}
+	blockData, err := hex.DecodeString(blockHex)
+	if err != nil {
+		return err
+	}
+	block := parser.NewBlock()
+	rest, err := block.ParseFromSlice(blockData)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 0 {
+		return errors.New("block serialization is too long")
+	}
+	blockHeight := block.GetHeight()
+	// first block, add to existing blocks slice if possible
+	if blockHeight > state.startHeight+len(state.blocks) {
+		// The new block can't contiguously extend the existing
+		// range, so we have to drop the existing range.
+		state.blocks = state.blocks[:0]
+	} else if blockHeight < state.startHeight {
+		// This block will replace the entire existing range.
+		state.blocks = state.blocks[:0]
+	} else {
+		// Drop the block that will be overwritten, and its children.
+		state.blocks = state.blocks[:blockHeight-state.startHeight]
+	}
+	if len(state.blocks) == 0 {
+		state.startHeight = blockHeight
+	} else {
+		// Set this block's prevhash.
+		prevblock := parser.NewBlock()
+		rest, err := prevblock.ParseFromSlice(state.blocks[len(state.blocks)-1])
 		if err != nil {
-			Log.Fatal("Error loading default darksidewalletd blocks")
+			return err
 		}
-		scan := bufio.NewScanner(testBlocks)
-		for scan.Scan() { // each line (block)
-			block := scan.Bytes()
-			state.blocks = append(state.blocks, string(block))
+		if len(rest) != 0 {
+			return errors.New("block is too long")
+		}
+		copy(blockData[4:4+32], prevblock.GetEncodableHash())
+	}
+	if state.saplingActivation < 0 {
+		state.saplingActivation = blockHeight
+	}
+	state.blocks = append(state.blocks, blockData)
+	return nil
+}
+
+func readBlocks(src io.Reader) error {
+	// some blocks are too large, especially when encoded in hex, for the
+	// default buffer size, so set up a larger one; 8mb should be enough.
+	scan := bufio.NewScanner(src)
+	var scanbuf []byte
+	scan.Buffer(scanbuf, 8*1000*1000)
+	for scan.Scan() { // each line (block)
+		if err := DarksideAddBlock(scan.Text()); err != nil {
+			return err
 		}
 	}
+	if scan.Err() != nil {
+		return scan.Err()
+	}
+	return nil
+}
 
-	if time.Now().Sub(state.server_start).Minutes() >= 30 {
+func DarksideSetMetaState(sa int32, bi, cn string) error {
+	state.saplingActivation = int(sa)
+	state.branchID = bi
+	state.chainName = cn
+	return nil
+}
+
+func DarksideGetIncomingTransactions() [][]byte {
+	return state.incomingTransactions
+}
+
+func DarksideSetBlocksURL(url string) error {
+	if strings.HasPrefix(url, "file:") && len(url) >= 6 && url[5] != '/' {
+		dir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		url = "file:" + dir + string(os.PathSeparator) + url[5:]
+	}
+	cmd := exec.Command("curl", "--silent", "--show-error", url)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	defer cmd.Wait()
+	err = readBlocks(stdout)
+	if err != nil {
+		return err
+	}
+	stderroutstr, err := ioutil.ReadAll(stderr)
+	if err != nil {
+		return err
+	}
+	if len(stderroutstr) > 0 {
+		return errors.New(string(stderroutstr))
+	}
+	return nil
+}
+
+func DarksideSendTransaction(txbytes []byte) {
+	state.incomingTransactions = append(state.incomingTransactions, txbytes)
+}
+func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
+	if time.Now().Sub(state.serverStart).Minutes() >= 30 {
 		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
 	}
 
@@ -67,102 +194,65 @@ func DarkSideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			Headers   int                    `json:"headers"`
 			Consensus consensus              `json:"consensus"`
 		}{
-			Chain: state.chain_name,
+			Chain: state.chainName,
 			Upgrades: map[string]upgradeinfo{
-				"76b809bb": upgradeinfo{ActivationHeight: state.sapling_activation},
+				"76b809bb": {ActivationHeight: state.saplingActivation},
 			},
-			Headers:   state.start_height + len(state.blocks) - 1,
-			Consensus: consensus{state.branch_id, state.branch_id},
+			Headers:   state.startHeight + len(state.blocks) - 1,
+			Consensus: consensus{state.branchID, state.branchID},
 		}
 		return json.Marshal(blockchaininfo)
 
 	case "getblock":
-		var height string
-		err := json.Unmarshal(params[0], &height)
+		var heightStr string
+		err := json.Unmarshal(params[0], &heightStr)
 		if err != nil {
-			return nil, errors.New("Failed to parse getblock request.")
+			return nil, errors.New("failed to parse getblock request")
 		}
 
-		height_i, err := strconv.Atoi(height)
+		height, err := strconv.Atoi(heightStr)
 		if err != nil {
-			return nil, errors.New("Error parsing height as integer.")
+			return nil, errors.New("error parsing height as integer")
 		}
-		index := height_i - state.start_height
+		index := height - state.startHeight
 
-		if index == len(state.blocks) {
+		const notFoundErr = "-8:"
+		if state.saplingActivation < 0 || index == len(state.blocks) {
 			// The current ingestor keeps going until it sees this error,
 			// meaning it's up to the latest height.
-			return nil, errors.New("-8:")
+			return nil, errors.New(notFoundErr)
 		}
 
 		if index < 0 || index > len(state.blocks) {
 			// If an integration test can reach this, it could be a bug, so generate an error.
-			Log.Errorf("getblock request made for out-of-range height %d (have %d to %d)", height_i, state.start_height, state.start_height+len(state.blocks)-1)
-			return nil, errors.New("-8:")
+			Log.Errorf("getblock request made for out-of-range height %d (have %d to %d)",
+				height, state.startHeight, state.startHeight+len(state.blocks)-1)
+			return nil, errors.New(notFoundErr)
 		}
-
-		return []byte("\"" + state.blocks[index] + "\""), nil
+		return []byte("\"" + hex.EncodeToString(state.blocks[index]) + "\""), nil
 
 	case "getaddresstxids":
 		// Not required for minimal reorg testing.
-		return nil, errors.New("Not implemented yet.")
+		return nil, errors.New("not implemented yet")
 
 	case "getrawtransaction":
 		// Not required for minimal reorg testing.
-		return nil, errors.New("Not implemented yet.")
+		return nil, errors.New("not implemented yet")
 
 	case "sendrawtransaction":
 		var rawtx string
 		err := json.Unmarshal(params[0], &rawtx)
 		if err != nil {
-			return nil, errors.New("Failed to parse sendrawtransaction JSON.")
+			return nil, errors.New("failed to parse sendrawtransaction JSON")
 		}
 		txbytes, err := hex.DecodeString(rawtx)
 		if err != nil {
-			return nil, errors.New("Failed to parse sendrawtransaction value as a hex string.")
+			return nil, errors.New("failed to parse sendrawtransaction value as a hex string")
 		}
-		state.incoming_transactions = append(state.incoming_transactions, txbytes)
+		state.incomingTransactions = append(state.incomingTransactions, txbytes)
 		return nil, nil
-
-	case "x_setstate":
-		var new_state map[string]interface{}
-
-		err := json.Unmarshal(params[0], &new_state)
-		if err != nil {
-			Log.Fatal("Could not unmarshal the provided state.")
-		}
-
-		block_strings := make([]string, 0)
-		for _, block_str := range new_state["blocks"].([]interface{}) {
-			block_strings = append(block_strings, block_str.(string))
-		}
-
-		state = &DarksideZcashdState{
-			start_height:          int(new_state["start_height"].(float64)),
-			sapling_activation:    int(new_state["sapling_activation"].(float64)),
-			branch_id:             new_state["branch_id"].(string),
-			chain_name:            new_state["chain_name"].(string),
-			blocks:                block_strings,
-			incoming_transactions: state.incoming_transactions,
-			server_start:          state.server_start,
-		}
-
-		return nil, nil
-
-	case "x_getincomingtransactions":
-		txlist := "["
-		for i, tx := range state.incoming_transactions {
-			txlist += "\"" + hex.EncodeToString(tx) + "\""
-			// add commas after all but the last
-			if i < len(state.incoming_transactions)-1 {
-				txlist += ", "
-			}
-		}
-		txlist += "]"
-
-		return []byte(txlist), nil
 
 	default:
-		return nil, errors.New("There was an attempt to call an unsupported RPC.")
+		return nil, errors.New("there was an attempt to call an unsupported RPC")
 	}
 }

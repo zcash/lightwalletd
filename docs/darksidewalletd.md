@@ -34,7 +34,7 @@ after 30 minutes.
 
 ### Default set of blocks
 
-There’s a file in the repo called ./testdata/default-darkside-blocks. This
+There’s a file in the repo called ./testdata/darkside/init-blocks. This
 contains the blocks darksidewalletd loads by default. The format of the file is
 one hex-encoded block per line.
 
@@ -74,7 +74,7 @@ echo “some hex-encoded transaction you want to put in block 1003” > blocksA/
 ```
 
 This will output the blocks, one hex-encoded block per line (the same format as
-./testdata/default-darkside-blocks). 
+./testdata/darkside/init-blocks). 
 
 Tip: Because nothing is checking the full validity of transactions, you can get
 any hex-encoded transaction you want from a block explorer and put those in the
@@ -93,20 +93,29 @@ submit the blocks, which internally uses grpcurl, e.g.:
 
 ```
 ./genblocks --blocks-dir blocksA > blocksA.txt
-./utils/submitblocks.sh 1000 1000 blocksA.txt
+./utils/submitblocks.sh 1000 blocksA.txt
 ```
 
-In the submitblocks.sh command, the first “1000” is the height to serve the
-first block at (so that if blocksA.txt contains 6 blocks they will be served as
-heights 1000, 1001, 1002, 1003, 1004, and 1005. If the genblocks tool was used
-to create the blocksA file, then this argument must match what was given to
-genblocks, otherwise the heights in the coinbase transactions will not match up
-with the height lightwalletd is serving the blocks as. The second “1000” sets
-the value that lightwalletd will report the sapling activation height to be.
+In the submitblocks.sh command, the “1000” sets the value that lightwalletd will
+report the sapling activation height to be.
 
-Tip: The DarksideSetState expects a complete set of blocks for the mock zcashd
-to serve, if you want to just add one block, for example, you need to re-submit
-all of the blocks including the new one.
+Tip: You may submit blocks incrementally, that is, submit 1000-1005 followed
+by 1006-1008, the result is 1000-1008. If you create a gap in the range (say,
+1000-1005 then 1007-1009), then the earlier range is forgotten; the only range
+is 1007-1009 because it doesn't make sense to have a gap.
+
+If you submit overlapping ranges, the expected things happen. For example, first
+submit 1000-1005, then 1003-1007, the result is 1000-1007 (the original 1000-1002
+followed by the new 1003-1007). This is how you can create a reorg starting at 1003.
+You can get the same effect slightly less efficiently by submitting 1000-1007 (that
+is, resubmitting the original 1000-1002 followed by the new 1003-1007).
+
+If you first submit 1000-1005, then 1001-1002, the result will be 1000-1002
+(1003-1005 are dropped; it's not possible to "insert" blocks into an range).
+Likewise, first submit 1005-1008, then 1000-1006, the result is only 1000-1006. As
+easy way to state it is that all earlier blocks beyond the end of the extent of
+the range being submitted now are dropped. But blocks before the start of the range
+being submitted now are preserved if doing so doesn't create a gap.
 
 ## Tutorial
 ### Triggering a Reorg
@@ -143,13 +152,35 @@ Now you can start darksidewalletd and it’ll load the blocksA blocks:
 That will have loaded and be serving the blocksA blocks. We can push up the
 blocksB blocks using ./utils/submitblocks.sh:
 
-`./utils/submitblocks.sh 1000 1000 testdata/darkside-blocks-reorg`
+`./utils/submitblocks.sh 1000 testdata/darkside-blocks-reorg`
 
 We should now see a reorg in server.log:
 
 ```
 {"app":"frontend-grpc","duration":442279,"error":null,"level":"info","method":"/cash.z.wallet.sdk.rpc.CompactTxStreamer/DarksideSetState","msg":"method called","peer_addr":{"IP":"127.0.0.1","Port":47636,"Zone":""},"time":"2020-03-23T13:59:41-06:00"}
 {"app":"frontend-grpc","hash":"a244942179988ea6e56a3a55509fcf22673df26200c67bebd93504385a1a7c4f","height":1004,"level":"warning","msg":"REORG","phash":"06e7c72646e3d51417de25bd83896c682b72bdf5be680908d621cba86d222798","reorg":1,"time":"2020-03-23T13:59:44-06:00"}
+```
+
+### Precomputed block ranges
+
+The ECC has already created some block ranges to simulate reorgs in
+the repository https://github.com/zcash-hackworks/darksidewalletd-test-data.
+This may relieve you of the task of generating test blocks. There's a `gRPC` method
+called `SetBlocksURL` that takes a resource location (anything that can be
+given to `curl`; indeed, the lightwalletd uses `curl`). Here's an example:
+
+`grpcurl -plaintext -d '{"url":"https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/blocks-663242-663251"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocksURL`
+
+When lightwalletd starts up in darksidewalletd mode, it automatically does the
+equivalent of:
+
+`grpcurl -plaintext -d '{"url":"file:testdata/darkside/init-blocks"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocksURL`
+
+which is also equivalent to (the `-d @` tells `grpcurl` to read from standard input):
+```
+cat testdata/darkside/init-blocks |
+sed 's/^/{"block":"/;s/$/"}/' |
+grpcurl -plaintext -d @ localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocks
 ```
 
 ## Use cases
@@ -160,9 +191,6 @@ tests](https://github.com/zcash/lightwalletd/blob/master/docs/integration-tests.
 
 ## Source Code
 * cmd/genblocks -- tool for generating fake block sets.
-* testdata/default-darkside-blocks -- the set of blocks loaded by default
+* testdata/darkside/init-blocks -- the set of blocks loaded by default
 * common/darkside.go -- implementation of darksidewalletd
 * frontend/service.go -- entrypoints for darksidewalletd GRPC APIs
-
-
-
