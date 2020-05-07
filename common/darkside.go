@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -253,7 +254,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 
 	case "getrawtransaction":
 		// Not required for minimal reorg testing.
-		return nil, errors.New("not implemented yet")
+		return darksideGetRawTransaction(params)
 
 	case "sendrawtransaction":
 		var rawtx string
@@ -271,4 +272,36 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC")
 	}
+}
+
+func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error) {
+	// remove the double-quotes from the beginning and end of the hex txid string
+	txbytes, err := hex.DecodeString(string(params[0][1 : 1+64]))
+	if err != nil {
+		return nil, errors.New("-9: " + err.Error())
+	}
+	// Linear search for the tx, somewhat inefficient but this is test code
+	// and there aren't many blocks. If this becomes a performance problem,
+	// we can maintain a map of transactions indexed by txid.
+	for _, b := range state.blocks {
+		block := parser.NewBlock()
+		rest, err := block.ParseFromSlice(b)
+		if err != nil {
+			// this would be strange; we've already parsed this block
+			return nil, errors.New("-9: " + err.Error())
+		}
+		if len(rest) != 0 {
+			return nil, errors.New("-9: block serialization is too long")
+		}
+		for _, tx := range block.Transactions() {
+			if bytes.Equal(tx.GetDisplayHash(), txbytes) {
+				reply := struct {
+					Hex    string `json:"hex"`
+					Height int    `json:"height"`
+				}{hex.EncodeToString(tx.Bytes()), block.GetHeight()}
+				return json.Marshal(reply)
+			}
+		}
+	}
+	return nil, errors.New("-5: No information available about transaction")
 }
