@@ -25,7 +25,6 @@ type darksideState struct {
 	// Should always be nonempty. Index 0 is the block at height start_height.
 	blocks               [][]byte // full blocks, binary, as from zcashd getblock rpc
 	incomingTransactions [][]byte // full transactions, binary, zcashd getrawtransaction txid
-	serverStart          time.Time
 }
 
 var state darksideState
@@ -43,7 +42,6 @@ func DarksideInit() {
 		chainName:            "darkside",
 		blocks:               make([][]byte, 0),
 		incomingTransactions: make([][]byte, 0),
-		serverStart:          time.Now(),
 	}
 	RawRequest = darksideRawRequest
 	f := "testdata/darkside/init-blocks"
@@ -55,6 +53,10 @@ func DarksideInit() {
 	if err = readBlocks(testBlocks); err != nil {
 		Log.Warn("Error loading default darksidewalletd blocks")
 	}
+	go func() {
+		time.Sleep(30 * time.Minute)
+		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
+	}()
 }
 
 // DarksideAddBlock adds a single block to the blocks list.
@@ -192,10 +194,6 @@ func DarksideSendTransaction(txHex []byte) ([]byte, error) {
 }
 
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
-	if time.Now().Sub(state.serverStart).Minutes() >= 30 {
-		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
-	}
-
 	switch method {
 	case "getblockchaininfo":
 		type upgradeinfo struct {
