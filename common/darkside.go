@@ -17,6 +17,7 @@ import (
 )
 
 type darksideState struct {
+	inited            bool
 	startHeight       int
 	saplingActivation int
 	branchID          string
@@ -30,11 +31,12 @@ type darksideState struct {
 var state darksideState
 
 func DarksideIsEnabled() bool {
-	return state.chainName != ""
+	return state.inited
 }
 
 func DarksideInit() {
 	state = darksideState{
+		inited:               true,
 		startHeight:          -1,
 		saplingActivation:    -1,
 		branchID:             "2bb40e60", // Blossom
@@ -170,9 +172,25 @@ func DarksideSetBlocksURL(url string) error {
 	return nil
 }
 
-func DarksideSendTransaction(txbytes []byte) {
+func DarksideSendTransaction(txHex []byte) ([]byte, error) {
+	// Need to parse the transaction to return its hash, plus it's
+	// good error checking.
+	txbytes, err := hex.DecodeString(string(txHex))
+	if err != nil {
+		return nil, err
+	}
+	tx := parser.NewTransaction()
+	rest, err := tx.ParseFromSlice(txbytes)
+	if err != nil {
+		return nil, err
+	}
+	if len(rest) != 0 {
+		return nil, errors.New("transaction serialization is too long")
+	}
 	state.incomingTransactions = append(state.incomingTransactions, txbytes)
+	return tx.GetDisplayHash(), nil
 }
+
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
 	if time.Now().Sub(state.serverStart).Minutes() >= 30 {
 		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")

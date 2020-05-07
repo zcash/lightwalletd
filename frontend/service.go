@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/zcash/lightwalletd/common"
-	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
 
@@ -221,21 +220,13 @@ func (s *LwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// "hex"             (string) The transaction hash in hex
 
 	if common.DarksideIsEnabled() {
-		txbytes, err := hex.DecodeString(string(rawtx.Data))
-		common.DarksideSendTransaction(txbytes)
-		// Need to parse the transaction to return its hash, plus it's
-		// good error checking.
-		tx := parser.NewTransaction()
-		rest, err := tx.ParseFromSlice(txbytes)
+		txid, err := common.DarksideSendTransaction(rawtx.Data)
 		if err != nil {
 			return nil, err
 		}
-		if len(rest) != 0 {
-			return nil, errors.New("transaction serialization is too long")
-		}
 		return &walletrpc.SendResponse{
 			ErrorCode:    0,
-			ErrorMessage: hex.EncodeToString(tx.GetDisplayHash()),
+			ErrorMessage: hex.EncodeToString(txid),
 		}, nil
 	}
 	// Construct raw JSON-RPC params
