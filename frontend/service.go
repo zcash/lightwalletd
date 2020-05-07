@@ -170,14 +170,18 @@ func (s *LwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 			common.Log.Errorf("GetTransaction error: %s", rpcErr.Error())
 			return nil, errors.New((strings.Split(rpcErr.Error(), ":"))[0])
 		}
-		var txinfo interface{}
+		var txinfo struct {
+			Hex    string
+			Height int
+		}
 		err := json.Unmarshal(result, &txinfo)
 		if err != nil {
 			return nil, err
 		}
-		txBytes := txinfo.(map[string]interface{})["hex"].(string)
-		txHeight := txinfo.(map[string]interface{})["height"].(float64)
-		return &walletrpc.RawTransaction{Data: []byte(txBytes), Height: uint64(txHeight)}, nil
+		return &walletrpc.RawTransaction{
+			Data:   []byte(txinfo.Hex),
+			Height: uint64(txinfo.Height),
+		}, nil
 	}
 
 	if txf.Block != nil && txf.Block.Hash != nil {
