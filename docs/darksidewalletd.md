@@ -13,6 +13,16 @@ same darksidewalletd at the same time. Darksidewalletd should only be used for
 testing, and therefore is hard-coded to shut down after 30 minutes of operation
 to prevent accidental deployment as a server.
 
+## Security warning
+
+Leaving darksidewalletd running puts your machine at greater risk because (a) it
+may be possible to use file: paths with `DarksideSetBlocksURL` to read arbitrary
+files on your system, and (b) also using `DarksideSetBlocksURL`, someone can
+force your system to make a web request to an arbitrary URL (which could have
+your system download questionable material, perform attacks on other systems,
+etc.). The maximum 30-minute run time limit built into darksidewalletd mitigates
+these risks, but users should still be cautious.
+
 ## Dependencies 
 
 Lightwalletd and most dependencies of lightwalletd, including Go version 1.11 or
@@ -111,8 +121,8 @@ You can get the same effect slightly less efficiently by submitting 1000-1007 (t
 is, resubmitting the original 1000-1002 followed by the new 1003-1007).
 
 If you first submit 1000-1005, then 1001-1002, the result will be 1000-1002
-(1003-1005 are dropped; it's not possible to "insert" blocks into an range).
-Likewise, first submit 1005-1008, then 1000-1006, the result is only 1000-1006. As
+(1003-1005 are dropped; it's not possible to "insert" blocks into a range).
+Likewise, first submit 1005-1008, then 1000-1006, the result is only 1000-1006. An
 easy way to state it is that all earlier blocks beyond the end of the extent of
 the range being submitted now are dropped. But blocks before the start of the range
 being submitted now are preserved if doing so doesn't create a gap.
