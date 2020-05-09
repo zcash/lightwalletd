@@ -282,7 +282,7 @@ func TestGetBlockRange(t *testing.T) {
 	RawRequest = getblockStub
 	os.RemoveAll(unitTestPath)
 	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, true)
-	blockChan := make(chan walletrpc.CompactBlock)
+	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go GetBlockRange(testcache, blockChan, errChan, 380640, 380642)
 

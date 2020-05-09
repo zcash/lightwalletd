@@ -129,7 +129,7 @@ func (s *LwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 // (as also returned by GetBlock) from the block height 'start' to height
 // 'end' inclusively.
 func (s *LwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
-	blockChan := make(chan walletrpc.CompactBlock)
+	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 
 	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
@@ -140,7 +140,7 @@ func (s *LwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			// this will also catch context.DeadlineExceeded from the timeout
 			return err
 		case cBlock := <-blockChan:
-			err := resp.Send(&cBlock)
+			err := resp.Send(cBlock)
 			if err != nil {
 				return err
 			}

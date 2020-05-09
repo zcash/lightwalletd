@@ -253,7 +253,7 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 }
 
 // GetBlockRange returns a sequence of consecutive blocks in the given range.
-func GetBlockRange(cache *BlockCache, blockOut chan<- walletrpc.CompactBlock, errOut chan<- error, start, end int) {
+func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, start, end int) {
 	// Go over [start, end] inclusive
 	for i := start; i <= end; i++ {
 		block, err := GetBlock(cache, i)
@@ -261,7 +261,7 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- walletrpc.CompactBlock, er
 			errOut <- err
 			return
 		}
-		blockOut <- *block
+		blockOut <- block
 	}
 	errOut <- nil
 }
