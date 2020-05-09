@@ -179,7 +179,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// this should cause one 10s sleep (then retry).
 		return nil, errors.New("-8: Block height out of range")
 	case 4:
-		if sleepCount != 1 || sleepDuration != 10*time.Second {
+		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380642" {
@@ -189,7 +189,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// wait then a check for reorg to shorter chain (back up one).
 		return nil, errors.New("-8: Block height out of range")
 	case 5:
-		if sleepCount != 2 || sleepDuration != 11*time.Second {
+		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		// Back up to 41.
@@ -200,7 +200,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// ingestor will immediately re-request the next block (42).
 		return blocks[1], nil
 	case 6:
-		if sleepCount != 2 || sleepDuration != 11*time.Second {
+		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380642" {
@@ -209,7 +209,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// Block 42 has now finally appeared, it will immediately ask for 43.
 		return blocks[2], nil
 	case 7:
-		if sleepCount != 2 || sleepDuration != 11*time.Second {
+		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380643" {
@@ -221,7 +221,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		return blocks[3], nil
 	case 8:
 		blocks[3][9]-- // repair first byte of the prevhash
-		if sleepCount != 3 || sleepDuration != 12*time.Second {
+		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380642" {
@@ -229,7 +229,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		}
 		return blocks[2], nil
 	case 9:
-		if sleepCount != 3 || sleepDuration != 12*time.Second {
+		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380643" {
@@ -239,7 +239,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// failure, should cause 10s sleep, retry
 		return nil, nil
 	case 10:
-		if sleepCount != 4 || sleepDuration != 22*time.Second {
+		if sleepCount != 2 || sleepDuration != 12*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380643" {
@@ -248,7 +248,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// Back to sunny-day
 		return blocks[3], nil
 	case 11:
-		if sleepCount != 4 || sleepDuration != 22*time.Second {
+		if sleepCount != 2 || sleepDuration != 12*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
 		if height != "380644" {

@@ -178,9 +178,10 @@ func BlockIngestor(c *BlockCache, rep int) {
 				// Wait a bit then retry the same height.
 				c.Sync()
 				if lastHeightLogged+1 != height {
-					Log.Info("Ingestor waiting for block: ", height)
+					Log.Info("Ingestor LHL: ", lastHeightLogged, " waiting for block: ", height)
+					lastHeightLogged = height - 1
 				}
-				Sleep(10 * time.Second)
+				Sleep(2 * time.Second)
 				wait = false
 				continue
 			}
@@ -212,7 +213,6 @@ func BlockIngestor(c *BlockCache, rep int) {
 			}
 			// Try backing up
 			c.Reorg(height - 1)
-			Sleep(1 * time.Second)
 			continue
 		}
 		// We have a valid block to add.
