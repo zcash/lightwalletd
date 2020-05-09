@@ -91,17 +91,6 @@ func DarksideAddBlock(blockHex string) error {
 	}
 	if len(state.blocks) == 0 {
 		state.startHeight = blockHeight
-	} else {
-		// Set this block's prevhash.
-		prevblock := parser.NewBlock()
-		rest, err := prevblock.ParseFromSlice(state.blocks[len(state.blocks)-1])
-		if err != nil {
-			return err
-		}
-		if len(rest) != 0 {
-			return errors.New("block is too long")
-		}
-		copy(blockData[4:4+32], prevblock.GetEncodableHash())
 	}
 	if state.saplingActivation < 0 {
 		state.saplingActivation = blockHeight
