@@ -7,11 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
+	"net/http"
 	"os"
-	"os/exec"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/zcash/lightwalletd/parser"
@@ -141,36 +139,15 @@ func DarksideGetIncomingTransactions() [][]byte {
 }
 
 func DarksideSetBlocksURL(url string) error {
-	if strings.HasPrefix(url, "file:") && len(url) >= 6 && url[5] != '/' {
-		dir, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		url = "file:" + dir + string(os.PathSeparator) + url[5:]
-	}
-	cmd := exec.Command("curl", "--silent", "--show-error", url)
-	stdout, err := cmd.StdoutPipe()
+	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
-	stderr, err := cmd.StderrPipe()
+	defer resp.Body.Close()
+	err = readBlocks(resp.Body)
 	if err != nil {
+
 		return err
-	}
-	if err := cmd.Start(); err != nil {
-		return err
-	}
-	defer cmd.Wait()
-	err = readBlocks(stdout)
-	if err != nil {
-		return err
-	}
-	stderroutstr, err := ioutil.ReadAll(stderr)
-	if err != nil {
-		return err
-	}
-	if len(stderroutstr) > 0 {
-		return errors.New(string(stderroutstr))
 	}
 	return nil
 }
