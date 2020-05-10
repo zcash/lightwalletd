@@ -50,10 +50,27 @@ var Sleep func(d time.Duration)
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
 
+type (
+	Upgradeinfo struct {
+		// there are other fields that aren't needed here, omit them
+		ActivationHeight int
+	}
+	ConsensusInfo struct {
+		Nextblock string
+		Chaintip  string
+	}
+	Blockchaininfo struct {
+		Chain     string
+		Upgrades  map[string]Upgradeinfo
+		Headers   int
+		Consensus ConsensusInfo
+	}
+)
+
 // GetSaplingInfo returns the result of the getblockchaininfo RPC to zcashd
 func GetSaplingInfo() (int, int, string, string) {
 	// This request must succeed or we can't go on; give zcashd time to start up
-	var f interface{}
+	var blockchaininfo Blockchaininfo
 	retryCount := 0
 	for {
 		result, rpcErr := RawRequest("getblockchaininfo", []json.RawMessage{})
@@ -61,7 +78,7 @@ func GetSaplingInfo() (int, int, string, string) {
 			if retryCount > 0 {
 				Log.Warn("getblockchaininfo RPC successful")
 			}
-			err := json.Unmarshal(result, &f)
+			err := json.Unmarshal(result, &blockchaininfo)
 			if err != nil {
 				Log.Fatalf("error parsing JSON getblockchaininfo response: %v", err)
 			}
@@ -80,23 +97,14 @@ func GetSaplingInfo() (int, int, string, string) {
 		Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
 	}
 
-	chainName := f.(map[string]interface{})["chain"].(string)
-
-	upgradeJSON := f.(map[string]interface{})["upgrades"]
-
 	// If the sapling consensus branch doesn't exist, it must be regtest
-	saplingHeight := float64(0)
-	if saplingJSON, ok := upgradeJSON.(map[string]interface{})["76b809bb"]; ok { // Sapling ID
-		saplingHeight = saplingJSON.(map[string]interface{})["activationheight"].(float64)
+	var saplingHeight int
+	if saplingJSON, ok := blockchaininfo.Upgrades["76b809bb"]; ok { // Sapling ID
+		saplingHeight = saplingJSON.ActivationHeight
 	}
 
-	blockHeight := f.(map[string]interface{})["headers"].(float64)
-
-	consensus := f.(map[string]interface{})["consensus"]
-
-	branchID := consensus.(map[string]interface{})["nextblock"].(string)
-
-	return int(saplingHeight), int(blockHeight), chainName, branchID
+	return saplingHeight, blockchaininfo.Headers, blockchaininfo.Chain,
+		blockchaininfo.Consensus.Nextblock
 }
 
 func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
