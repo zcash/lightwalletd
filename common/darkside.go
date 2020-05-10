@@ -163,26 +163,13 @@ func DarksideSendTransaction(txHex []byte) ([]byte, error) {
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
 	switch method {
 	case "getblockchaininfo":
-		type upgradeinfo struct {
-			// there are other fields that aren't needed here, omit them
-			ActivationHeight int `json:"activationheight"`
-		}
-		type consensus struct {
-			Nextblock string `json:"nextblock"`
-			Chaintip  string `json:"chaintip"`
-		}
-		blockchaininfo := struct {
-			Chain     string                 `json:"chain"`
-			Upgrades  map[string]upgradeinfo `json:"upgrades"`
-			Headers   int                    `json:"headers"`
-			Consensus consensus              `json:"consensus"`
-		}{
+		blockchaininfo := Blockchaininfo{
 			Chain: state.chainName,
-			Upgrades: map[string]upgradeinfo{
+			Upgrades: map[string]Upgradeinfo{
 				"76b809bb": {ActivationHeight: state.saplingActivation},
 			},
 			Headers:   state.startHeight + len(state.blocks) - 1,
-			Consensus: consensus{state.branchID, state.branchID},
+			Consensus: ConsensusInfo{state.branchID, state.branchID},
 		}
 		return json.Marshal(blockchaininfo)
 
