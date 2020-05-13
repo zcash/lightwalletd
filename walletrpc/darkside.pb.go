@@ -96,6 +96,7 @@ func (x *DarksideMetaState) GetChainName() string {
 	return ""
 }
 
+// A block is a hex-encoded string.
 type DarksideBlock struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -246,6 +247,116 @@ func (x *DarksideTx) GetTransaction() string {
 	return ""
 }
 
+type DarksideHeight struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Height int32 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
+}
+
+func (x *DarksideHeight) Reset() {
+	*x = DarksideHeight{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_darkside_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DarksideHeight) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DarksideHeight) ProtoMessage() {}
+
+func (x *DarksideHeight) ProtoReflect() protoreflect.Message {
+	mi := &file_darkside_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DarksideHeight.ProtoReflect.Descriptor instead.
+func (*DarksideHeight) Descriptor() ([]byte, []int) {
+	return file_darkside_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DarksideHeight) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+type DarksideEmptyBlocks struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Height int32 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
+	Nonce  int32 `protobuf:"varint,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	Count  int32 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+}
+
+func (x *DarksideEmptyBlocks) Reset() {
+	*x = DarksideEmptyBlocks{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_darkside_proto_msgTypes[5]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *DarksideEmptyBlocks) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DarksideEmptyBlocks) ProtoMessage() {}
+
+func (x *DarksideEmptyBlocks) ProtoReflect() protoreflect.Message {
+	mi := &file_darkside_proto_msgTypes[5]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DarksideEmptyBlocks.ProtoReflect.Descriptor instead.
+func (*DarksideEmptyBlocks) Descriptor() ([]byte, []int) {
+	return file_darkside_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *DarksideEmptyBlocks) GetHeight() int32 {
+	if x != nil {
+		return x.Height
+	}
+	return 0
+}
+
+func (x *DarksideEmptyBlocks) GetNonce() int32 {
+	if x != nil {
+		return x.Nonce
+	}
+	return 0
+}
+
+func (x *DarksideEmptyBlocks) GetCount() int32 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
 var File_darkside_proto protoreflect.FileDescriptor
 
 var file_darkside_proto_rawDesc = []byte{
@@ -269,38 +380,69 @@ var file_darkside_proto_rawDesc = []byte{
 	0x16, 0x0a, 0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52,
 	0x06, 0x68, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x20, 0x0a, 0x0b, 0x74, 0x72, 0x61, 0x6e, 0x73,
 	0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x74, 0x72,
-	0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x32, 0xcd, 0x03, 0x0a, 0x10, 0x44, 0x61,
-	0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x65, 0x72, 0x12, 0x58,
-	0x0a, 0x0c, 0x53, 0x65, 0x74, 0x4d, 0x65, 0x74, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x12, 0x28,
-	0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73,
-	0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x4d,
-	0x65, 0x74, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e,
-	0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63,
-	0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x12, 0x53, 0x0a, 0x09, 0x53, 0x65, 0x74, 0x42,
-	0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x12, 0x24, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77,
-	0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61,
-	0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x1a, 0x1c, 0x2e, 0x63, 0x61,
-	0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e,
-	0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x28, 0x01, 0x12, 0x58, 0x0a,
-	0x0c, 0x53, 0x65, 0x74, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x55, 0x52, 0x4c, 0x12, 0x28, 0x2e,
+	0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x28, 0x0a, 0x0e, 0x44, 0x61, 0x72,
+	0x6b, 0x73, 0x69, 0x64, 0x65, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x12, 0x16, 0x0a, 0x06, 0x68,
+	0x65, 0x69, 0x67, 0x68, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x68, 0x65, 0x69,
+	0x67, 0x68, 0x74, 0x22, 0x59, 0x0a, 0x13, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x45,
+	0x6d, 0x70, 0x74, 0x79, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x68, 0x65,
+	0x69, 0x67, 0x68, 0x74, 0x18, 0x01, 0x20, 0x01, 0x28, 0x05, 0x52, 0x06, 0x68, 0x65, 0x69, 0x67,
+	0x68, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x6e, 0x6f, 0x6e, 0x63, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x05, 0x52, 0x05, 0x6e, 0x6f, 0x6e, 0x63, 0x65, 0x12, 0x14, 0x0a, 0x05, 0x63, 0x6f, 0x75, 0x6e,
+	0x74, 0x18, 0x03, 0x20, 0x01, 0x28, 0x05, 0x52, 0x05, 0x63, 0x6f, 0x75, 0x6e, 0x74, 0x32, 0xbd,
+	0x06, 0x0a, 0x10, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x53, 0x74, 0x72, 0x65, 0x61,
+	0x6d, 0x65, 0x72, 0x12, 0x58, 0x0a, 0x0c, 0x53, 0x65, 0x74, 0x4d, 0x65, 0x74, 0x61, 0x53, 0x74,
+	0x61, 0x74, 0x65, 0x12, 0x28, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c,
+	0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b,
+	0x73, 0x69, 0x64, 0x65, 0x4d, 0x65, 0x74, 0x61, 0x53, 0x74, 0x61, 0x74, 0x65, 0x1a, 0x1c, 0x2e,
 	0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64,
-	0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x42, 0x6c,
-	0x6f, 0x63, 0x6b, 0x73, 0x55, 0x52, 0x4c, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a,
-	0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e,
-	0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x12, 0x4c, 0x0a, 0x05, 0x53, 0x65, 0x74, 0x54, 0x78,
-	0x12, 0x21, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74,
-	0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64,
-	0x65, 0x54, 0x78, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c,
+	0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x12, 0x5b, 0x0a,
+	0x11, 0x53, 0x74, 0x61, 0x67, 0x65, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x53, 0x74, 0x72, 0x65,
+	0x61, 0x6d, 0x12, 0x24, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c,
+	0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73,
+	0x69, 0x64, 0x65, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e,
+	0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63,
+	0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x28, 0x01, 0x12, 0x57, 0x0a, 0x0b, 0x53, 0x74,
+	0x61, 0x67, 0x65, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x73, 0x12, 0x28, 0x2e, 0x63, 0x61, 0x73, 0x68,
+	0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70,
+	0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x42, 0x6c, 0x6f, 0x63, 0x6b, 0x73,
+	0x55, 0x52, 0x4c, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c,
 	0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74,
-	0x79, 0x22, 0x00, 0x28, 0x01, 0x12, 0x62, 0x0a, 0x17, 0x47, 0x65, 0x74, 0x49, 0x6e, 0x63, 0x6f,
-	0x6d, 0x69, 0x6e, 0x67, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x73,
+	0x79, 0x22, 0x00, 0x12, 0x5f, 0x0a, 0x11, 0x53, 0x74, 0x61, 0x67, 0x65, 0x42, 0x6c, 0x6f, 0x63,
+	0x6b, 0x73, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x12, 0x2a, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e,
+	0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63,
+	0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69, 0x64, 0x65, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x42, 0x6c,
+	0x6f, 0x63, 0x6b, 0x73, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61,
+	0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70,
+	0x74, 0x79, 0x22, 0x00, 0x12, 0x5c, 0x0a, 0x11, 0x53, 0x74, 0x61, 0x67, 0x65, 0x54, 0x72, 0x61,
+	0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x25, 0x2e, 0x63, 0x61, 0x73, 0x68,
+	0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70,
+	0x63, 0x2e, 0x52, 0x61, 0x77, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e,
+	0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74,
+	0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00,
+	0x28, 0x01, 0x12, 0x54, 0x0a, 0x0b, 0x41, 0x70, 0x70, 0x6c, 0x79, 0x53, 0x74, 0x61, 0x67, 0x65,
+	0x64, 0x12, 0x25, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65,
+	0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x44, 0x61, 0x72, 0x6b, 0x73, 0x69,
+	0x64, 0x65, 0x48, 0x65, 0x69, 0x67, 0x68, 0x74, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e,
+	0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63,
+	0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x12, 0x62, 0x0a, 0x17, 0x47, 0x65, 0x74, 0x49,
+	0x6e, 0x63, 0x6f, 0x6d, 0x69, 0x6e, 0x67, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61, 0x63, 0x74, 0x69,
+	0x6f, 0x6e, 0x73, 0x12, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c,
+	0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74,
+	0x79, 0x1a, 0x25, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65,
+	0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x52, 0x61, 0x77, 0x54, 0x72, 0x61,
+	0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x00, 0x30, 0x01, 0x12, 0x59, 0x0a, 0x19,
+	0x43, 0x6c, 0x65, 0x61, 0x72, 0x49, 0x6e, 0x63, 0x6f, 0x6d, 0x69, 0x6e, 0x67, 0x54, 0x72, 0x61,
+	0x6e, 0x73, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x12, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68,
+	0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70,
+	0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a,
+	0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e,
+	0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x12, 0x45, 0x0a, 0x05, 0x52, 0x65, 0x73, 0x65, 0x74,
 	0x12, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74,
-	0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x25,
+	0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x1a, 0x1c,
 	0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73,
-	0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x52, 0x61, 0x77, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x61,
-	0x63, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x00, 0x30, 0x01, 0x42, 0x10, 0x5a, 0x0b, 0x2e, 0x3b, 0x77,
-	0x61, 0x6c, 0x6c, 0x65, 0x74, 0x72, 0x70, 0x63, 0xba, 0x02, 0x00, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x45, 0x6d, 0x70, 0x74, 0x79, 0x22, 0x00, 0x42, 0x10,
+	0x5a, 0x0b, 0x2e, 0x3b, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x72, 0x70, 0x63, 0xba, 0x02, 0x00,
+	0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -315,28 +457,38 @@ func file_darkside_proto_rawDescGZIP() []byte {
 	return file_darkside_proto_rawDescData
 }
 
-var file_darkside_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_darkside_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_darkside_proto_goTypes = []interface{}{
-	(*DarksideMetaState)(nil), // 0: cash.z.wallet.sdk.rpc.DarksideMetaState
-	(*DarksideBlock)(nil),     // 1: cash.z.wallet.sdk.rpc.DarksideBlock
-	(*DarksideBlocksURL)(nil), // 2: cash.z.wallet.sdk.rpc.DarksideBlocksURL
-	(*DarksideTx)(nil),        // 3: cash.z.wallet.sdk.rpc.DarksideTx
-	(*Empty)(nil),             // 4: cash.z.wallet.sdk.rpc.Empty
-	(*RawTransaction)(nil),    // 5: cash.z.wallet.sdk.rpc.RawTransaction
+	(*DarksideMetaState)(nil),   // 0: cash.z.wallet.sdk.rpc.DarksideMetaState
+	(*DarksideBlock)(nil),       // 1: cash.z.wallet.sdk.rpc.DarksideBlock
+	(*DarksideBlocksURL)(nil),   // 2: cash.z.wallet.sdk.rpc.DarksideBlocksURL
+	(*DarksideTx)(nil),          // 3: cash.z.wallet.sdk.rpc.DarksideTx
+	(*DarksideHeight)(nil),      // 4: cash.z.wallet.sdk.rpc.DarksideHeight
+	(*DarksideEmptyBlocks)(nil), // 5: cash.z.wallet.sdk.rpc.DarksideEmptyBlocks
+	(*RawTransaction)(nil),      // 6: cash.z.wallet.sdk.rpc.RawTransaction
+	(*Empty)(nil),               // 7: cash.z.wallet.sdk.rpc.Empty
 }
 var file_darkside_proto_depIdxs = []int32{
 	0, // 0: cash.z.wallet.sdk.rpc.DarksideStreamer.SetMetaState:input_type -> cash.z.wallet.sdk.rpc.DarksideMetaState
-	1, // 1: cash.z.wallet.sdk.rpc.DarksideStreamer.SetBlocks:input_type -> cash.z.wallet.sdk.rpc.DarksideBlock
-	2, // 2: cash.z.wallet.sdk.rpc.DarksideStreamer.SetBlocksURL:input_type -> cash.z.wallet.sdk.rpc.DarksideBlocksURL
-	3, // 3: cash.z.wallet.sdk.rpc.DarksideStreamer.SetTx:input_type -> cash.z.wallet.sdk.rpc.DarksideTx
-	4, // 4: cash.z.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:input_type -> cash.z.wallet.sdk.rpc.Empty
-	4, // 5: cash.z.wallet.sdk.rpc.DarksideStreamer.SetMetaState:output_type -> cash.z.wallet.sdk.rpc.Empty
-	4, // 6: cash.z.wallet.sdk.rpc.DarksideStreamer.SetBlocks:output_type -> cash.z.wallet.sdk.rpc.Empty
-	4, // 7: cash.z.wallet.sdk.rpc.DarksideStreamer.SetBlocksURL:output_type -> cash.z.wallet.sdk.rpc.Empty
-	4, // 8: cash.z.wallet.sdk.rpc.DarksideStreamer.SetTx:output_type -> cash.z.wallet.sdk.rpc.Empty
-	5, // 9: cash.z.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:output_type -> cash.z.wallet.sdk.rpc.RawTransaction
-	5, // [5:10] is the sub-list for method output_type
-	0, // [0:5] is the sub-list for method input_type
+	1, // 1: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksStream:input_type -> cash.z.wallet.sdk.rpc.DarksideBlock
+	2, // 2: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocks:input_type -> cash.z.wallet.sdk.rpc.DarksideBlocksURL
+	5, // 3: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksCreate:input_type -> cash.z.wallet.sdk.rpc.DarksideEmptyBlocks
+	6, // 4: cash.z.wallet.sdk.rpc.DarksideStreamer.StageTransactions:input_type -> cash.z.wallet.sdk.rpc.RawTransaction
+	4, // 5: cash.z.wallet.sdk.rpc.DarksideStreamer.ApplyStaged:input_type -> cash.z.wallet.sdk.rpc.DarksideHeight
+	7, // 6: cash.z.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:input_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 7: cash.z.wallet.sdk.rpc.DarksideStreamer.ClearIncomingTransactions:input_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 8: cash.z.wallet.sdk.rpc.DarksideStreamer.Reset:input_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 9: cash.z.wallet.sdk.rpc.DarksideStreamer.SetMetaState:output_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 10: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksStream:output_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 11: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocks:output_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 12: cash.z.wallet.sdk.rpc.DarksideStreamer.StageBlocksCreate:output_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 13: cash.z.wallet.sdk.rpc.DarksideStreamer.StageTransactions:output_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 14: cash.z.wallet.sdk.rpc.DarksideStreamer.ApplyStaged:output_type -> cash.z.wallet.sdk.rpc.Empty
+	6, // 15: cash.z.wallet.sdk.rpc.DarksideStreamer.GetIncomingTransactions:output_type -> cash.z.wallet.sdk.rpc.RawTransaction
+	7, // 16: cash.z.wallet.sdk.rpc.DarksideStreamer.ClearIncomingTransactions:output_type -> cash.z.wallet.sdk.rpc.Empty
+	7, // 17: cash.z.wallet.sdk.rpc.DarksideStreamer.Reset:output_type -> cash.z.wallet.sdk.rpc.Empty
+	9, // [9:18] is the sub-list for method output_type
+	0, // [0:9] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -397,6 +549,30 @@ func file_darkside_proto_init() {
 				return nil
 			}
 		}
+		file_darkside_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DarksideHeight); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_darkside_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*DarksideEmptyBlocks); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -404,7 +580,7 @@ func file_darkside_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_darkside_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -430,47 +606,58 @@ const _ = grpc.SupportPackageIsVersion6
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type DarksideStreamerClient interface {
-	// Set (some of) the values that should be returned by GetLightdInfo()
+	// Set (some of) the values returned by GetLightdInfo()
 	SetMetaState(ctx context.Context, in *DarksideMetaState, opts ...grpc.CallOption) (*Empty, error)
-	// SetBlocks() replaces the specified range of blocks (gaps not allowed);
-	// for example, you can set blocks 1000-1006, do some tests, then set blocks
-	// 1003-1004. This preserves blocks 1000-1002, replaces blocks 1003-1004,
-	// and removes blocks 1005-1006. This can be used to simulate a chain reorg.
-	// Blocks are hex-encoded.
-	SetBlocks(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_SetBlocksClient, error)
-	// This is the same as SetBlocks(), except the blocks are fetched
+	// StageBlocksStream accepts a list of blocks and saves them into the blocks
+	// staging area until ApplyStaged() is called; there is no immediate effect on
+	// the mock zcashd. Blocks are hex-encoded.
+	StageBlocksStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageBlocksStreamClient, error)
+	// StageBlocks is the same as StageBlocksStream() except the blocks are fetched
 	// from the given URL. Blocks are one per line, hex-encoded (not JSON).
-	// SetBlocksURL("file:testdata/darkside/init-blocks") is done at startup.
-	SetBlocksURL(ctx context.Context, in *DarksideBlocksURL, opts ...grpc.CallOption) (*Empty, error)
-	// SetTx() allows the test coordinator to submit a list of transactions and
-	// for each indicate in which block it should appear.
-	// For example,
-	//   tx1, block=1001
-	//   tx2, block=1002
-	//   tx3, block=1002
-	// Then use Setblocks(1000-1005): block 1001 will include tx1 (plus
-	// any transactions were part of that block to begin with); tx2 and tx3
-	// will appear in block 1002. Blocks 1003-1005 will be returned as submitted.
+	StageBlocks(ctx context.Context, in *DarksideBlocksURL, opts ...grpc.CallOption) (*Empty, error)
+	// StageBlocksCreate is like the previous two, except it creates 'count'
+	// empty blocks at consecutive heights starting at height 'height'. The
+	// 'nonce' is part of the header, so it contributes to the block hash; this
+	// lets you create two fake blocks with the same transactions (or no
+	// transactions) and same height, with two different hashes.
+	StageBlocksCreate(ctx context.Context, in *DarksideEmptyBlocks, opts ...grpc.CallOption) (*Empty, error)
+	// StageTransactions stores the given transaction-height pairs in the
+	// staging area until ApplyStaged() is called. Note that these transactions
+	// are not returned by the production GetTransaction() gRPC until they
+	// appear in a "mined" block (contained in the active blockchain presented
+	// by the mock zcashd).
+	StageTransactions(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageTransactionsClient, error)
+	// ApplyStaged iterates the list of blocks that were staged by the
+	// StageBlocks*() gRPCs, in the order they were staged, and "merges" each
+	// into the active, working blocks list that the mock zcashd is presenting
+	// to lightwalletd. The resulting working block list can't have gaps; if the
+	// working block range is 1000-1006, and the staged block range is 1003-1004,
+	// the resulting range is 1000-1004, with 1000-1002 unchanged, blocks
+	// 1003-1004 from the new range, and 1005-1006 dropped. After merging all
+	// blocks, ApplyStaged() appends staged transactions (in the order received)
+	// into each one's corresponding block. The staging area is then cleared.
 	//
-	// If you first set a range of blocks, then submit transactions within that
-	// range, it's too late for them to be included in those blocks. If blocks
-	// are resubmitted, then those transactions are included in those blocks.
-	//
-	// Calling GetTransaction() on tx1-3 will return those transactions, and
-	// GetTransaction() will also return any transactions that were part of
-	// the submitted blocks.
-	//
-	// Each call to SetTx() completely replaces the stored transaction set.
-	SetTx(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_SetTxClient, error)
-	// Calls to SendTransaction() are accepted and stored; this method returns
-	// all transactions that were previously submitted. This enables the
-	// following kind of test, for example:
-	//   1. wallet submits a transaction
-	//   2. Test coordinator retrives the transaction using this interface
-	//   3. Test coordinator submits the transaction using SetTx()
-	//   4. Darksidewalletd simulates the transaction appearing in a mined block
-	//
+	// The argument specifies the latest block height that mock zcashd reports
+	// (i.e. what's returned by GetLatestBlock). Note that ApplyStaged() can
+	// also be used to simply advance the latest block height presented by mock
+	// zcashd. That is, there doesn't need to be anything in the staging area.
+	ApplyStaged(ctx context.Context, in *DarksideHeight, opts ...grpc.CallOption) (*Empty, error)
+	// Calls to the production gRPC SendTransaction() store the transaction in
+	// a separate area (not the staging area); this method returns all transactions
+	// in this separate area, which is then cleared. The height returned
+	// with each transaction is -1 (invalid) since these transactions haven't
+	// been mined yet. The intention is that the transactions returned here can
+	// then, for example, be given to StageTransactions() to get them "mined"
+	// into a specified block on the next ApplyStaged().
 	GetIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DarksideStreamer_GetIncomingTransactionsClient, error)
+	// Clear the incoming transaction pool.
+	ClearIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Reset reverts all darksidewalletd state (active block range, latest height,
+	// staged blocks and transactions) and lightwalletd state (cache) to empty,
+	// the same as the initial state. This occurs synchronously and instantaneously;
+	// no reorg happens in lightwalletd. This is good to do before each independent
+	// test so that no state leaks from one test to another.
+	Reset(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type darksideStreamerClient struct {
@@ -490,30 +677,30 @@ func (c *darksideStreamerClient) SetMetaState(ctx context.Context, in *DarksideM
 	return out, nil
 }
 
-func (c *darksideStreamerClient) SetBlocks(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_SetBlocksClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocks", opts...)
+func (c *darksideStreamerClient) StageBlocksStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageBlocksStreamClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksStream", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &darksideStreamerSetBlocksClient{stream}
+	x := &darksideStreamerStageBlocksStreamClient{stream}
 	return x, nil
 }
 
-type DarksideStreamer_SetBlocksClient interface {
+type DarksideStreamer_StageBlocksStreamClient interface {
 	Send(*DarksideBlock) error
 	CloseAndRecv() (*Empty, error)
 	grpc.ClientStream
 }
 
-type darksideStreamerSetBlocksClient struct {
+type darksideStreamerStageBlocksStreamClient struct {
 	grpc.ClientStream
 }
 
-func (x *darksideStreamerSetBlocksClient) Send(m *DarksideBlock) error {
+func (x *darksideStreamerStageBlocksStreamClient) Send(m *DarksideBlock) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *darksideStreamerSetBlocksClient) CloseAndRecv() (*Empty, error) {
+func (x *darksideStreamerStageBlocksStreamClient) CloseAndRecv() (*Empty, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
@@ -524,39 +711,48 @@ func (x *darksideStreamerSetBlocksClient) CloseAndRecv() (*Empty, error) {
 	return m, nil
 }
 
-func (c *darksideStreamerClient) SetBlocksURL(ctx context.Context, in *DarksideBlocksURL, opts ...grpc.CallOption) (*Empty, error) {
+func (c *darksideStreamerClient) StageBlocks(ctx context.Context, in *DarksideBlocksURL, opts ...grpc.CallOption) (*Empty, error) {
 	out := new(Empty)
-	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocksURL", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *darksideStreamerClient) SetTx(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_SetTxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.DarksideStreamer/SetTx", opts...)
+func (c *darksideStreamerClient) StageBlocksCreate(ctx context.Context, in *DarksideEmptyBlocks, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &darksideStreamerSetTxClient{stream}
+	return out, nil
+}
+
+func (c *darksideStreamerClient) StageTransactions(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageTransactionsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactions", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &darksideStreamerStageTransactionsClient{stream}
 	return x, nil
 }
 
-type DarksideStreamer_SetTxClient interface {
-	Send(*DarksideTx) error
+type DarksideStreamer_StageTransactionsClient interface {
+	Send(*RawTransaction) error
 	CloseAndRecv() (*Empty, error)
 	grpc.ClientStream
 }
 
-type darksideStreamerSetTxClient struct {
+type darksideStreamerStageTransactionsClient struct {
 	grpc.ClientStream
 }
 
-func (x *darksideStreamerSetTxClient) Send(m *DarksideTx) error {
+func (x *darksideStreamerStageTransactionsClient) Send(m *RawTransaction) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *darksideStreamerSetTxClient) CloseAndRecv() (*Empty, error) {
+func (x *darksideStreamerStageTransactionsClient) CloseAndRecv() (*Empty, error) {
 	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
@@ -565,6 +761,15 @@ func (x *darksideStreamerSetTxClient) CloseAndRecv() (*Empty, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (c *darksideStreamerClient) ApplyStaged(ctx context.Context, in *DarksideHeight, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *darksideStreamerClient) GetIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DarksideStreamer_GetIncomingTransactionsClient, error) {
@@ -599,49 +804,78 @@ func (x *darksideStreamerGetIncomingTransactionsClient) Recv() (*RawTransaction,
 	return m, nil
 }
 
+func (c *darksideStreamerClient) ClearIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearIncomingTransactions", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *darksideStreamerClient) Reset(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/Reset", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DarksideStreamerServer is the server API for DarksideStreamer service.
 type DarksideStreamerServer interface {
-	// Set (some of) the values that should be returned by GetLightdInfo()
+	// Set (some of) the values returned by GetLightdInfo()
 	SetMetaState(context.Context, *DarksideMetaState) (*Empty, error)
-	// SetBlocks() replaces the specified range of blocks (gaps not allowed);
-	// for example, you can set blocks 1000-1006, do some tests, then set blocks
-	// 1003-1004. This preserves blocks 1000-1002, replaces blocks 1003-1004,
-	// and removes blocks 1005-1006. This can be used to simulate a chain reorg.
-	// Blocks are hex-encoded.
-	SetBlocks(DarksideStreamer_SetBlocksServer) error
-	// This is the same as SetBlocks(), except the blocks are fetched
+	// StageBlocksStream accepts a list of blocks and saves them into the blocks
+	// staging area until ApplyStaged() is called; there is no immediate effect on
+	// the mock zcashd. Blocks are hex-encoded.
+	StageBlocksStream(DarksideStreamer_StageBlocksStreamServer) error
+	// StageBlocks is the same as StageBlocksStream() except the blocks are fetched
 	// from the given URL. Blocks are one per line, hex-encoded (not JSON).
-	// SetBlocksURL("file:testdata/darkside/init-blocks") is done at startup.
-	SetBlocksURL(context.Context, *DarksideBlocksURL) (*Empty, error)
-	// SetTx() allows the test coordinator to submit a list of transactions and
-	// for each indicate in which block it should appear.
-	// For example,
-	//   tx1, block=1001
-	//   tx2, block=1002
-	//   tx3, block=1002
-	// Then use Setblocks(1000-1005): block 1001 will include tx1 (plus
-	// any transactions were part of that block to begin with); tx2 and tx3
-	// will appear in block 1002. Blocks 1003-1005 will be returned as submitted.
+	StageBlocks(context.Context, *DarksideBlocksURL) (*Empty, error)
+	// StageBlocksCreate is like the previous two, except it creates 'count'
+	// empty blocks at consecutive heights starting at height 'height'. The
+	// 'nonce' is part of the header, so it contributes to the block hash; this
+	// lets you create two fake blocks with the same transactions (or no
+	// transactions) and same height, with two different hashes.
+	StageBlocksCreate(context.Context, *DarksideEmptyBlocks) (*Empty, error)
+	// StageTransactions stores the given transaction-height pairs in the
+	// staging area until ApplyStaged() is called. Note that these transactions
+	// are not returned by the production GetTransaction() gRPC until they
+	// appear in a "mined" block (contained in the active blockchain presented
+	// by the mock zcashd).
+	StageTransactions(DarksideStreamer_StageTransactionsServer) error
+	// ApplyStaged iterates the list of blocks that were staged by the
+	// StageBlocks*() gRPCs, in the order they were staged, and "merges" each
+	// into the active, working blocks list that the mock zcashd is presenting
+	// to lightwalletd. The resulting working block list can't have gaps; if the
+	// working block range is 1000-1006, and the staged block range is 1003-1004,
+	// the resulting range is 1000-1004, with 1000-1002 unchanged, blocks
+	// 1003-1004 from the new range, and 1005-1006 dropped. After merging all
+	// blocks, ApplyStaged() appends staged transactions (in the order received)
+	// into each one's corresponding block. The staging area is then cleared.
 	//
-	// If you first set a range of blocks, then submit transactions within that
-	// range, it's too late for them to be included in those blocks. If blocks
-	// are resubmitted, then those transactions are included in those blocks.
-	//
-	// Calling GetTransaction() on tx1-3 will return those transactions, and
-	// GetTransaction() will also return any transactions that were part of
-	// the submitted blocks.
-	//
-	// Each call to SetTx() completely replaces the stored transaction set.
-	SetTx(DarksideStreamer_SetTxServer) error
-	// Calls to SendTransaction() are accepted and stored; this method returns
-	// all transactions that were previously submitted. This enables the
-	// following kind of test, for example:
-	//   1. wallet submits a transaction
-	//   2. Test coordinator retrives the transaction using this interface
-	//   3. Test coordinator submits the transaction using SetTx()
-	//   4. Darksidewalletd simulates the transaction appearing in a mined block
-	//
+	// The argument specifies the latest block height that mock zcashd reports
+	// (i.e. what's returned by GetLatestBlock). Note that ApplyStaged() can
+	// also be used to simply advance the latest block height presented by mock
+	// zcashd. That is, there doesn't need to be anything in the staging area.
+	ApplyStaged(context.Context, *DarksideHeight) (*Empty, error)
+	// Calls to the production gRPC SendTransaction() store the transaction in
+	// a separate area (not the staging area); this method returns all transactions
+	// in this separate area, which is then cleared. The height returned
+	// with each transaction is -1 (invalid) since these transactions haven't
+	// been mined yet. The intention is that the transactions returned here can
+	// then, for example, be given to StageTransactions() to get them "mined"
+	// into a specified block on the next ApplyStaged().
 	GetIncomingTransactions(*Empty, DarksideStreamer_GetIncomingTransactionsServer) error
+	// Clear the incoming transaction pool.
+	ClearIncomingTransactions(context.Context, *Empty) (*Empty, error)
+	// Reset reverts all darksidewalletd state (active block range, latest height,
+	// staged blocks and transactions) and lightwalletd state (cache) to empty,
+	// the same as the initial state. This occurs synchronously and instantaneously;
+	// no reorg happens in lightwalletd. This is good to do before each independent
+	// test so that no state leaks from one test to another.
+	Reset(context.Context, *Empty) (*Empty, error)
 }
 
 // UnimplementedDarksideStreamerServer can be embedded to have forward compatible implementations.
@@ -651,17 +885,29 @@ type UnimplementedDarksideStreamerServer struct {
 func (*UnimplementedDarksideStreamerServer) SetMetaState(context.Context, *DarksideMetaState) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetMetaState not implemented")
 }
-func (*UnimplementedDarksideStreamerServer) SetBlocks(DarksideStreamer_SetBlocksServer) error {
-	return status.Errorf(codes.Unimplemented, "method SetBlocks not implemented")
+func (*UnimplementedDarksideStreamerServer) StageBlocksStream(DarksideStreamer_StageBlocksStreamServer) error {
+	return status.Errorf(codes.Unimplemented, "method StageBlocksStream not implemented")
 }
-func (*UnimplementedDarksideStreamerServer) SetBlocksURL(context.Context, *DarksideBlocksURL) (*Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SetBlocksURL not implemented")
+func (*UnimplementedDarksideStreamerServer) StageBlocks(context.Context, *DarksideBlocksURL) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StageBlocks not implemented")
 }
-func (*UnimplementedDarksideStreamerServer) SetTx(DarksideStreamer_SetTxServer) error {
-	return status.Errorf(codes.Unimplemented, "method SetTx not implemented")
+func (*UnimplementedDarksideStreamerServer) StageBlocksCreate(context.Context, *DarksideEmptyBlocks) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StageBlocksCreate not implemented")
+}
+func (*UnimplementedDarksideStreamerServer) StageTransactions(DarksideStreamer_StageTransactionsServer) error {
+	return status.Errorf(codes.Unimplemented, "method StageTransactions not implemented")
+}
+func (*UnimplementedDarksideStreamerServer) ApplyStaged(context.Context, *DarksideHeight) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ApplyStaged not implemented")
 }
 func (*UnimplementedDarksideStreamerServer) GetIncomingTransactions(*Empty, DarksideStreamer_GetIncomingTransactionsServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetIncomingTransactions not implemented")
+}
+func (*UnimplementedDarksideStreamerServer) ClearIncomingTransactions(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearIncomingTransactions not implemented")
+}
+func (*UnimplementedDarksideStreamerServer) Reset(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Reset not implemented")
 }
 
 func RegisterDarksideStreamerServer(s *grpc.Server, srv DarksideStreamerServer) {
@@ -686,25 +932,25 @@ func _DarksideStreamer_SetMetaState_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DarksideStreamer_SetBlocks_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(DarksideStreamerServer).SetBlocks(&darksideStreamerSetBlocksServer{stream})
+func _DarksideStreamer_StageBlocksStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DarksideStreamerServer).StageBlocksStream(&darksideStreamerStageBlocksStreamServer{stream})
 }
 
-type DarksideStreamer_SetBlocksServer interface {
+type DarksideStreamer_StageBlocksStreamServer interface {
 	SendAndClose(*Empty) error
 	Recv() (*DarksideBlock, error)
 	grpc.ServerStream
 }
 
-type darksideStreamerSetBlocksServer struct {
+type darksideStreamerStageBlocksStreamServer struct {
 	grpc.ServerStream
 }
 
-func (x *darksideStreamerSetBlocksServer) SendAndClose(m *Empty) error {
+func (x *darksideStreamerStageBlocksStreamServer) SendAndClose(m *Empty) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *darksideStreamerSetBlocksServer) Recv() (*DarksideBlock, error) {
+func (x *darksideStreamerStageBlocksStreamServer) Recv() (*DarksideBlock, error) {
 	m := new(DarksideBlock)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -712,48 +958,84 @@ func (x *darksideStreamerSetBlocksServer) Recv() (*DarksideBlock, error) {
 	return m, nil
 }
 
-func _DarksideStreamer_SetBlocksURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _DarksideStreamer_StageBlocks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DarksideBlocksURL)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(DarksideStreamerServer).SetBlocksURL(ctx, in)
+		return srv.(DarksideStreamerServer).StageBlocks(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocksURL",
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DarksideStreamerServer).SetBlocksURL(ctx, req.(*DarksideBlocksURL))
+		return srv.(DarksideStreamerServer).StageBlocks(ctx, req.(*DarksideBlocksURL))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _DarksideStreamer_SetTx_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(DarksideStreamerServer).SetTx(&darksideStreamerSetTxServer{stream})
+func _DarksideStreamer_StageBlocksCreate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DarksideEmptyBlocks)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).StageBlocksCreate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).StageBlocksCreate(ctx, req.(*DarksideEmptyBlocks))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-type DarksideStreamer_SetTxServer interface {
+func _DarksideStreamer_StageTransactions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DarksideStreamerServer).StageTransactions(&darksideStreamerStageTransactionsServer{stream})
+}
+
+type DarksideStreamer_StageTransactionsServer interface {
 	SendAndClose(*Empty) error
-	Recv() (*DarksideTx, error)
+	Recv() (*RawTransaction, error)
 	grpc.ServerStream
 }
 
-type darksideStreamerSetTxServer struct {
+type darksideStreamerStageTransactionsServer struct {
 	grpc.ServerStream
 }
 
-func (x *darksideStreamerSetTxServer) SendAndClose(m *Empty) error {
+func (x *darksideStreamerStageTransactionsServer) SendAndClose(m *Empty) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *darksideStreamerSetTxServer) Recv() (*DarksideTx, error) {
-	m := new(DarksideTx)
+func (x *darksideStreamerStageTransactionsServer) Recv() (*RawTransaction, error) {
+	m := new(RawTransaction)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
+}
+
+func _DarksideStreamer_ApplyStaged_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DarksideHeight)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).ApplyStaged(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).ApplyStaged(ctx, req.(*DarksideHeight))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _DarksideStreamer_GetIncomingTransactions_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -777,6 +1059,42 @@ func (x *darksideStreamerGetIncomingTransactionsServer) Send(m *RawTransaction) 
 	return x.ServerStream.SendMsg(m)
 }
 
+func _DarksideStreamer_ClearIncomingTransactions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).ClearIncomingTransactions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearIncomingTransactions",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).ClearIncomingTransactions(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DarksideStreamer_Reset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).Reset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/Reset",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).Reset(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _DarksideStreamer_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "cash.z.wallet.sdk.rpc.DarksideStreamer",
 	HandlerType: (*DarksideStreamerServer)(nil),
@@ -786,19 +1104,35 @@ var _DarksideStreamer_serviceDesc = grpc.ServiceDesc{
 			Handler:    _DarksideStreamer_SetMetaState_Handler,
 		},
 		{
-			MethodName: "SetBlocksURL",
-			Handler:    _DarksideStreamer_SetBlocksURL_Handler,
+			MethodName: "StageBlocks",
+			Handler:    _DarksideStreamer_StageBlocks_Handler,
+		},
+		{
+			MethodName: "StageBlocksCreate",
+			Handler:    _DarksideStreamer_StageBlocksCreate_Handler,
+		},
+		{
+			MethodName: "ApplyStaged",
+			Handler:    _DarksideStreamer_ApplyStaged_Handler,
+		},
+		{
+			MethodName: "ClearIncomingTransactions",
+			Handler:    _DarksideStreamer_ClearIncomingTransactions_Handler,
+		},
+		{
+			MethodName: "Reset",
+			Handler:    _DarksideStreamer_Reset_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "SetBlocks",
-			Handler:       _DarksideStreamer_SetBlocks_Handler,
+			StreamName:    "StageBlocksStream",
+			Handler:       _DarksideStreamer_StageBlocksStream_Handler,
 			ClientStreams: true,
 		},
 		{
-			StreamName:    "SetTx",
-			Handler:       _DarksideStreamer_SetTx_Handler,
+			StreamName:    "StageTransactions",
+			Handler:       _DarksideStreamer_StageTransactions_Handler,
 			ClientStreams: true,
 		},
 		{

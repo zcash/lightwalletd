@@ -195,7 +195,7 @@ func (s *LwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 // GetLightdInfo gets the LightWalletD (this server) info, and includes information
 // it gets from its backend zcashd.
 func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
-	saplingHeight, blockHeight, chainName, consensusBranchId := common.GetSaplingInfo()
+	saplingHeight, blockHeight, chainName, consensusBranchID := common.GetSaplingInfo()
 
 	return &walletrpc.LightdInfo{
 		Version:                 common.Version,
@@ -203,7 +203,7 @@ func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 		TaddrSupport:            true,
 		ChainName:               chainName,
 		SaplingActivationHeight: uint64(saplingHeight),
-		ConsensusBranchId:       consensusBranchId,
+		ConsensusBranchId:       consensusBranchID,
 		BlockHeight:             uint64(blockHeight),
 	}, nil
 }
@@ -212,13 +212,7 @@ func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 func (s *LwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	// sendrawtransaction "hexstring" ( allowhighfees )
 	//
-	// Submits raw transaction (serialized, hex-encoded) to local node and network.
-	//
-	// Also see createrawtransaction and signrawtransaction calls.
-	//
-	// Arguments:
-	// 1. "hexstring"    (string, required) The hex string of the raw transaction)
-	// 2. allowhighfees    (boolean, optional, default=false) Allow high fees
+	// Submits raw transaction (binary) to local node and network.
 	//
 	// Result:
 	// "hex"             (string) The transaction hash in hex
@@ -293,7 +287,9 @@ func (s *DarksideStreamer) SetMetaState(ctx context.Context, ms *walletrpc.Darks
 	return &walletrpc.Empty{}, nil
 }
 
-func (s *DarksideStreamer) SetBlocks(blocks walletrpc.DarksideStreamer_SetBlocksServer) error {
+// StageBlocksStream accepts a list of blocks from the wallet test code,
+// and makes them available to present from the mock zcashd's GetBlock rpc.
+func (s *DarksideStreamer) StageBlocksStream(blocks walletrpc.DarksideStreamer_StageBlocksStreamServer) error {
 	for {
 		b, err := blocks.Recv()
 		if err == io.EOF {
@@ -307,26 +303,54 @@ func (s *DarksideStreamer) SetBlocks(blocks walletrpc.DarksideStreamer_SetBlocks
 	}
 }
 
-func (s *DarksideStreamer) SetBlocksURL(ctx context.Context, u *walletrpc.DarksideBlocksURL) (*walletrpc.Empty, error) {
-	if err := common.DarksideSetBlocksURL(u.Url); err != nil {
+// StageBlocks loads blocks from the given URL to the staging area.
+func (s *DarksideStreamer) StageBlocks(ctx context.Context, u *walletrpc.DarksideBlocksURL) (*walletrpc.Empty, error) {
+	if err := common.DarksideStageBlocks(u.Url); err != nil {
 		return nil, err
 	}
 	return &walletrpc.Empty{}, nil
 }
-func (s *DarksideStreamer) SetTx(tx walletrpc.DarksideStreamer_SetTxServer) error {
+
+// StageBlocksCreate stages a set of synthetic (manufactured on the fly) blocks.
+func (s *DarksideStreamer) StageBlocksCreate(ctx context.Context, e *walletrpc.DarksideEmptyBlocks) (*walletrpc.Empty, error) {
+	if err := common.DarksideStageBlocksCreate(e.Height, e.Nonce, e.Count); err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
+}
+
+// StageTransactions adds the given transactions to the staging area.
+func (s *DarksideStreamer) StageTransactions(tx walletrpc.DarksideStreamer_StageTransactionsServer) error {
 	// My current thinking is that this should take a JSON array of {height, txid}, store them,
 	// then DarksideAddBlock() would "inject" transactions into blocks as its storing
 	// them (remembering to update the header so the block hash changes).
-	return errors.New("SetTx is not yet implemented")
+	return errors.New("StageTransactions is not yet implemented")
 }
 
+// ApplyStaged merges all staged transactions into staged blocks and all staged blocks into the active blockchain.
+func (s *DarksideStreamer) ApplyStaged(ctx context.Context, h *walletrpc.DarksideHeight) (*walletrpc.Empty, error) {
+	return &walletrpc.Empty{}, nil
+}
+
+// GetIncomingTransactions returns the transactions that were submitted via SendTransaction().
 func (s *DarksideStreamer) GetIncomingTransactions(in *walletrpc.Empty, resp walletrpc.DarksideStreamer_GetIncomingTransactionsServer) error {
 	// Get all of the incoming transactions we're received via SendTransaction()
-	for _, tx_bytes := range common.DarksideGetIncomingTransactions() {
-		err := resp.Send(&walletrpc.RawTransaction{Data: tx_bytes, Height: 0})
+	for _, txBytes := range common.DarksideGetIncomingTransactions() {
+		err := resp.Send(&walletrpc.RawTransaction{Data: txBytes, Height: 0})
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// ClearIncomingTransactions empties the incoming transaction list.
+func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *walletrpc.Empty) (*walletrpc.Empty, error) {
+	common.DarksideClearIncomingTransactions()
+	return &walletrpc.Empty{}, nil
+}
+
+// Reset clears all the state from both darksidewalletd and lightwalletd.
+func (s *DarksideStreamer) Reset(ctx context.Context, e *walletrpc.Empty) (*walletrpc.Empty, error) {
+	return &walletrpc.Empty{}, nil
 }

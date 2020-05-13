@@ -19,7 +19,7 @@ const (
 )
 
 // A block header as defined in version 2018.0-beta-29 of the Zcash Protocol Spec.
-type rawBlockHeader struct {
+type RawBlockHeader struct {
 	// The block version number indicates which set of block validation rules
 	// to follow. The current and only defined block version number for Zcash
 	// is 4.
@@ -59,9 +59,8 @@ type rawBlockHeader struct {
 }
 
 type BlockHeader struct {
-	*rawBlockHeader
-	cachedHash      []byte
-	targetThreshold *big.Int
+	*RawBlockHeader
+	cachedHash []byte
 }
 
 // CompactLengthPrefixedLen calculates the total number of bytes needed to
@@ -99,11 +98,11 @@ func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) {
 	binary.Write(buf, binary.LittleEndian, val)
 }
 
-func (hdr *rawBlockHeader) GetSize() int {
+func (hdr *RawBlockHeader) GetSize() int {
 	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(len(hdr.Solution))
 }
 
-func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
+func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
 	headerSize := hdr.GetSize()
 	backing := make([]byte, 0, headerSize)
 	buf := bytes.NewBuffer(backing)
@@ -120,13 +119,13 @@ func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 
 func NewBlockHeader() *BlockHeader {
 	return &BlockHeader{
-		rawBlockHeader: new(rawBlockHeader),
+		RawBlockHeader: new(RawBlockHeader),
 	}
 }
 
 func BlockHeaderFromParts(version int32, prevhash []byte, merkleroot []byte, saplingroot []byte, time uint32, nbitsbytes []byte, nonce []byte, solution []byte) *BlockHeader {
 	return &BlockHeader{
-		rawBlockHeader: &rawBlockHeader{
+		RawBlockHeader: &RawBlockHeader{
 			Version:              version,
 			HashPrevBlock:        prevhash,
 			HashMerkleRoot:       merkleroot,
