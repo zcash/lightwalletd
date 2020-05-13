@@ -3,13 +3,15 @@ package common
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/zcash/lightwalletd/parser"
@@ -23,7 +25,9 @@ type darksideState struct {
 	chainName         string
 	// Should always be nonempty. Index 0 is the block at height start_height.
 	blocks               [][]byte // full blocks, binary, as from zcashd getblock rpc
+	stagedBlocks         [][]byte
 	incomingTransactions [][]byte // full transactions, binary, zcashd getrawtransaction txid
+	stagedTransactions   [][]byte
 }
 
 var state darksideState
@@ -40,18 +44,11 @@ func DarksideInit() {
 		branchID:             "2bb40e60", // Blossom
 		chainName:            "darkside",
 		blocks:               make([][]byte, 0),
+		stagedBlocks:         make([][]byte, 0),
 		incomingTransactions: make([][]byte, 0),
+		stagedTransactions:   make([][]byte, 0),
 	}
 	RawRequest = darksideRawRequest
-	f := "testdata/darkside/init-blocks"
-	testBlocks, err := os.Open(f)
-	if err != nil {
-		Log.Warn("Error opening default darksidewalletd blocks file", f)
-		return
-	}
-	if err = readBlocks(testBlocks); err != nil {
-		Log.Warn("Error loading default darksidewalletd blocks")
-	}
 	go func() {
 		time.Sleep(30 * time.Minute)
 		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
@@ -92,9 +89,6 @@ func DarksideAddBlock(blockHex string) error {
 	if len(state.blocks) == 0 {
 		state.startHeight = blockHeight
 	}
-	if state.saplingActivation < 0 {
-		state.saplingActivation = blockHeight
-	}
 	state.blocks = append(state.blocks, blockData)
 	return nil
 }
@@ -116,6 +110,8 @@ func readBlocks(src io.Reader) error {
 	return nil
 }
 
+// DarksideSetMetaState allows the wallet test code to specify values
+// that are returned by GetLightdInfo().
 func DarksideSetMetaState(sa int32, bi, cn string) error {
 	state.saplingActivation = int(sa)
 	state.branchID = bi
@@ -123,11 +119,15 @@ func DarksideSetMetaState(sa int32, bi, cn string) error {
 	return nil
 }
 
+// DarksideGetIncomingTransactions returns all transactions we're
+// received via SendTransaction().
 func DarksideGetIncomingTransactions() [][]byte {
 	return state.incomingTransactions
 }
 
-func DarksideSetBlocksURL(url string) error {
+// DarksideStageBlocks opens and reads blocks from the given URL and
+// adds them to the staging area.
+func DarksideStageBlocks(url string) error {
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -141,6 +141,64 @@ func DarksideSetBlocksURL(url string) error {
 	return nil
 }
 
+// DarksideStageBlocksCreate creates empty blocks and adds them to the staging area.
+func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
+	for i := int32(0); i < count; i++ {
+
+		fakeCoinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
+			"00000000000000ffffffff2a03d12c0c00043855975e464b8896790758f824ceac97836" +
+			"22c17ed38f1669b8a45ce1da857dbbe7950e2ffffffff02a0ebce1d000000001976a914" +
+			"7ed15946ec14ae0cd8fa8991eb6084452eb3f77c88ac405973070000000017a914e445cf" +
+			"a944b6f2bdacefbda904a81d5fdd26d77f8700000000000000000000000000000000000000"
+
+		// This coinbase transaction was pulled from block 797905, whose
+		// little-endian encoding is 0xD12C0C00. Replace it with the block
+		// number we want.
+		fakeCoinbase = strings.Replace(fakeCoinbase, "d12c0c00",
+			fmt.Sprintf("%02x", height&0xFF)+
+				fmt.Sprintf("%02x", (height>>8)&0xFF)+
+				fmt.Sprintf("%02x", (height>>16)&0xFF)+
+				fmt.Sprintf("%02x", (height>>24)&0xFF), 1)
+		fakeCoinbaseBytes, err := hex.DecodeString(fakeCoinbase)
+		if err != nil {
+			Log.Fatal(err)
+		}
+
+		hash_of_txns_and_height := sha256.Sum256([]byte(string(nonce) + string(height)))
+		blockHeader := &parser.BlockHeader{
+			RawBlockHeader: &parser.RawBlockHeader{
+				Version:              4,
+				HashPrevBlock:        make([]byte, 32),
+				HashMerkleRoot:       hash_of_txns_and_height[:],
+				HashFinalSaplingRoot: make([]byte, 32),
+				Time:                 1,
+				NBitsBytes:           make([]byte, 4),
+				Nonce:                make([]byte, 32),
+				Solution:             make([]byte, 1344),
+			},
+		}
+
+		headerBytes, err := blockHeader.MarshalBinary()
+		if err != nil {
+			Log.Fatal(err)
+		}
+		newBlockData := make([]byte, 0)
+		newBlockData = append(newBlockData, headerBytes...)
+		newBlockData = append(newBlockData, byte(1))
+		newBlockData = append(newBlockData, fakeCoinbaseBytes...)
+		state.stagedBlocks = append(state.stagedBlocks, newBlockData)
+	}
+
+	return nil
+}
+
+// DarksideClearIncomingTransactions empties the incoming transaction list.
+func DarksideClearIncomingTransactions() {
+	state.incomingTransactions = make([][]byte, 0)
+}
+
+// DarksideSendTransaction is the handler for the SendTransaction gRPC.
+// Save the transaction in the incoming transactions list.
 func DarksideSendTransaction(txHex []byte) ([]byte, error) {
 	// Need to parse the transaction to return its hash, plus it's
 	// good error checking.
