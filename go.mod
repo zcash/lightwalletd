@@ -3,7 +3,6 @@ module github.com/zcash/lightwalletd
 go 1.12
 
 require (
-	github.com/adityapk00/lightwalletd v0.0.0-20200504192708-32ea32f06cdc
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/golang/protobuf v1.4.1
 	github.com/gopherjs/gopherjs v0.0.0-20191106031601-ce3c9ade29de // indirect

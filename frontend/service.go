@@ -21,25 +21,27 @@ import (
 	"github.com/zcash/lightwalletd/walletrpc"
 )
 
-type LwdStreamer struct {
+type lwdStreamer struct {
 	cache *common.BlockCache
 }
 
+// NewLwdStreamer constructs a gRPC context.
 func NewLwdStreamer(cache *common.BlockCache) (walletrpc.CompactTxStreamerServer, error) {
-	return &LwdStreamer{cache}, nil
+	return &lwdStreamer{cache}, nil
 }
 
-// Darkside is for full-stack integration testing.
+// DarksideStreamer holds the gRPC state for darksidewalletd.
 type DarksideStreamer struct {
 	cache *common.BlockCache
 }
 
+// NewDarksideStreamer constructs a gRPC context for darksidewalletd.
 func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerServer, error) {
 	return &DarksideStreamer{cache}, nil
 }
 
 // GetLatestBlock returns the height of the best chain, according to zcashd.
-func (s *LwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
+func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestHeight()
 
 	if latestBlock == -1 {
@@ -52,7 +54,7 @@ func (s *LwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 
 // GetAddressTxids is a streaming RPC that returns transaction IDs that have
 // the given transparent address (taddr) as either an input or output.
-func (s *LwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
+func (s *lwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
 	// Test to make sure Address is a single t address
 	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(addressBlockFilter.Address))
 	if err != nil || !match {
@@ -106,7 +108,7 @@ func (s *LwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 
 // GetBlock returns the compact block at the requested height. Requesting a
 // block by hash is not yet supported.
-func (s *LwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
+func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
 	if id.Height == 0 && id.Hash == nil {
 		return nil, errors.New("request for unspecified identifier")
 	}
@@ -128,7 +130,7 @@ func (s *LwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 // GetBlockRange is a streaming RPC that returns blocks, in compact form,
 // (as also returned by GetBlock) from the block height 'start' to height
 // 'end' inclusively.
-func (s *LwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
+func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 
@@ -150,7 +152,7 @@ func (s *LwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 
 // GetTransaction returns the raw transaction bytes that are returned
 // by the zcashd 'getrawtransaction' RPC.
-func (s *LwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
+func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	if txf.Hash != nil {
 		txid := txf.Hash
 		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
@@ -194,7 +196,7 @@ func (s *LwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 // GetLightdInfo gets the LightWalletD (this server) info, and includes information
 // it gets from its backend zcashd.
-func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
+func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
 	saplingHeight, blockHeight, chainName, consensusBranchID := common.GetSaplingInfo()
 
 	return &walletrpc.LightdInfo{
@@ -209,7 +211,7 @@ func (s *LwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 }
 
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
-func (s *LwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
+func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	// sendrawtransaction "hexstring" ( allowhighfees )
 	//
 	// Submits raw transaction (binary) to local node and network.
@@ -262,7 +264,7 @@ func (s *LwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 // This rpc is used only for testing.
 var concurrent int64
 
-func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*walletrpc.PingResponse, error) {
+func (s *lwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*walletrpc.PingResponse, error) {
 	var response walletrpc.PingResponse
 	response.Entry = atomic.AddInt64(&concurrent, 1)
 	time.Sleep(time.Duration(in.IntervalUs) * time.Microsecond)
@@ -270,7 +272,8 @@ func (s *LwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	return &response, nil
 }
 
-func (s *DarksideStreamer) SetMetaState(ctx context.Context, ms *walletrpc.DarksideMetaState) (*walletrpc.Empty, error) {
+// SetMetaState lets the test driver control some GetLightdInfo values.
+func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMetaState) (*walletrpc.Empty, error) {
 	match, err := regexp.Match("\\A[a-fA-F0-9]+\\z", []byte(ms.BranchID))
 	if err != nil || !match {
 		return nil, errors.New("Invalid branch ID")
@@ -280,7 +283,7 @@ func (s *DarksideStreamer) SetMetaState(ctx context.Context, ms *walletrpc.Darks
 	if err != nil || !match {
 		return nil, errors.New("Invalid chain name")
 	}
-	err = common.DarksideSetMetaState(ms.SaplingActivation, ms.BranchID, ms.ChainName)
+	err = common.DarksideReset(int(ms.SaplingActivation), ms.BranchID, ms.ChainName)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +302,7 @@ func (s *DarksideStreamer) StageBlocksStream(blocks walletrpc.DarksideStreamer_S
 		if err != nil {
 			return err
 		}
-		common.DarksideAddBlock(b.Block)
+		common.DarksideStageBlockStream(b.Block)
 	}
 }
 
@@ -324,12 +327,22 @@ func (s *DarksideStreamer) StageTransactions(tx walletrpc.DarksideStreamer_Stage
 	// My current thinking is that this should take a JSON array of {height, txid}, store them,
 	// then DarksideAddBlock() would "inject" transactions into blocks as its storing
 	// them (remembering to update the header so the block hash changes).
-	return errors.New("StageTransactions is not yet implemented")
+	for {
+		transaction, err := tx.Recv()
+		if err == io.EOF {
+			tx.SendAndClose(&walletrpc.Empty{})
+			return nil
+		}
+		err = common.DarksideStageTransaction(int(transaction.Height), transaction.Data)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 // ApplyStaged merges all staged transactions into staged blocks and all staged blocks into the active blockchain.
 func (s *DarksideStreamer) ApplyStaged(ctx context.Context, h *walletrpc.DarksideHeight) (*walletrpc.Empty, error) {
-	return &walletrpc.Empty{}, nil
+	return &walletrpc.Empty{}, common.DarksideApplyStaged(int(h.Height))
 }
 
 // GetIncomingTransactions returns the transactions that were submitted via SendTransaction().
@@ -347,10 +360,5 @@ func (s *DarksideStreamer) GetIncomingTransactions(in *walletrpc.Empty, resp wal
 // ClearIncomingTransactions empties the incoming transaction list.
 func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *walletrpc.Empty) (*walletrpc.Empty, error) {
 	common.DarksideClearIncomingTransactions()
-	return &walletrpc.Empty{}, nil
-}
-
-// Reset clears all the state from both darksidewalletd and lightwalletd.
-func (s *DarksideStreamer) Reset(ctx context.Context, e *walletrpc.Empty) (*walletrpc.Empty, error) {
 	return &walletrpc.Empty{}, nil
 }

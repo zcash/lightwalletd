@@ -37,29 +37,29 @@ import (
 	"github.com/zcash/lightwalletd/parser"
 )
 
-type Options struct {
+type options struct {
 	startHeight int
 	blocksDir   string
 }
 
 func main() {
-	opts := &Options{}
+	opts := &options{}
 	flag.IntVar(&opts.startHeight, "start-height", 1000, "generated blocks start at this height")
 	flag.StringVar(&opts.blocksDir, "blocks-dir", "./blocks", "directory containing <N>.txt for each block height <N>, with one hex-encoded transaction per line")
 	flag.Parse()
 
 	prevhash := make([]byte, 32)
-	cur_height := opts.startHeight
+	curHeight := opts.startHeight
 
-	// Keep opening <cur_height>.txt and incrementing until the file doesn't exist.
+	// Keep opening <curHeight>.txt and incrementing until the file doesn't exist.
 	for {
-		testBlocks, err := os.Open(path.Join(opts.blocksDir, strconv.Itoa(cur_height)+".txt"))
+		testBlocks, err := os.Open(path.Join(opts.blocksDir, strconv.Itoa(curHeight)+".txt"))
 		if err != nil {
 			break
 		}
 		scan := bufio.NewScanner(testBlocks)
 
-		fake_coinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
+		fakeCoinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
 			"00000000000000ffffffff2a03d12c0c00043855975e464b8896790758f824ceac97836" +
 			"22c17ed38f1669b8a45ce1da857dbbe7950e2ffffffff02a0ebce1d000000001976a914" +
 			"7ed15946ec14ae0cd8fa8991eb6084452eb3f77c88ac405973070000000017a914e445cf" +
@@ -68,49 +68,51 @@ func main() {
 		// This coinbase transaction was pulled from block 797905, whose
 		// little-endian encoding is 0xD12C0C00. Replace it with the block
 		// number we want.
-		fake_coinbase = strings.Replace(fake_coinbase, "d12c0c00",
-			fmt.Sprintf("%02x", cur_height&0xFF)+
-				fmt.Sprintf("%02x", (cur_height>>8)&0xFF)+
-				fmt.Sprintf("%02x", (cur_height>>16)&0xFF)+
-				fmt.Sprintf("%02x", (cur_height>>24)&0xFF), 1)
+		fakeCoinbase = strings.Replace(fakeCoinbase, "d12c0c00",
+			fmt.Sprintf("%02x", curHeight&0xFF)+
+				fmt.Sprintf("%02x", (curHeight>>8)&0xFF)+
+				fmt.Sprintf("%02x", (curHeight>>16)&0xFF)+
+				fmt.Sprintf("%02x", (curHeight>>24)&0xFF), 1)
 
-		num_transactions := 1 // coinbase
-		all_transactions_hex := ""
+		numTransactions := 1 // coinbase
+		allTransactionsHex := ""
 		for scan.Scan() { // each line (hex-encoded transaction)
 			transaction := scan.Bytes()
-			all_transactions_hex += string(transaction)
-			num_transactions += 1
+			allTransactionsHex += string(transaction)
+			numTransactions++
 		}
 
-		hash_of_txns_and_height := sha256.Sum256([]byte(all_transactions_hex + "#" + string(cur_height)))
+		hashOfTxnsAndHeight := sha256.Sum256([]byte(allTransactionsHex + "#" + string(curHeight)))
 
-		block_header := parser.BlockHeaderFromParts(
-			4,
-			prevhash,
-			// These fields do not need to be valid for the lightwalletd/wallet stack to work.
-			// The lightwalletd/wallet stack rely on the miners to validate these.
+		// These fields do not need to be valid for the lightwalletd/wallet stack to work.
+		// The lightwalletd/wallet stack rely on the miners to validate these.
+		// Make the block header depend on height + all transactions (in an incorrect way)
+		blockHeader := &parser.BlockHeader{
+			RawBlockHeader: &parser.RawBlockHeader{
+				Version:              4,
+				HashPrevBlock:        prevhash,
+				HashMerkleRoot:       hashOfTxnsAndHeight[:],
+				HashFinalSaplingRoot: make([]byte, 32),
+				Time:                 1,
+				NBitsBytes:           make([]byte, 4),
+				Nonce:                make([]byte, 32),
+				Solution:             make([]byte, 1344),
+			},
+		}
 
-			// Make the block header depend on height + all transactions (in an incorrect way)
-			hash_of_txns_and_height[:],
-
-			make([]byte, 32),
-			1,
-			make([]byte, 4),
-			make([]byte, 32),
-			make([]byte, 1344))
-
-		header_bytes, err := block_header.MarshalBinary()
+		headerBytes, err := blockHeader.MarshalBinary()
 
 		// After the header, there's a compactsize representation of the number of transactions.
-		if num_transactions >= 253 {
+		if numTransactions >= 253 {
 			panic("Sorry, this tool doesn't support more than 253 transactions per block.")
 		}
-		compactsize := make([]byte, 1)
-		compactsize[0] = byte(num_transactions)
+		fmt.Printf("%s%02x%s%s\n",
+			hex.EncodeToString(headerBytes),
+			numTransactions,
+			fakeCoinbase,
+			allTransactionsHex)
 
-		fmt.Println(hex.EncodeToString(header_bytes) + hex.EncodeToString(compactsize) + fake_coinbase + all_transactions_hex)
-
-		cur_height++
-		prevhash = block_header.GetEncodableHash()
+		curHeight++
+		prevhash = blockHeader.GetEncodableHash()
 	}
 }

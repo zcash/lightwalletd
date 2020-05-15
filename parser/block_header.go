@@ -117,24 +117,10 @@ func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
 	return backing[:headerSize], nil
 }
 
+// NewBlockHeader return a pointer to a new block header instance.
 func NewBlockHeader() *BlockHeader {
 	return &BlockHeader{
 		RawBlockHeader: new(RawBlockHeader),
-	}
-}
-
-func BlockHeaderFromParts(version int32, prevhash []byte, merkleroot []byte, saplingroot []byte, time uint32, nbitsbytes []byte, nonce []byte, solution []byte) *BlockHeader {
-	return &BlockHeader{
-		RawBlockHeader: &RawBlockHeader{
-			Version:              version,
-			HashPrevBlock:        prevhash,
-			HashMerkleRoot:       merkleroot,
-			HashFinalSaplingRoot: saplingroot,
-			Time:                 time,
-			NBitsBytes:           nbitsbytes,
-			Nonce:                nonce,
-			Solution:             solution,
-		},
 	}
 }
 
