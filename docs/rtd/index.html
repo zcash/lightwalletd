@@ -210,7 +210,15 @@
                 </li>
               
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideBlocksUrl"><span class="badge">M</span>DarksideBlocksUrl</a>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideBlocksURL"><span class="badge">M</span>DarksideBlocksURL</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideEmptyBlocks"><span class="badge">M</span>DarksideEmptyBlocks</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideHeight"><span class="badge">M</span>DarksideHeight</a>
                 </li>
               
                 <li>
@@ -501,7 +509,7 @@ in a pure-Sapling context, the fee will be calculable as:
 
       
         <h3 id="cash.z.wallet.sdk.rpc.DarksideBlock">DarksideBlock</h3>
-        <p></p>
+        <p>A block is a hex-encoded string.</p>
 
         
           <table class="field-table">
@@ -524,7 +532,7 @@ in a pure-Sapling context, the fee will be calculable as:
 
         
       
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideBlocksUrl">DarksideBlocksUrl</h3>
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideBlocksURL">DarksideBlocksURL</h3>
         <p></p>
 
         
@@ -537,6 +545,68 @@ in a pure-Sapling context, the fee will be calculable as:
                 <tr>
                   <td>url</td>
                   <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideEmptyBlocks">DarksideEmptyBlocks</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>height</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>nonce</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>count</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideHeight">DarksideHeight</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>height</td>
+                  <td><a href="#int32">int32</a></td>
                   <td></td>
                   <td><p> </p></td>
                 </tr>
@@ -624,7 +694,7 @@ in a pure-Sapling context, the fee will be calculable as:
 
       
         <h3 id="cash.z.wallet.sdk.rpc.DarksideStreamer">DarksideStreamer</h3>
-        <p>This service implements the following rpc methods:</p><p>SetMetaState</p><p>SetBlocks</p><p>SetBlocksUrl</p><p>SetTx</p><p>GetIncomingTransactions</p>
+        <p>Darksidewalletd maintains two staging areas, blocks and transactions. The</p><p>Stage*() gRPCs add items to the staging area; ApplyStaged() "applies" everything</p><p>in the staging area to the working (operational) state that the mock zcashd</p><p>serves; transactions are placed into their corresponding blocks (by height).</p>
         <table class="enum-table">
           <thead>
             <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
@@ -632,67 +702,94 @@ in a pure-Sapling context, the fee will be calculable as:
           <tbody>
             
               <tr>
-                <td>SetMetaState</td>
+                <td>Reset</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.DarksideMetaState">DarksideMetaState</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Set (some of) the values that should be returned by GetLightdInfo()</p></td>
+                <td><p>Reset reverts all darksidewalletd state (active block range, latest height,
+staged blocks and transactions) and lightwalletd state (cache) to empty,
+the same as the initial state. This occurs synchronously and instantaneously;
+no reorg happens in lightwalletd. This is good to do before each independent
+test so that no state leaks from one test to another.
+Also (some of) the values returned by GetLightdInfo().</p></td>
               </tr>
             
               <tr>
-                <td>SetBlocks</td>
+                <td>StageBlocksStream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlock">DarksideBlock</a> stream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>SetBlocks() replaces the specified range of blocks (gaps not allowed);
-for example, you can set blocks 1000-1006, do some tests, then set blocks
-1003-1004. This preserves blocks 1000-1002, replaces blocks 1003-1004,
-and removes blocks 1005-1006. This can be used to simulate a chain reorg.
-Blocks are hex-encoded.</p></td>
+                <td><p>StageBlocksStream accepts a list of blocks and saves them into the blocks
+staging area until ApplyStaged() is called; there is no immediate effect on
+the mock zcashd. Blocks are hex-encoded.</p></td>
               </tr>
             
               <tr>
-                <td>SetBlocksUrl</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlocksUrl">DarksideBlocksUrl</a></td>
+                <td>StageBlocks</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlocksURL">DarksideBlocksURL</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>This is the same as SetBlocks(), except the blocks are fetched
+                <td><p>StageBlocks is the same as StageBlocksStream() except the blocks are fetched
 from the given URL. Blocks are one per line, hex-encoded (not JSON).</p></td>
               </tr>
             
               <tr>
-                <td>SetTx</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideTx">DarksideTx</a> stream</td>
+                <td>StageBlocksCreate</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideEmptyBlocks">DarksideEmptyBlocks</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>SetTx() allows the test coordinator to submit a list of transactions and
-for each indicate in which block it should appear.
-For example,
-  tx1, block=1001
-  tx2, block=1002
-  tx3, block=1002
-Then use Setblocks(1000-1005): block 1001 will include tx1 (plus
-any transactions were part of that block to begin with); tx2 and tx3
-will appear in block 1002. Blocks 1003-1005 will be returned as submitted.
+                <td><p>StageBlocksCreate is like the previous two, except it creates &#39;count&#39;
+empty blocks at consecutive heights starting at height &#39;height&#39;. The
+&#39;nonce&#39; is part of the header, so it contributes to the block hash; this
+lets you create two fake blocks with the same transactions (or no
+transactions) and same height, with two different hashes.</p></td>
+              </tr>
+            
+              <tr>
+                <td>StageTransactions</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>StageTransactions stores the given transaction-height pairs in the
+staging area until ApplyStaged() is called. Note that these transactions
+are not returned by the production GetTransaction() gRPC until they
+appear in a &#34;mined&#34; block (contained in the active blockchain presented
+by the mock zcashd).</p></td>
+              </tr>
+            
+              <tr>
+                <td>ApplyStaged</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideHeight">DarksideHeight</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>ApplyStaged iterates the list of blocks that were staged by the
+StageBlocks*() gRPCs, in the order they were staged, and &#34;merges&#34; each
+into the active, working blocks list that the mock zcashd is presenting
+to lightwalletd. The resulting working block list can&#39;t have gaps; if the
+working block range is 1000-1006, and the staged block range is 1003-1004,
+the resulting range is 1000-1004, with 1000-1002 unchanged, blocks
+1003-1004 from the new range, and 1005-1006 dropped. After merging all
+blocks, ApplyStaged() appends staged transactions (in the order received)
+into each one&#39;s corresponding block. The staging area is then cleared.
 
-If you first set a range of blocks, then submit transactions within that
-range, it&#39;s too late for them to be included in those blocks. If blocks
-are resubmitted, then those transactions are included in those blocks.
-
-Calling GetTransaction() on tx1-3 will return those transactions, and
-GetTransaction() will also return any transactions that were part of
-the submitted blocks.
-
-Each call to SetTx() completely replaces the stored transaction set.</p></td>
+The argument specifies the latest block height that mock zcashd reports
+(i.e. what&#39;s returned by GetLatestBlock). Note that ApplyStaged() can
+also be used to simply advance the latest block height presented by mock
+zcashd. That is, there doesn&#39;t need to be anything in the staging area.</p></td>
               </tr>
             
               <tr>
                 <td>GetIncomingTransactions</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p>Calls to SendTransaction() are accepted and stored; this method returns
-all transactions that were previously submitted. This enables the
-following kind of test, for example:
-  1. wallet submits a transaction
-  2. Test coordinator retrives the transaction using this interface
-  3. Test coordinator submits the transaction using SetTx()
-  4. Darksidewalletd simulates the transaction appearing in a mined block</p></td>
+                <td><p>Calls to the production gRPC SendTransaction() store the transaction in
+a separate area (not the staging area); this method returns all transactions
+in this separate area, which is then cleared. The height returned
+with each transaction is -1 (invalid) since these transactions haven&#39;t
+been mined yet. The intention is that the transactions returned here can
+then, for example, be given to StageTransactions() to get them &#34;mined&#34;
+into a specified block on the next ApplyStaged().</p></td>
+              </tr>
+            
+              <tr>
+                <td>ClearIncomingTransactions</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>Clear the incoming transaction pool.</p></td>
               </tr>
             
           </tbody>
@@ -801,7 +898,7 @@ following kind of test, for example:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.Empty">Empty</h3>
-        <p>Empty is for gRPCs that take no arguments or return no values.</p>
+        <p>Empty is for gRPCs that take no arguments, currently only GetLightdInfo.</p>
 
         
 

@@ -162,8 +162,12 @@ func startServer(opts *common.Options) error {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
+	var saplingHeight int
+	var blockHeight int
+	var chainName string
+	var branchID string
 	if opts.Darkside {
-		common.DarksideInit()
+		chainName = "darkside"
 	} else {
 		rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
 		if err != nil {
@@ -173,12 +177,14 @@ func startServer(opts *common.Options) error {
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
 		common.RawRequest = rpcClient.RawRequest
+		// Get the sapling activation height from the RPC
+		// (this first RPC also verifies that we can communicate with zcashd)
+		saplingHeight, blockHeight, chainName, branchID = common.GetSaplingInfo()
+		common.Log.Info("Got sapling height ", saplingHeight,
+			" block height ", blockHeight,
+			" chain ", chainName,
+			" branchID ", branchID)
 	}
-
-	// Get the sapling activation height from the RPC
-	// (this first RPC also verifies that we can communicate with zcashd)
-	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo()
-	common.Log.Info("Got sapling height ", saplingHeight, " block height ", blockHeight, " chain ", chainName, " branchID ", branchID)
 
 	dbPath := filepath.Join(opts.DataDir, "db")
 	if opts.Darkside {
@@ -194,7 +200,12 @@ func startServer(opts *common.Options) error {
 		os.Exit(1)
 	}
 	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, opts.Redownload)
-	go common.BlockIngestor(cache, 0 /*loop forever*/)
+	if !opts.Darkside {
+		go common.BlockIngestor(cache, 0 /*loop forever*/)
+	} else {
+		// Darkside wants to control starting the block ingestor.
+		common.DarksideInit(cache)
+	}
 
 	// Compact transaction service initialization
 	{

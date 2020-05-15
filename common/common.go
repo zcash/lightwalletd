@@ -149,6 +149,25 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	return block.ToCompact(), nil
 }
 
+var (
+	ingestorRunning  bool
+	stopIngestorChan chan struct{}
+)
+
+func startIngestor(c *BlockCache) {
+	if !ingestorRunning {
+		ingestorRunning = true
+		go BlockIngestor(c, 0)
+	}
+}
+func stopIngestor() {
+	if ingestorRunning {
+		ingestorRunning = false
+		stopIngestorChan <- struct{}{}
+		<-stopIngestorChan
+	}
+}
+
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
@@ -160,6 +179,14 @@ func BlockIngestor(c *BlockCache, rep int) {
 
 	// Start listening for new blocks
 	for i := 0; rep == 0 || i < rep; i++ {
+		// stop if requested
+		select {
+		case <-stopIngestorChan:
+			stopIngestorChan <- struct{}{}
+			return
+		default:
+		}
+
 		height := c.GetNextHeight()
 		block, err := getBlockFromRPC(height)
 		if err != nil {
@@ -186,7 +213,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 				// Wait a bit then retry the same height.
 				c.Sync()
 				if lastHeightLogged+1 != height {
-					Log.Info("Ingestor LHL: ", lastHeightLogged, " waiting for block: ", height)
+					Log.Info("Ingestor: waiting for block: ", height)
 					lastHeightLogged = height - 1
 				}
 				Sleep(2 * time.Second)
