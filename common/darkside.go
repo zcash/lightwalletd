@@ -299,6 +299,7 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 		blockBytes = append(blockBytes, byte(1))
 		blockBytes = append(blockBytes, fakeCoinbaseBytes...)
 		state.stagedBlocks = append(state.stagedBlocks, blockBytes)
+		height++
 	}
 	return nil
 }
@@ -362,15 +363,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		if len(state.activeBlocks) == 0 {
 			return nil, errors.New(notFoundErr)
 		}
-		if height == state.latestHeight {
-			// The ingestor keeps going until it sees this error,
-			// meaning it's up to the latest height.
-			return nil, errors.New(notFoundErr)
-		}
 		if height > state.latestHeight {
-			// If an integration test can reach this, it could be a bug, so generate an error.
-			Log.Errorf("getblock request made for out-of-range height %d (have %d to %d)",
-				height, state.startHeight, state.startHeight+len(state.activeBlocks)-1)
 			return nil, errors.New(notFoundErr)
 		}
 		index := height - state.startHeight
