@@ -151,7 +151,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 
 var (
 	ingestorRunning  bool
-	stopIngestorChan chan struct{}
+	stopIngestorChan = make(chan struct{})
 )
 
 func startIngestor(c *BlockCache) {
@@ -164,7 +164,6 @@ func stopIngestor() {
 	if ingestorRunning {
 		ingestorRunning = false
 		stopIngestorChan <- struct{}{}
-		<-stopIngestorChan
 	}
 }
 
@@ -182,7 +181,6 @@ func BlockIngestor(c *BlockCache, rep int) {
 		// stop if requested
 		select {
 		case <-stopIngestorChan:
-			stopIngestorChan <- struct{}{}
 			return
 		default:
 		}
