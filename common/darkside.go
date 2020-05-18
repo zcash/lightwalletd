@@ -55,8 +55,11 @@ type stagedTx struct {
 	bytes  []byte
 }
 
+var DarksideEnabled bool
+
 // DarksideInit should be called once at startup in darksidewalletd mode.
 func DarksideInit(c *BlockCache) {
+	DarksideEnabled = true
 	state.cache = c
 	RawRequest = darksideRawRequest
 	go func() {
@@ -170,9 +173,6 @@ func DarksideApplyStaged(height int) error {
 		block[68]++   // hack HashFinalSaplingRoot to mod the block hash
 		block = append(block, tx.bytes...)
 		state.activeBlocks[tx.height-state.startHeight] = block
-	}
-	if len(state.stagedTransactions) > 0 {
-		return errors.New("one or more transactions have no block")
 	}
 	state.stagedTransactions = state.stagedTransactions[:0]
 	setPrevhash()
