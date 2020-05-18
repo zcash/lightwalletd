@@ -225,10 +225,6 @@
                   <a href="#cash.z.wallet.sdk.rpc.DarksideMetaState"><span class="badge">M</span>DarksideMetaState</a>
                 </li>
               
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideTx"><span class="badge">M</span>DarksideTx</a>
-                </li>
-              
               
               
               
@@ -656,37 +652,6 @@ in a pure-Sapling context, the fee will be calculable as:
 
         
       
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideTx">DarksideTx</h3>
-        <p>A single transaction that should appear to be mined at the given height.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>height</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>transaction</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
 
       
 
@@ -710,7 +675,7 @@ staged blocks and transactions) and lightwalletd state (cache) to empty,
 the same as the initial state. This occurs synchronously and instantaneously;
 no reorg happens in lightwalletd. This is good to do before each independent
 test so that no state leaks from one test to another.
-Also (some of) the values returned by GetLightdInfo().</p></td>
+Also sets (some of) the values returned by GetLightdInfo().</p></td>
               </tr>
             
               <tr>
