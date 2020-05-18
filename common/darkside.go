@@ -51,11 +51,6 @@ type darksideState struct {
 
 var state darksideState
 
-// DarksideIsEnabled returns true if we're in darkside (test) mode.
-func DarksideIsEnabled() bool {
-	return state.resetted
-}
-
 type stagedTx struct {
 	height int
 	bytes  []byte
@@ -309,30 +304,6 @@ func DarksideClearIncomingTransactions() {
 	state.incomingTransactions = make([][]byte, 0)
 }
 
-// DarksideSendTransaction is the handler for the SendTransaction gRPC.
-// Save the transaction in the incoming transactions list.
-func DarksideSendTransaction(txHex []byte) ([]byte, error) {
-	if !state.resetted {
-		return nil, errors.New("please call Reset first")
-	}
-	// Need to parse the transaction to return its hash, plus it's
-	// good error checking.
-	txBytes, err := hex.DecodeString(string(txHex))
-	if err != nil {
-		return nil, err
-	}
-	tx := parser.NewTransaction()
-	rest, err := tx.ParseFromSlice(txBytes)
-	if err != nil {
-		return nil, err
-	}
-	if len(rest) != 0 {
-		return nil, errors.New("transaction serialization is too long")
-	}
-	state.incomingTransactions = append(state.incomingTransactions, txBytes)
-	return tx.GetDisplayHash(), nil
-}
-
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
 	switch method {
 	case "getblockchaininfo":
@@ -382,13 +353,21 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		if err != nil {
 			return nil, errors.New("failed to parse sendrawtransaction JSON")
 		}
-		txbytes, err := hex.DecodeString(rawtx)
+		txBytes, err := hex.DecodeString(rawtx)
 		if err != nil {
 			return nil, errors.New("failed to parse sendrawtransaction value as a hex string")
 		}
-		state.incomingTransactions = append(state.incomingTransactions, txbytes)
-		return nil, nil
-
+		// Parse the transaction to get its hash (txid).
+		tx := parser.NewTransaction()
+		rest, err := tx.ParseFromSlice(txBytes)
+		if err != nil {
+			return nil, err
+		}
+		if len(rest) != 0 {
+			return nil, errors.New("transaction serialization is too long")
+		}
+		state.incomingTransactions = append(state.incomingTransactions, txBytes)
+		return tx.GetDisplayHash(), nil
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC")
 	}

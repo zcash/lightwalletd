@@ -219,16 +219,6 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// Result:
 	// "hex"             (string) The transaction hash in hex
 
-	if common.DarksideIsEnabled() {
-		txid, err := common.DarksideSendTransaction(rawtx.Data)
-		if err != nil {
-			return nil, err
-		}
-		return &walletrpc.SendResponse{
-			ErrorCode:    0,
-			ErrorMessage: hex.EncodeToString(txid),
-		}, nil
-	}
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
 	txHexString := hex.EncodeToString(rawtx.Data)
