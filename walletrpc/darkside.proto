@@ -23,12 +23,6 @@ message DarksideBlocksURL {
     string url = 2;
 }
 
-// A single transaction that should appear to be mined at the given height.
-message DarksideTx {
-    int32 height = 1;
-    string transaction = 2;
-}
-
 message DarksideHeight {
     int32 height = 1;
 }
