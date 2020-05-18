@@ -143,7 +143,9 @@ func DarksideApplyStaged(height int) error {
 		return errors.New("please call Reset first")
 	}
 	// Move the staged blocks into active list
-	for _, blockBytes := range state.stagedBlocks {
+	stagedBlocks := state.stagedBlocks
+	state.stagedBlocks = nil
+	for _, blockBytes := range stagedBlocks {
 		if err := addBlockActive(blockBytes); err != nil {
 			return err
 		}
@@ -328,6 +330,10 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		if height > state.latestHeight {
 			return nil, errors.New(notFoundErr)
+		}
+		if height < state.startHeight {
+			return nil, errors.New(fmt.Sprint("getblock: requesting height ", height,
+				" is less than sapling activation height"))
 		}
 		index := height - state.startHeight
 		return []byte("\"" + hex.EncodeToString(state.activeBlocks[index]) + "\""), nil
