@@ -18,13 +18,12 @@ import (
 )
 
 type darksideState struct {
-	resetted          bool
-	startHeight       int // activeBlocks[0] corresponds to this height
-	saplingActivation int // must be <= startHeight
-	branchID          string
-	chainName         string
-	cache             *BlockCache
-	mutex             sync.RWMutex
+	resetted    bool
+	startHeight int // activeBlocks[0] corresponds to this height
+	branchID    string
+	chainName   string
+	cache       *BlockCache
+	mutex       sync.RWMutex
 
 	// This is the highest (latest) block height currently being presented
 	// by the mock zcashd.
@@ -72,7 +71,7 @@ func DarksideReset(sa int, bi, cn string) error {
 	stopIngestor()
 	state = darksideState{
 		resetted:             true,
-		saplingActivation:    sa,
+		startHeight:          sa,
 		latestHeight:         -1,
 		branchID:             bi,
 		chainName:            cn,
@@ -100,30 +99,15 @@ func addBlockActive(blockBytes []byte) error {
 	blockHeight := block.GetHeight()
 	// first block, add to existing blocks slice if possible
 	if blockHeight > state.startHeight+len(state.activeBlocks) {
-		// The new block can't contiguously extend the existing
-		// range, so we have to drop the existing range.
-		state.activeBlocks = state.activeBlocks[:0]
-	} else if blockHeight < state.startHeight {
-		// This block will replace the entire existing range.
-		state.activeBlocks = state.activeBlocks[:0]
-	} else {
-		// Drop the block that will be overwritten, and its children.
-		state.activeBlocks = state.activeBlocks[:blockHeight-state.startHeight]
+		return errors.New(fmt.Sprint("adding block at height ", blockHeight,
+			" would create a gap in the blockchain"))
 	}
-	if len(state.activeBlocks) == 0 {
-		state.startHeight = blockHeight
-	} else {
-		// Set this block's prevhash.
-		prevblock := parser.NewBlock()
-		rest, err := prevblock.ParseFromSlice(state.activeBlocks[len(state.activeBlocks)-1])
-		if err != nil {
-			return err
-		}
-		if len(rest) != 0 {
-			return errors.New("block is too long")
-		}
-		copy(blockBytes[4:4+32], prevblock.GetEncodableHash())
+	if blockHeight < state.startHeight {
+		return errors.New(fmt.Sprint("adding block at height ", blockHeight,
+			" is lower than Sapling activation height"))
 	}
+	// Drop the block that will be overwritten, and its children, then add block.
+	state.activeBlocks = state.activeBlocks[:blockHeight-state.startHeight]
 	state.activeBlocks = append(state.activeBlocks, blockBytes)
 	return nil
 }
@@ -162,6 +146,11 @@ func DarksideApplyStaged(height int) error {
 		}
 	}
 	state.stagedBlocks = state.stagedBlocks[:0]
+	if height >= state.startHeight+len(state.activeBlocks) {
+		return errors.New(fmt.Sprint("ApplyStaged height ", height,
+			" is greater or equal to highest height ",
+			state.startHeight+len(state.activeBlocks)))
+	}
 
 	// Add staged transactions into blocks. Note we're not trying to
 	// recover to the initial state; maybe it's better to just crash
@@ -188,6 +177,9 @@ func DarksideApplyStaged(height int) error {
 	state.stagedTransactions = state.stagedTransactions[:0]
 	setPrevhash()
 	state.latestHeight = height
+	Log.Info("active blocks from ", state.startHeight,
+		" to ", state.startHeight+len(state.activeBlocks)-1,
+		", latest height ", state.latestHeight)
 
 	// The block ingestor can only run if there are blocks
 	if len(state.activeBlocks) > 0 {
@@ -310,7 +302,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		blockchaininfo := Blockchaininfo{
 			Chain: state.chainName,
 			Upgrades: map[string]Upgradeinfo{
-				"76b809bb": {ActivationHeight: state.saplingActivation},
+				"76b809bb": {ActivationHeight: state.startHeight},
 			},
 			Headers:   state.latestHeight,
 			Consensus: ConsensusInfo{state.branchID, state.branchID},
