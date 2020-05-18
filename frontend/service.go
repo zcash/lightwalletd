@@ -199,9 +199,13 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
 	saplingHeight, blockHeight, chainName, consensusBranchID := common.GetSaplingInfo()
 
+	vendor := "ECC LightWalletD"
+	if common.DarksideEnabled {
+		vendor = "ECC DarkWalletD"
+	}
 	return &walletrpc.LightdInfo{
 		Version:                 common.Version,
-		Vendor:                  "ECC LightWalletD",
+		Vendor:                  vendor,
 		TaddrSupport:            true,
 		ChainName:               chainName,
 		SaplingActivationHeight: uint64(saplingHeight),
