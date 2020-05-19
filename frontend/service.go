@@ -201,7 +201,7 @@ func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 
 	vendor := "ECC LightWalletD"
 	if common.DarksideEnabled {
-		vendor = "ECC DarkWalletD"
+		vendor = "ECC DarksideWalletD"
 	}
 	return &walletrpc.LightdInfo{
 		Version:                 common.Version,
