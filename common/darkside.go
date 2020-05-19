@@ -115,9 +115,10 @@ func addBlockActive(blockBytes []byte) error {
 	return nil
 }
 
-// Set the prev hashes of the blocks in the active chain
+// Set missing prev hashes of the blocks in the active chain
 func setPrevhash() {
 	prevhash := make([]byte, 32)
+	zeros := make([]byte, 32)
 	for _, blockBytes := range state.activeBlocks {
 		// Set this block's prevhash.
 		block := parser.NewBlock()
@@ -128,7 +129,9 @@ func setPrevhash() {
 		if len(rest) != 0 {
 			Log.Fatal(errors.New("block is too long"))
 		}
-		copy(blockBytes[4:4+32], prevhash)
+		if bytes.Equal(blockBytes[4:4+32], zeros) {
+			copy(blockBytes[4:4+32], prevhash)
+		}
 		prevhash = block.GetEncodableHash()
 	}
 }
@@ -150,11 +153,11 @@ func DarksideApplyStaged(height int) error {
 			return err
 		}
 	}
-	state.stagedBlocks = state.stagedBlocks[:0]
 	if height >= state.startHeight+len(state.activeBlocks) {
-		return errors.New(fmt.Sprint("ApplyStaged height ", height,
+		// this is hard to recover from
+		Log.Fatal("ApplyStaged height ", height,
 			" is greater or equal to highest height ",
-			state.startHeight+len(state.activeBlocks)))
+			state.startHeight+len(state.activeBlocks))
 	}
 
 	// Add staged transactions into blocks. Note we're not trying to
@@ -336,6 +339,9 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 				" is less than sapling activation height"))
 		}
 		index := height - state.startHeight
+		if index >= len(state.activeBlocks) {
+			return nil, errors.New(notFoundErr)
+		}
 		return []byte("\"" + hex.EncodeToString(state.activeBlocks[index]) + "\""), nil
 
 	case "getaddresstxids":
