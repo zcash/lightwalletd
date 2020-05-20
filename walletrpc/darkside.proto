@@ -19,7 +19,17 @@ message DarksideBlock {
     string block = 1;
 }
 
+// DarksideBlocksURL is typically something like:
+// https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/basic-reorg/before-reorg.txt
 message DarksideBlocksURL {
+    string url = 1;
+}
+
+// DarksideTransactionsURL refers to an HTTP source that contains a list
+// of hex-encoded transactions, one per line, that are to be associated
+// with the given height (fake-mined into the block at that height)
+message DarksideTransactionsURL {
+    int32 height = 1;
     string url = 2;
 }
 
@@ -67,7 +77,10 @@ service DarksideStreamer {
     // are not returned by the production GetTransaction() gRPC until they
     // appear in a "mined" block (contained in the active blockchain presented
     // by the mock zcashd).
-    rpc StageTransactions(stream RawTransaction) returns (Empty) {}
+    rpc StageTransactionsStream(stream RawTransaction) returns (Empty) {}
+
+    rpc StageTransactions(DarksideTransactionsURL) returns (Empty) {}
+
 
     // ApplyStaged iterates the list of blocks that were staged by the
     // StageBlocks*() gRPCs, in the order they were staged, and "merges" each

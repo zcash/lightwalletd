@@ -225,6 +225,10 @@
                   <a href="#cash.z.wallet.sdk.rpc.DarksideMetaState"><span class="badge">M</span>DarksideMetaState</a>
                 </li>
               
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL"><span class="badge">M</span>DarksideTransactionsURL</a>
+                </li>
+              
               
               
               
@@ -529,7 +533,7 @@ in a pure-Sapling context, the fee will be calculable as:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.DarksideBlocksURL">DarksideBlocksURL</h3>
-        <p></p>
+        <p>DarksideBlocksURL is typically something like:</p><p>https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/basic-reorg/before-reorg.txt</p>
 
         
           <table class="field-table">
@@ -652,6 +656,37 @@ in a pure-Sapling context, the fee will be calculable as:
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</h3>
+        <p>DarksideTransactionsURL refers to an HTTP source that contains a list</p><p>of hex-encoded transactions, one per line, that are to be associated</p><p>with the given height (fake-mined into the block at that height)</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>height</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>url</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
 
       
 
@@ -707,7 +742,7 @@ transactions) and same height, with two different hashes.</p></td>
               </tr>
             
               <tr>
-                <td>StageTransactions</td>
+                <td>StageTransactionsStream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><p>StageTransactions stores the given transaction-height pairs in the
@@ -715,6 +750,13 @@ staging area until ApplyStaged() is called. Note that these transactions
 are not returned by the production GetTransaction() gRPC until they
 appear in a &#34;mined&#34; block (contained in the active blockchain presented
 by the mock zcashd).</p></td>
+              </tr>
+            
+              <tr>
+                <td>StageTransactions</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p></p></td>
               </tr>
             
               <tr>

@@ -316,8 +316,8 @@ func (s *DarksideStreamer) StageBlocksCreate(ctx context.Context, e *walletrpc.D
 	return &walletrpc.Empty{}, nil
 }
 
-// StageTransactions adds the given transactions to the staging area.
-func (s *DarksideStreamer) StageTransactions(tx walletrpc.DarksideStreamer_StageTransactionsServer) error {
+// StageTransactionsStream adds the given transactions to the staging area.
+func (s *DarksideStreamer) StageTransactionsStream(tx walletrpc.DarksideStreamer_StageTransactionsStreamServer) error {
 	// My current thinking is that this should take a JSON array of {height, txid}, store them,
 	// then DarksideAddBlock() would "inject" transactions into blocks as its storing
 	// them (remembering to update the header so the block hash changes).
@@ -332,6 +332,14 @@ func (s *DarksideStreamer) StageTransactions(tx walletrpc.DarksideStreamer_Stage
 			return err
 		}
 	}
+}
+
+// StageTransactions loads blocks from the given URL to the staging area.
+func (s *DarksideStreamer) StageTransactions(ctx context.Context, u *walletrpc.DarksideTransactionsURL) (*walletrpc.Empty, error) {
+	if err := common.DarksideStageTransactionsURL(int(u.Height), u.Url); err != nil {
+		return nil, err
+	}
+	return &walletrpc.Empty{}, nil
 }
 
 // ApplyStaged merges all staged transactions into staged blocks and all staged blocks into the active blockchain.
