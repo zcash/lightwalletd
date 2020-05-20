@@ -55,6 +55,8 @@ type stagedTx struct {
 	bytes  []byte
 }
 
+// DarksideEnabled is true if --darkside-very-insecure was given on
+// the command line.
 var DarksideEnabled bool
 
 // DarksideInit should be called once at startup in darksidewalletd mode.
@@ -68,7 +70,7 @@ func DarksideInit(c *BlockCache) {
 	}()
 }
 
-// DarksideSetMetaState allows the wallet test code to specify values
+// DarksideReset allows the wallet test code to specify values
 // that are returned by GetLightdInfo().
 func DarksideReset(sa int, bi, cn string) error {
 	stopIngestor()
@@ -79,7 +81,6 @@ func DarksideReset(sa int, bi, cn string) error {
 		branchID:             bi,
 		chainName:            cn,
 		cache:                state.cache,
-		mutex:                state.mutex,
 		activeBlocks:         make([][]byte, 0),
 		stagedBlocks:         make([][]byte, 0),
 		incomingTransactions: make([][]byte, 0),
@@ -118,7 +119,6 @@ func addBlockActive(blockBytes []byte) error {
 // Set missing prev hashes of the blocks in the active chain
 func setPrevhash() {
 	prevhash := make([]byte, 32)
-	zeros := make([]byte, 32)
 	for _, blockBytes := range state.activeBlocks {
 		// Set this block's prevhash.
 		block := parser.NewBlock()
@@ -129,10 +129,9 @@ func setPrevhash() {
 		if len(rest) != 0 {
 			Log.Fatal(errors.New("block is too long"))
 		}
-		if bytes.Equal(blockBytes[4:4+32], zeros) {
-			copy(blockBytes[4:4+32], prevhash)
-		}
+		copy(blockBytes[4:4+32], prevhash)
 		prevhash = block.GetEncodableHash()
+
 	}
 }
 
@@ -163,7 +162,9 @@ func DarksideApplyStaged(height int) error {
 	// Add staged transactions into blocks. Note we're not trying to
 	// recover to the initial state; maybe it's better to just crash
 	// on errors.
-	for _, tx := range state.stagedTransactions {
+	stagedTransactions := state.stagedTransactions
+	state.stagedTransactions = nil
+	for _, tx := range stagedTransactions {
 		if tx.height < state.startHeight {
 			return errors.New("transaction height too low")
 		}
@@ -177,9 +178,7 @@ func DarksideApplyStaged(height int) error {
 		block[1487]++ // one more transaction
 		block[68]++   // hack HashFinalSaplingRoot to mod the block hash
 		block = append(block, tx.bytes...)
-		state.activeBlocks[tx.height-state.startHeight] = block
 	}
-	state.stagedTransactions = state.stagedTransactions[:0]
 	setPrevhash()
 	state.latestHeight = height
 	Log.Info("active blocks from ", state.startHeight,
@@ -423,4 +422,39 @@ func DarksideStageTransaction(height int, txBytes []byte) error {
 			bytes:  txBytes,
 		})
 	return nil
+}
+
+// DarksideStageTransactionsURL reads a list of transactions (hex-encoded, one
+// per line) from the given URL, and associates them with the given height.
+func DarksideStageTransactionsURL(height int, url string) error {
+	if !state.resetted {
+		return errors.New("please call Reset first")
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	// some blocks are too large, especially when encoded in hex, for the
+	// default buffer size, so set up a larger one; 8mb should be enough.
+	scan := bufio.NewScanner(resp.Body)
+	var scanbuf []byte
+	scan.Buffer(scanbuf, 8*1000*1000)
+	for scan.Scan() { // each line (transaction)
+		transactionHex := scan.Text()
+		if transactionHex == "404: Not Found" {
+			// special case error (http resource not found, bad pathname)
+			return errors.New(transactionHex)
+		}
+		transactionBytes, err := hex.DecodeString(transactionHex)
+		if err != nil {
+			return err
+		}
+		state.stagedTransactions = append(state.stagedTransactions, stagedTx{
+			height: height,
+			bytes:  transactionBytes,
+		})
+	}
+	return scan.Err()
+
 }

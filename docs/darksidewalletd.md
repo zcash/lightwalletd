@@ -110,9 +110,8 @@ In the submitblocks.sh command, the “1000” sets the value that lightwalletd 
 report the sapling activation height to be.
 
 Tip: You may submit blocks incrementally, that is, submit 1000-1005 followed
-by 1006-1008, the result is 1000-1008. If you create a gap in the range (say,
-1000-1005 then 1007-1009), then the earlier range is forgotten; the only range
-is 1007-1009 because it doesn't make sense to have a gap.
+by 1006-1008, the result is 1000-1008. You can't create a gap in the range (say,
+1000-1005 then 1007-1009).
 
 If you submit overlapping ranges, the expected things happen. For example, first
 submit 1000-1005, then 1003-1007, the result is 1000-1007 (the original 1000-1002
