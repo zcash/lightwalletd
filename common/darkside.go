@@ -118,7 +118,7 @@ func addBlockActive(blockBytes []byte) error {
 
 // Set missing prev hashes of the blocks in the active chain
 func setPrevhash() {
-	prevhash := make([]byte, 32)
+	var prevhash []byte
 	for _, blockBytes := range state.activeBlocks {
 		// Set this block's prevhash.
 		block := parser.NewBlock()
@@ -129,8 +129,11 @@ func setPrevhash() {
 		if len(rest) != 0 {
 			Log.Fatal(errors.New("block is too long"))
 		}
-		copy(blockBytes[4:4+32], prevhash)
+		if prevhash != nil {
+			copy(blockBytes[4:4+32], prevhash)
+		}
 		prevhash = block.GetEncodableHash()
+		Log.Info("height ", block.GetHeight(), " hash ", hex.EncodeToString(block.GetDisplayHash()))
 	}
 }
 
