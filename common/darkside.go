@@ -61,6 +61,7 @@ var DarksideEnabled bool
 
 // DarksideInit should be called once at startup in darksidewalletd mode.
 func DarksideInit(c *BlockCache) {
+	Log.Info("Darkside mode running")
 	DarksideEnabled = true
 	state.cache = c
 	RawRequest = darksideRawRequest
@@ -73,6 +74,7 @@ func DarksideInit(c *BlockCache) {
 // DarksideReset allows the wallet test code to specify values
 // that are returned by GetLightdInfo().
 func DarksideReset(sa int, bi, cn string) error {
+	Log.Info("Reset(saplingActivation=", sa, ")")
 	stopIngestor()
 	state = darksideState{
 		resetted:             true,
@@ -108,7 +110,7 @@ func addBlockActive(blockBytes []byte) error {
 	}
 	if blockHeight < state.startHeight {
 		return errors.New(fmt.Sprint("adding block at height ", blockHeight,
-			" is lower than Sapling activation height"))
+			" is lower than Sapling activation height ", state.startHeight))
 	}
 	// Drop the block that will be overwritten, and its children, then add block.
 	state.activeBlocks = state.activeBlocks[:blockHeight-state.startHeight]
@@ -133,7 +135,8 @@ func setPrevhash() {
 			copy(blockBytes[4:4+32], prevhash)
 		}
 		prevhash = block.GetEncodableHash()
-		Log.Info("height ", block.GetHeight(), " hash ", hex.EncodeToString(block.GetDisplayHash()))
+		Log.Info("height ", block.GetHeight(), " hash ",
+			hex.EncodeToString(block.GetDisplayHash()))
 	}
 }
 
@@ -146,6 +149,7 @@ func DarksideApplyStaged(height int) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
+	Log.Info("ApplyStaged(height=", height, ")")
 	// Move the staged blocks into active list
 	stagedBlocks := state.stagedBlocks
 	state.stagedBlocks = nil
@@ -154,11 +158,11 @@ func DarksideApplyStaged(height int) error {
 			return err
 		}
 	}
-	if height >= state.startHeight+len(state.activeBlocks) {
+	if height > state.startHeight+len(state.activeBlocks)-1 {
 		// this is hard to recover from
 		Log.Fatal("ApplyStaged height ", height,
-			" is greater or equal to highest height ",
-			state.startHeight+len(state.activeBlocks))
+			" is greater than the highest height ",
+			state.startHeight+len(state.activeBlocks)-1)
 	}
 
 	// Add staged transactions into blocks. Note we're not trying to
@@ -186,7 +190,7 @@ func DarksideApplyStaged(height int) error {
 	state.latestHeight = height
 	Log.Info("active blocks from ", state.startHeight,
 		" to ", state.startHeight+len(state.activeBlocks)-1,
-		", latest height ", state.latestHeight)
+		", latest presented height ", state.latestHeight)
 
 	// The block ingestor can only run if there are blocks
 	if len(state.activeBlocks) > 0 {
@@ -209,6 +213,7 @@ func DarksideStageBlocks(url string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
+	Log.Info("StageBlocks(url=", url, ")")
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -236,6 +241,10 @@ func DarksideStageBlocks(url string) error {
 
 // DarksideStageBlockStream adds the block to the staging area
 func DarksideStageBlockStream(blockHex string) error {
+	if !state.resetted {
+		return errors.New("please call Reset first")
+	}
+	Log.Info("StageBlocks()")
 	blockBytes, err := hex.DecodeString(blockHex)
 	if err != nil {
 		return err
@@ -249,6 +258,7 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
+	Log.Info("StageBlocksCreate(height=", height, ", nonce=", nonce, "count=", count, ")")
 	for i := 0; i < int(count); i++ {
 
 		fakeCoinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
@@ -419,6 +429,7 @@ func DarksideStageTransaction(height int, txBytes []byte) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
+	Log.Info("StageTransactions(height=", height, ")")
 	state.stagedTransactions = append(state.stagedTransactions,
 		stagedTx{
 			height: height,
@@ -433,6 +444,7 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
+	Log.Info("StageTransactionsURL(height=", height, "url=", url, ")")
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
