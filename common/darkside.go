@@ -131,7 +131,6 @@ func setPrevhash() {
 		}
 		copy(blockBytes[4:4+32], prevhash)
 		prevhash = block.GetEncodableHash()
-
 	}
 }
 
@@ -178,6 +177,7 @@ func DarksideApplyStaged(height int) error {
 		block[1487]++ // one more transaction
 		block[68]++   // hack HashFinalSaplingRoot to mod the block hash
 		block = append(block, tx.bytes...)
+		state.activeBlocks[tx.height-state.startHeight] = block
 	}
 	setPrevhash()
 	state.latestHeight = height
