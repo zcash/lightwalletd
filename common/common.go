@@ -35,6 +35,7 @@ type Options struct {
 	Redownload        bool   `json:"redownload"`
 	DataDir           string `json:"data-dir"`
 	Darkside          bool   `json:"darkside"`
+	DarksideTimeout   uint64 `json:"darkside-timeout"`
 }
 
 // RawRequest points to the function to send a an RPC request to zcashd;
