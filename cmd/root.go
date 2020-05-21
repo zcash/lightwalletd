@@ -49,6 +49,7 @@ var rootCmd = &cobra.Command{
 			DataDir:           viper.GetString("data-dir"),
 			Redownload:        viper.GetBool("redownload"),
 			Darkside:          viper.GetBool("darkside-very-insecure"),
+			DarksideTimeout:   viper.GetUint64("darkside-timeout"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -204,7 +205,7 @@ func startServer(opts *common.Options) error {
 		go common.BlockIngestor(cache, 0 /*loop forever*/)
 	} else {
 		// Darkside wants to control starting the block ingestor.
-		common.DarksideInit(cache)
+		common.DarksideInit(cache, int(opts.DarksideTimeout))
 	}
 
 	// Compact transaction service initialization
@@ -281,6 +282,7 @@ func init() {
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
+	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
@@ -304,6 +306,8 @@ func init() {
 	viper.SetDefault("data-dir", "/var/lib/lightwalletd")
 	viper.BindPFlag("darkside-very-insecure", rootCmd.Flags().Lookup("darkside-very-insecure"))
 	viper.SetDefault("darkside-very-insecure", false)
+	viper.BindPFlag("darkside-timeout", rootCmd.Flags().Lookup("darkside-timeout"))
+	viper.SetDefault("darkside-timeout", 30)
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,

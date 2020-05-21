@@ -60,13 +60,13 @@ type stagedTx struct {
 var DarksideEnabled bool
 
 // DarksideInit should be called once at startup in darksidewalletd mode.
-func DarksideInit(c *BlockCache) {
+func DarksideInit(c *BlockCache, timeout int) {
 	Log.Info("Darkside mode running")
 	DarksideEnabled = true
 	state.cache = c
 	RawRequest = darksideRawRequest
 	go func() {
-		time.Sleep(30 * time.Minute)
+		time.Sleep(time.Duration(timeout) * time.Minute)
 		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
 	}()
 }
