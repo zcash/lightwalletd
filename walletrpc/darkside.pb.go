@@ -617,11 +617,12 @@ type DarksideStreamerClient interface {
 	// the same as the initial state. This occurs synchronously and instantaneously;
 	// no reorg happens in lightwalletd. This is good to do before each independent
 	// test so that no state leaks from one test to another.
-	// Also sets (some of) the values returned by GetLightdInfo().
+	// Also sets (some of) the values returned by GetLightdInfo(). The Sapling
+	// activation height specified here must be where the block range starts.
 	Reset(ctx context.Context, in *DarksideMetaState, opts ...grpc.CallOption) (*Empty, error)
 	// StageBlocksStream accepts a list of blocks and saves them into the blocks
 	// staging area until ApplyStaged() is called; there is no immediate effect on
-	// the mock zcashd. Blocks are hex-encoded.
+	// the mock zcashd. Blocks are hex-encoded. Order is important, see ApplyStaged.
 	StageBlocksStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageBlocksStreamClient, error)
 	// StageBlocks is the same as StageBlocksStream() except the blocks are fetched
 	// from the given URL. Blocks are one per line, hex-encoded (not JSON).
@@ -632,12 +633,16 @@ type DarksideStreamerClient interface {
 	// lets you create two fake blocks with the same transactions (or no
 	// transactions) and same height, with two different hashes.
 	StageBlocksCreate(ctx context.Context, in *DarksideEmptyBlocks, opts ...grpc.CallOption) (*Empty, error)
-	// StageTransactions stores the given transaction-height pairs in the
+	// StageTransactionsStream stores the given transaction-height pairs in the
 	// staging area until ApplyStaged() is called. Note that these transactions
 	// are not returned by the production GetTransaction() gRPC until they
 	// appear in a "mined" block (contained in the active blockchain presented
 	// by the mock zcashd).
 	StageTransactionsStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageTransactionsStreamClient, error)
+	// StageTransactions is the same except the transactions are fetched
+	// from the given url. They are all staged into the block at the given
+	// height. Staging transactions at multiple different heights requires
+	// multiple calls.
 	StageTransactions(ctx context.Context, in *DarksideTransactionsURL, opts ...grpc.CallOption) (*Empty, error)
 	// ApplyStaged iterates the list of blocks that were staged by the
 	// StageBlocks*() gRPCs, in the order they were staged, and "merges" each
@@ -835,11 +840,12 @@ type DarksideStreamerServer interface {
 	// the same as the initial state. This occurs synchronously and instantaneously;
 	// no reorg happens in lightwalletd. This is good to do before each independent
 	// test so that no state leaks from one test to another.
-	// Also sets (some of) the values returned by GetLightdInfo().
+	// Also sets (some of) the values returned by GetLightdInfo(). The Sapling
+	// activation height specified here must be where the block range starts.
 	Reset(context.Context, *DarksideMetaState) (*Empty, error)
 	// StageBlocksStream accepts a list of blocks and saves them into the blocks
 	// staging area until ApplyStaged() is called; there is no immediate effect on
-	// the mock zcashd. Blocks are hex-encoded.
+	// the mock zcashd. Blocks are hex-encoded. Order is important, see ApplyStaged.
 	StageBlocksStream(DarksideStreamer_StageBlocksStreamServer) error
 	// StageBlocks is the same as StageBlocksStream() except the blocks are fetched
 	// from the given URL. Blocks are one per line, hex-encoded (not JSON).
@@ -850,12 +856,16 @@ type DarksideStreamerServer interface {
 	// lets you create two fake blocks with the same transactions (or no
 	// transactions) and same height, with two different hashes.
 	StageBlocksCreate(context.Context, *DarksideEmptyBlocks) (*Empty, error)
-	// StageTransactions stores the given transaction-height pairs in the
+	// StageTransactionsStream stores the given transaction-height pairs in the
 	// staging area until ApplyStaged() is called. Note that these transactions
 	// are not returned by the production GetTransaction() gRPC until they
 	// appear in a "mined" block (contained in the active blockchain presented
 	// by the mock zcashd).
 	StageTransactionsStream(DarksideStreamer_StageTransactionsStreamServer) error
+	// StageTransactions is the same except the transactions are fetched
+	// from the given url. They are all staged into the block at the given
+	// height. Staging transactions at multiple different heights requires
+	// multiple calls.
 	StageTransactions(context.Context, *DarksideTransactionsURL) (*Empty, error)
 	// ApplyStaged iterates the list of blocks that were staged by the
 	// StageBlocks*() gRPCs, in the order they were staged, and "merges" each

@@ -710,7 +710,8 @@ staged blocks and transactions) and lightwalletd state (cache) to empty,
 the same as the initial state. This occurs synchronously and instantaneously;
 no reorg happens in lightwalletd. This is good to do before each independent
 test so that no state leaks from one test to another.
-Also sets (some of) the values returned by GetLightdInfo().</p></td>
+Also sets (some of) the values returned by GetLightdInfo(). The Sapling
+activation height specified here must be where the block range starts.</p></td>
               </tr>
             
               <tr>
@@ -719,7 +720,7 @@ Also sets (some of) the values returned by GetLightdInfo().</p></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><p>StageBlocksStream accepts a list of blocks and saves them into the blocks
 staging area until ApplyStaged() is called; there is no immediate effect on
-the mock zcashd. Blocks are hex-encoded.</p></td>
+the mock zcashd. Blocks are hex-encoded. Order is important, see ApplyStaged.</p></td>
               </tr>
             
               <tr>
@@ -745,7 +746,7 @@ transactions) and same height, with two different hashes.</p></td>
                 <td>StageTransactionsStream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageTransactions stores the given transaction-height pairs in the
+                <td><p>StageTransactionsStream stores the given transaction-height pairs in the
 staging area until ApplyStaged() is called. Note that these transactions
 are not returned by the production GetTransaction() gRPC until they
 appear in a &#34;mined&#34; block (contained in the active blockchain presented
@@ -756,7 +757,10 @@ by the mock zcashd).</p></td>
                 <td>StageTransactions</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p></p></td>
+                <td><p>StageTransactions is the same except the transactions are fetched
+from the given url. They are all staged into the block at the given
+height. Staging transactions at multiple different heights requires
+multiple calls.</p></td>
               </tr>
             
               <tr>
