@@ -17,10 +17,6 @@ import (
 	"github.com/zcash/lightwalletd/walletrpc"
 )
 
-type blockCacheEntry struct {
-	data []byte
-}
-
 // BlockCache contains a consecutive set of recent compact blocks in marshalled form.
 type BlockCache struct {
 	lengthsName, blocksName string // pathnames
@@ -44,7 +40,7 @@ func (c *BlockCache) GetLatestHash() []byte {
 	return c.latestHash
 }
 
-//  HashMismatch indicates if the given prev-hash doesn't match the most recent block's hash
+// HashMismatch indicates if the given prev-hash doesn't match the most recent block's hash
 // so reorgs can be detected.
 func (c *BlockCache) HashMismatch(prevhash []byte) bool {
 	c.mutex.RLock()
@@ -175,6 +171,12 @@ func (c *BlockCache) setLatestHash() {
 	}
 }
 
+func (c *BlockCache) Reset(startHeight int) {
+	c.setDbFiles(c.firstBlock) // empty the cache
+	c.firstBlock = startHeight
+	c.nextBlock = startHeight
+}
+
 // NewBlockCache returns an instance of a block cache object.
 // (No locking here, we assume this is single-threaded.)
 func NewBlockCache(dbPath string, chainName string, startHeight int, redownload bool) *BlockCache {
@@ -267,7 +269,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	}
 	bheight := int(block.Height)
 
-	// TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
+	// XXX check? TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
 	if false && bheight != height {
 		// This could only happen if zcashd returned the wrong
 		// block (not the height we requested).
@@ -370,7 +372,7 @@ func (c *BlockCache) Sync() {
 	c.blocksFile.Sync()
 }
 
-// Currently used only for testing.
+// Close is Currently used only for testing.
 func (c *BlockCache) Close() {
 	// Some operating system require you to close files before you can remove them.
 	if c.lengthsFile != nil {

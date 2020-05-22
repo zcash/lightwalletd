@@ -1,6 +1,7 @@
 // Copyright (c) 2019-2020 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
 package common
 
 import (
@@ -34,6 +35,7 @@ type Options struct {
 	Redownload        bool   `json:"redownload"`
 	DataDir           string `json:"data-dir"`
 	Darkside          bool   `json:"darkside"`
+	DarksideTimeout   uint64 `json:"darkside-timeout"`
 }
 
 // RawRequest points to the function to send a an RPC request to zcashd;
@@ -49,10 +51,27 @@ var Sleep func(d time.Duration)
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
 
+type (
+	Upgradeinfo struct {
+		// there are other fields that aren't needed here, omit them
+		ActivationHeight int
+	}
+	ConsensusInfo struct {
+		Nextblock string
+		Chaintip  string
+	}
+	Blockchaininfo struct {
+		Chain     string
+		Upgrades  map[string]Upgradeinfo
+		Headers   int
+		Consensus ConsensusInfo
+	}
+)
+
 // GetSaplingInfo returns the result of the getblockchaininfo RPC to zcashd
 func GetSaplingInfo() (int, int, string, string) {
 	// This request must succeed or we can't go on; give zcashd time to start up
-	var f interface{}
+	var blockchaininfo Blockchaininfo
 	retryCount := 0
 	for {
 		result, rpcErr := RawRequest("getblockchaininfo", []json.RawMessage{})
@@ -60,7 +79,7 @@ func GetSaplingInfo() (int, int, string, string) {
 			if retryCount > 0 {
 				Log.Warn("getblockchaininfo RPC successful")
 			}
-			err := json.Unmarshal(result, &f)
+			err := json.Unmarshal(result, &blockchaininfo)
 			if err != nil {
 				Log.Fatalf("error parsing JSON getblockchaininfo response: %v", err)
 			}
@@ -79,23 +98,14 @@ func GetSaplingInfo() (int, int, string, string) {
 		Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
 	}
 
-	chainName := f.(map[string]interface{})["chain"].(string)
-
-	upgradeJSON := f.(map[string]interface{})["upgrades"]
-
 	// If the sapling consensus branch doesn't exist, it must be regtest
-	saplingHeight := float64(0)
-	if saplingJSON, ok := upgradeJSON.(map[string]interface{})["76b809bb"]; ok { // Sapling ID
-		saplingHeight = saplingJSON.(map[string]interface{})["activationheight"].(float64)
+	var saplingHeight int
+	if saplingJSON, ok := blockchaininfo.Upgrades["76b809bb"]; ok { // Sapling ID
+		saplingHeight = saplingJSON.ActivationHeight
 	}
 
-	blockHeight := f.(map[string]interface{})["headers"].(float64)
-
-	consensus := f.(map[string]interface{})["consensus"]
-
-	branchID := consensus.(map[string]interface{})["nextblock"].(string)
-
-	return int(saplingHeight), int(blockHeight), chainName, branchID
+	return saplingHeight, blockchaininfo.Headers, blockchaininfo.Chain,
+		blockchaininfo.Consensus.Nextblock
 }
 
 func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
@@ -133,12 +143,29 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		return nil, errors.New("received overlong message")
 	}
 
-	// TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
-	if false && block.GetHeight() != height {
+	if block.GetHeight() != height {
 		return nil, errors.New("received unexpected height block")
 	}
 
 	return block.ToCompact(), nil
+}
+
+var (
+	ingestorRunning  bool
+	stopIngestorChan = make(chan struct{})
+)
+
+func startIngestor(c *BlockCache) {
+	if !ingestorRunning {
+		ingestorRunning = true
+		go BlockIngestor(c, 0)
+	}
+}
+func stopIngestor() {
+	if ingestorRunning {
+		ingestorRunning = false
+		stopIngestorChan <- struct{}{}
+	}
 }
 
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
@@ -152,6 +179,13 @@ func BlockIngestor(c *BlockCache, rep int) {
 
 	// Start listening for new blocks
 	for i := 0; rep == 0 || i < rep; i++ {
+		// stop if requested
+		select {
+		case <-stopIngestorChan:
+			return
+		default:
+		}
+
 		height := c.GetNextHeight()
 		block, err := getBlockFromRPC(height)
 		if err != nil {
@@ -178,9 +212,10 @@ func BlockIngestor(c *BlockCache, rep int) {
 				// Wait a bit then retry the same height.
 				c.Sync()
 				if lastHeightLogged+1 != height {
-					Log.Info("Ingestor waiting for block: ", height)
+					Log.Info("Ingestor: waiting for block: ", height)
+					lastHeightLogged = height - 1
 				}
-				Sleep(10 * time.Second)
+				Sleep(2 * time.Second)
 				wait = false
 				continue
 			}
@@ -190,7 +225,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 			// and there's no new block yet, but we want to back up
 			// so we detect a reorg in which the new chain is the
 			// same length or shorter.
-			reorgCount += 1
+			reorgCount++
 			if reorgCount > 100 {
 				Log.Fatal("Reorg exceeded max of 100 blocks! Help!")
 			}
@@ -212,7 +247,6 @@ func BlockIngestor(c *BlockCache, rep int) {
 			}
 			// Try backing up
 			c.Reorg(height - 1)
-			Sleep(1 * time.Second)
 			continue
 		}
 		// We have a valid block to add.
@@ -253,7 +287,7 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 }
 
 // GetBlockRange returns a sequence of consecutive blocks in the given range.
-func GetBlockRange(cache *BlockCache, blockOut chan<- walletrpc.CompactBlock, errOut chan<- error, start, end int) {
+func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, start, end int) {
 	// Go over [start, end] inclusive
 	for i := start; i <= end; i++ {
 		block, err := GetBlock(cache, i)
@@ -261,7 +295,7 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- walletrpc.CompactBlock, er
 			errOut <- err
 			return
 		}
-		blockOut <- *block
+		blockOut <- block
 	}
 	errOut <- nil
 }
