@@ -220,7 +220,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, redownload 
 			break
 		}
 		length := binary.LittleEndian.Uint32(lengths[i*4 : (i+1)*4])
-		if length < 78 || length > 4*1000*1000 {
+		if length < 74 || length > 4*1000*1000 {
 			Log.Warning("lengths file has impossible value ", length)
 			c.recoverFromCorruption(c.nextBlock)
 			break
