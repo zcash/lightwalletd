@@ -1,14 +1,16 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package parser
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
-	"log"
 	"math/big"
 
 	"github.com/pkg/errors"
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 )
 
 const (
@@ -17,7 +19,7 @@ const (
 )
 
 // A block header as defined in version 2018.0-beta-29 of the Zcash Protocol Spec.
-type rawBlockHeader struct {
+type RawBlockHeader struct {
 	// The block version number indicates which set of block validation rules
 	// to follow. The current and only defined block version number for Zcash
 	// is 4.
@@ -56,12 +58,13 @@ type rawBlockHeader struct {
 	Solution []byte
 }
 
-type blockHeader struct {
-	*rawBlockHeader
-	cachedHash      []byte
-	targetThreshold *big.Int
+type BlockHeader struct {
+	*RawBlockHeader
+	cachedHash []byte
 }
 
+// CompactLengthPrefixedLen calculates the total number of bytes needed to
+// encode 'length' bytes.
 func CompactLengthPrefixedLen(length int) int {
 	if length < 253 {
 		return 1 + length
@@ -74,6 +77,7 @@ func CompactLengthPrefixedLen(length int) int {
 	}
 }
 
+// WriteCompactLengthPrefixedLen writes the given length to the stream.
 func WriteCompactLengthPrefixedLen(buf *bytes.Buffer, length int) {
 	if length < 253 {
 		binary.Write(buf, binary.LittleEndian, uint8(length))
@@ -94,11 +98,11 @@ func WriteCompactLengthPrefixed(buf *bytes.Buffer, val []byte) {
 	binary.Write(buf, binary.LittleEndian, val)
 }
 
-func (hdr *rawBlockHeader) GetSize() int {
+func (hdr *RawBlockHeader) GetSize() int {
 	return serBlockHeaderMinusEquihashSize + CompactLengthPrefixedLen(len(hdr.Solution))
 }
 
-func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
+func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
 	headerSize := hdr.GetSize()
 	backing := make([]byte, 0, headerSize)
 	buf := bytes.NewBuffer(backing)
@@ -113,16 +117,17 @@ func (hdr *rawBlockHeader) MarshalBinary() ([]byte, error) {
 	return backing[:headerSize], nil
 }
 
-func NewBlockHeader() *blockHeader {
-	return &blockHeader{
-		rawBlockHeader: new(rawBlockHeader),
+// NewBlockHeader return a pointer to a new block header instance.
+func NewBlockHeader() *BlockHeader {
+	return &BlockHeader{
+		RawBlockHeader: new(RawBlockHeader),
 	}
 }
 
 // ParseFromSlice parses the block header struct from the provided byte slice,
 // advancing over the bytes read. If successful it returns the rest of the
 // slice, otherwise it returns the input slice unaltered along with an error.
-func (hdr *blockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
+func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 	s := bytestring.String(in)
 
 	// Primary parsing layer: sort the bytes into things
@@ -185,14 +190,13 @@ func parseNBits(b []byte) *big.Int {
 }
 
 // GetDisplayHash returns the bytes of a block hash in big-endian order.
-func (hdr *blockHeader) GetDisplayHash() []byte {
+func (hdr *BlockHeader) GetDisplayHash() []byte {
 	if hdr.cachedHash != nil {
 		return hdr.cachedHash
 	}
 
 	serializedHeader, err := hdr.MarshalBinary()
 	if err != nil {
-		log.Fatalf("error marshaling block header: %v", err)
 		return nil
 	}
 
@@ -211,11 +215,10 @@ func (hdr *blockHeader) GetDisplayHash() []byte {
 }
 
 // GetEncodableHash returns the bytes of a block hash in little-endian wire order.
-func (hdr *blockHeader) GetEncodableHash() []byte {
+func (hdr *BlockHeader) GetEncodableHash() []byte {
 	serializedHeader, err := hdr.MarshalBinary()
 
 	if err != nil {
-		log.Fatalf("error marshaling block header: %v", err)
 		return nil
 	}
 
@@ -226,7 +229,7 @@ func (hdr *blockHeader) GetEncodableHash() []byte {
 	return digest[:]
 }
 
-func (hdr *blockHeader) GetDisplayPrevHash() []byte {
+func (hdr *BlockHeader) GetDisplayPrevHash() []byte {
 	rhash := make([]byte, len(hdr.HashPrevBlock))
 	copy(rhash, hdr.HashPrevBlock)
 	// Reverse byte order

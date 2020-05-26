@@ -1,7 +1,11 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package parser
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -69,7 +73,7 @@ func TestBlockParser(t *testing.T) {
 			break
 		}
 		for _, tx := range block.Transactions() {
-			if tx.HasSaplingTransactions() {
+			if tx.HasSaplingElements() {
 				t.Error("Unexpected Saping tx")
 				break
 			}
@@ -190,6 +194,9 @@ func TestCompactBlocks(t *testing.T) {
 		if hex.EncodeToString(block.GetDisplayPrevHash()) != test.PrevHash {
 			t.Errorf("incorrect block prevhash in testnet block %x", test.BlockHash)
 			continue
+		}
+		if !bytes.Equal(block.GetPrevHash(), block.hdr.HashPrevBlock) {
+			t.Error("block and block header prevhash don't match")
 		}
 
 		compact := block.ToCompact()

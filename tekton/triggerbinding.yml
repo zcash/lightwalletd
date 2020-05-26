@@ -1,0 +1,45 @@
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: lightwalletd-master-binding
+spec:
+  params:
+  - name: newSHA
+    value: $(body.after)
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: lightwalletd-dockerbuild-template
+spec:
+  params:
+  - name: newSHA
+    description: The git repository HEAD sha   
+  resourcetemplates:
+  - apiVersion: tekton.dev/v1alpha1
+    kind: TaskRun
+    metadata:
+      generateName: lightwalletd-dockerbuild-
+    spec:
+      serviceAccountName: zcashsysadmin-service
+      taskRef:
+        name: build-docker-image-from-git-source
+      inputs:
+        resources:
+          - name: docker-source
+            resourceRef:
+              name: lightwalletd-git
+        params:
+          - name: pathToDockerFile
+            value: /workspace/docker-source/Dockerfile
+          - name: pathToContext
+            value: /workspace/docker-source/
+      outputs:
+        resources:
+          - name: builtImage
+            resourceRef:
+              name: lightwalletd-image
+          - name: notification
+            resourceRef:
+              name: event-to-cloudlog

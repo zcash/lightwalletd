@@ -1,13 +1,25 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package common
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"io/ioutil"
+	"os"
 	"testing"
 
-	"github.com/zcash-hackworks/lightwalletd/parser"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/parser"
+	"github.com/zcash/lightwalletd/walletrpc"
+)
+
+var compacts []*walletrpc.CompactBlock
+var cache *BlockCache
+
+const (
+	unitTestPath  = "unittestcache"
+	unitTestChain = "unittestnet"
 )
 
 func TestCache(t *testing.T) {
@@ -19,7 +31,6 @@ func TestCache(t *testing.T) {
 		Compact     string `json:"compact"`
 	}
 	var compactTests []compactTest
-	var compacts []*walletrpc.CompactBlock
 
 	blockJSON, err := ioutil.ReadFile("../testdata/compact_blocks.json")
 	if err != nil {
@@ -30,215 +41,141 @@ func TestCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cache := NewBlockCache(4)
 
-	// derive compact blocks from file data (setup, not part of the test)
+	// Derive compact blocks from file data (setup, not part of the test).
 	for _, test := range compactTests {
 		blockData, _ := hex.DecodeString(test.Full)
 		block := parser.NewBlock()
-		blockData, err = block.ParseFromSlice(blockData)
+		_, err = block.ParseFromSlice(blockData)
 		if err != nil {
 			t.Fatal(err)
 		}
 		compacts = append(compacts, block.ToCompact())
 	}
 
-	// initially empty cache
-	if cache.GetLatestBlock() != -1 {
-		t.Fatal("unexpected GetLatestBlock")
+	// Pretend Sapling starts at 289460.
+	os.RemoveAll(unitTestPath)
+	cache = NewBlockCache(unitTestPath, unitTestChain, 289460, true)
+
+	// Initially cache is empty.
+	if cache.GetLatestHeight() != -1 {
+		t.Fatal("unexpected GetLatestHeight")
+	}
+	if cache.firstBlock != 289460 {
+		t.Fatal("unexpected initial firstBlock")
+	}
+	if cache.nextBlock != 289460 {
+		t.Fatal("unexpected initial nextBlock")
+	}
+	fillCache(t)
+	reorgCache(t)
+	fillCache(t)
+
+	// Simulate a restart to ensure the db files are read correctly.
+	cache = NewBlockCache(unitTestPath, unitTestChain, 289460, false)
+
+	// Should still be 6 blocks.
+	if cache.nextBlock != 289466 {
+		t.Fatal("unexpected nextBlock height")
+	}
+	reorgCache(t)
+
+	// Reorg to before the first block moves back to only the first block
+	cache.Reorg(289459)
+	if cache.latestHash != nil {
+		t.Fatal("unexpected latestHash, should be nil")
+	}
+	if cache.nextBlock != 289460 {
+		t.Fatal("unexpected nextBlock: ", cache.nextBlock)
 	}
 
-	// normal, sunny-day case, 6 blocks, add as blocks 10-15
+	// Clean up the test files.
+	cache.Close()
+	os.RemoveAll(unitTestPath)
+}
+
+func reorgCache(t *testing.T) {
+	// Simulate a reorg by adding a block whose height is lower than the latest;
+	// we're replacing the second block, so there should be only two blocks.
+	cache.Reorg(289461)
+	err := cache.Add(289461, compacts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache.firstBlock != 289460 {
+		t.Fatal("unexpected firstBlock height")
+	}
+	if cache.nextBlock != 289462 {
+		t.Fatal("unexpected nextBlock height")
+	}
+	if len(cache.starts) != 3 {
+		t.Fatal("unexpected len(cache.starts)")
+	}
+
+	// some "black-box" tests (using exported interfaces)
+	if cache.GetLatestHeight() != 289461 {
+		t.Fatal("unexpected GetLatestHeight")
+	}
+	if int(cache.Get(289461).Height) != 289461 {
+		t.Fatal("unexpected block contents")
+	}
+
+	// Make sure we can go forward from here
+	err = cache.Add(289462, compacts[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cache.firstBlock != 289460 {
+		t.Fatal("unexpected firstBlock height")
+	}
+	if cache.nextBlock != 289463 {
+		t.Fatal("unexpected nextBlock height")
+	}
+	if len(cache.starts) != 4 {
+		t.Fatal("unexpected len(cache.starts)")
+	}
+
+	if cache.GetLatestHeight() != 289462 {
+		t.Fatal("unexpected GetLatestHeight")
+	}
+	if int(cache.Get(289462).Height) != 289462 {
+		t.Fatal("unexpected block contents")
+	}
+}
+
+// Whatever the state of the cache, add 6 blocks starting at the
+// pretend Sapling height, 289460 (this could cause a reorg).
+func fillCache(t *testing.T) {
+	next := 289460
+	cache.Reorg(next)
 	for i, compact := range compacts {
-		err, reorg := cache.Add(10+i, compact)
+		err := cache.Add(next, compact)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if reorg {
-			t.Fatal("unexpected reorg")
+		next++
+
+		// some "white-box" checks
+		if cache.firstBlock != 289460 {
+			t.Fatal("unexpected firstBlock height")
 		}
-		if cache.GetLatestBlock() != 10+i {
-			t.Fatal("unexpected GetLatestBlock")
+		if cache.nextBlock != 289460+i+1 {
+			t.Fatal("unexpected nextBlock height")
 		}
-		// The test blocks start at height 289460
-		if int(cache.Get(10+i).Height) != 289460+i {
+		if len(cache.starts) != i+2 {
+			t.Fatal("unexpected len(cache.starts)")
+		}
+
+		// some "black-box" tests (using exported interfaces)
+		if cache.GetLatestHeight() != 289460+i {
+			t.Fatal("unexpected GetLatestHeight")
+		}
+		b := cache.Get(289460 + i)
+		if b == nil {
+			t.Fatal("unexpected Get failure")
+		}
+		if int(b.Height) != 289460+i {
 			t.Fatal("unexpected block contents")
 		}
-	}
-	if len(cache.m) != 4 { // max entries is 4
-		t.Fatal("unexpected number of cache entries")
-	}
-	if cache.firstBlock != 16-4 {
-		t.Fatal("unexpected firstBlock")
-	}
-	if cache.nextBlock != 16 {
-		t.Fatal("unexpected nextBlock")
-	}
-
-	// No entries just before and just after the cache range
-	if cache.Get(11) != nil || cache.Get(16) != nil {
-		t.Fatal("unexpected Get")
-	}
-
-	// We can re-add the last block (with the same data) and
-	// that should just replace and not be considered a reorg
-	err, reorg := cache.Add(15, compacts[5])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reorg {
-		t.Fatal("unexpected reorg")
-	}
-	if len(cache.m) != 4 {
-		t.Fatal("unexpected number of blocks")
-	}
-	if cache.firstBlock != 16-4 {
-		t.Fatal("unexpected firstBlock")
-	}
-	if cache.nextBlock != 16 {
-		t.Fatal("unexpected nextBlock")
-	}
-
-	// Simulate a reorg by resubmitting as the next block, 16, any block with
-	// the wrote prev-hash (let's use the first, just because it's handy)
-	err, reorg = cache.Add(16, compacts[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reorg {
-		t.Fatal("unexpected non-reorg")
-	}
-	// The cache shouldn't have changed in any way
-	if cache.Get(16) != nil {
-		t.Fatal("unexpected block 16 exists")
-	}
-	if cache.GetLatestBlock() != 15 {
-		t.Fatal("unexpected GetLatestBlock")
-	}
-	if int(cache.Get(15).Height) != 289460+5 {
-		t.Fatal("unexpected Get")
-	}
-	if len(cache.m) != 4 {
-		t.Fatal("unexpected number of cache entries")
-	}
-
-	// In response to the reorg being detected, we must back up until we
-	// reach a block that's before the reorg (where the chain split).
-	// Let's back up one block, to height 15, request it from zcashd,
-	// but let's say this block is from the new branch, so we haven't
-	// gone back far enough, so this will still be disallowed.
-	err, reorg = cache.Add(15, compacts[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reorg {
-		t.Fatal("unexpected non-reorg")
-	}
-	// the cache deleted block 15 (it's definitely wrong)
-	if cache.Get(15) != nil {
-		t.Fatal("unexpected block 15 exists")
-	}
-	if cache.GetLatestBlock() != 14 {
-		t.Fatal("unexpected GetLatestBlock")
-	}
-	if int(cache.Get(14).Height) != 289460+4 {
-		t.Fatal("unexpected Get")
-	}
-	// now only 3 entries (12-14)
-	if len(cache.m) != 3 {
-		t.Fatal("unexpected number of cache entries")
-	}
-
-	// Back up a couple more, try to re-add height 13, and suppose
-	// that's before the split (for example, there were two 14s).
-	// (In this test, we're replacing 13 with the same block; in
-	// real life, we'd be replacing it with a different version of
-	// 13 that has the same prev-hash).
-	err, reorg = cache.Add(13, compacts[3])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reorg {
-		t.Fatal("unexpected reorg")
-	}
-	// 13 was replaced (with the same block), but that means
-	// everything after 13 is deleted
-	if cache.Get(14) != nil {
-		t.Fatal("unexpected block 14 exists")
-	}
-	if cache.GetLatestBlock() != 13 {
-		t.Fatal("unexpected GetLatestBlock")
-	}
-	if int(cache.Get(13).Height) != 289460+3 {
-		t.Fatal("unexpected Get")
-	}
-	if int(cache.Get(12).Height) != 289460+2 {
-		t.Fatal("unexpected Get")
-	}
-	// down to 2 entries (12-13)
-	if len(cache.m) != 2 {
-		t.Fatal("unexpected number of cache entries")
-	}
-
-	// Now we can continue forward from here
-	err, reorg = cache.Add(14, compacts[4])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reorg {
-		t.Fatal("unexpected reorg")
-	}
-	if cache.GetLatestBlock() != 14 {
-		t.Fatal("unexpected GetLatestBlock")
-	}
-	if int(cache.Get(14).Height) != 289460+4 {
-		t.Fatal("unexpected Get")
-	}
-	if len(cache.m) != 3 {
-		t.Fatal("unexpected number of cache entries")
-	}
-
-	// It's possible, although unlikely, that after a reorg is detected,
-	// we back up so much that we're before the start of the cache
-	// (especially if the cache is very small). This should remove the
-	// entire cache before adding the new entry.
-	if cache.firstBlock != 12 {
-		t.Fatal("unexpected firstBlock")
-	}
-	err, reorg = cache.Add(10, compacts[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reorg {
-		t.Fatal("unexpected reorg")
-	}
-	if cache.GetLatestBlock() != 10 {
-		t.Fatal("unexpected GetLatestBlock")
-	}
-	if int(cache.Get(10).Height) != 289460+0 {
-		t.Fatal("unexpected Get")
-	}
-	if len(cache.m) != 1 {
-		t.Fatal("unexpected number of cache entries")
-	}
-
-	// Another weird case (not currently possible) is adding a block at
-	// a height that is not one higher than the current latest block.
-	// This should remove the entire cache before adding the new entry.
-	err, reorg = cache.Add(20, compacts[0])
-	if err != nil {
-		t.Fatal(err)
-	}
-	if reorg {
-		t.Fatal("unexpected reorg")
-	}
-	if cache.GetLatestBlock() != 20 {
-		t.Fatal("unexpected GetLatestBlock")
-	}
-	if int(cache.Get(20).Height) != 289460 {
-		t.Fatal("unexpected Get")
-	}
-	if len(cache.m) != 1 {
-		t.Fatal("unexpected number of cache entries")
 	}
 }

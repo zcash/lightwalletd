@@ -1,11 +1,14 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package parser
 
 import (
 	"crypto/sha256"
 
 	"github.com/pkg/errors"
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
 type rawTransaction struct {
@@ -300,7 +303,7 @@ func (tx *Transaction) Bytes() []byte {
 	return tx.rawBytes
 }
 
-func (tx *Transaction) HasSaplingTransactions() bool {
+func (tx *Transaction) HasSaplingElements() bool {
 	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
 }
 

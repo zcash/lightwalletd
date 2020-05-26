@@ -1,15 +1,18 @@
+// Copyright (c) 2019-2020 The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package parser
 
 import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/zcash-hackworks/lightwalletd/parser/internal/bytestring"
-	"github.com/zcash-hackworks/lightwalletd/walletrpc"
+	"github.com/zcash/lightwalletd/parser/internal/bytestring"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
 type Block struct {
-	hdr    *blockHeader
+	hdr    *BlockHeader
 	vtx    []*Transaction
 	height int
 }
@@ -49,14 +52,14 @@ func (b *Block) GetDisplayPrevHash() []byte {
 
 func (b *Block) HasSaplingTransactions() bool {
 	for _, tx := range b.vtx {
-		if tx.HasSaplingTransactions() {
+		if tx.HasSaplingElements() {
 			return true
 		}
 	}
 	return false
 }
 
-// see https://github.com/zcash-hackworks/lightwalletd/issues/17#issuecomment-467110828
+// see https://github.com/zcash/lightwalletd/issues/17#issuecomment-467110828
 const genesisTargetDifficulty = 520617983
 
 // GetHeight() extracts the block height from the coinbase transaction. See
@@ -103,7 +106,7 @@ func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	// Only Sapling transactions have a meaningful compact encoding
 	saplingTxns := make([]*walletrpc.CompactTx, 0, len(b.vtx))
 	for idx, tx := range b.vtx {
-		if tx.HasSaplingTransactions() {
+		if tx.HasSaplingElements() {
 			saplingTxns = append(saplingTxns, tx.ToCompact(idx))
 		}
 	}

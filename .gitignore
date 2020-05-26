@@ -1,8 +1,9 @@
-*.conf
-*.config
-*.log
-*.sqlite
-*.pem
-*.key
-*.elf
-coverage.*
+first-make-timestamp
+lightwalletd
+server.log
+db/
+coverage.out
+test-log
+lwd-api.html
+*.orig
+__debug_bin
