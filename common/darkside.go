@@ -383,7 +383,8 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			return nil, errors.New("transaction serialization is too long")
 		}
 		state.incomingTransactions = append(state.incomingTransactions, txBytes)
-		return tx.GetDisplayHash(), nil
+
+		return []byte(hex.EncodeToString(tx.GetDisplayHash())), nil
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC")
 	}
