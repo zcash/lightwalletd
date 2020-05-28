@@ -8,17 +8,17 @@ services:
       - .env
     #entrypoint: ["/bin/bash", "-c", "sleep infinity"]
     command:
-      - -grpc-bind-addr=0.0.0.0:$LWD_GRPC_PORT
-      - -http-bind-addr=0.0.0.0:$LWD_HTTP_PORT
-      - -cache-size=10
-      - -conf-file=$ZCASHD_CONF_PATH
-      - -log-file=/dev/stdout
-      - -log-level=2
+      - --grpc-bind-addr=0.0.0.0:$LWD_GRPC_PORT
+      - --http-bind-addr=0.0.0.0:$LWD_HTTP_PORT
+      - --zcash-conf-path=$ZCASHD_CONF_PATH
+      - --log-file=/dev/stdout
+      - --log-level=7
     ports:
       - "127.0.0.1:$LWD_GRPC_PORT:$LWD_GRPC_PORT"
       - "127.0.0.1:$LWD_HTTP_PORT:$LWD_HTTP_PORT"      
     volumes:
       - ./docker/:/srv/lightwalletd
+      - lightwalletd_cache:/var/lib/lightwalletd
     logging:
       driver: loki
       options:
@@ -96,3 +96,4 @@ services:
 
 volumes:
   promethus_data:
+  lightwalletd_cache:
