@@ -74,12 +74,18 @@ func main() {
 				fmt.Sprintf("%02x", (curHeight>>16)&0xFF)+
 				fmt.Sprintf("%02x", (curHeight>>24)&0xFF), 1)
 
-		numTransactions := 1 // coinbase
+		var numTransactions uint = 1 // coinbase
 		allTransactionsHex := ""
 		for scan.Scan() { // each line (hex-encoded transaction)
-			transaction := scan.Bytes()
-			allTransactionsHex += string(transaction)
+			allTransactionsHex += scan.Text()
 			numTransactions++
+		}
+		if err = scan.Err(); err != nil {
+			panic("line too long!")
+		}
+		if numTransactions > 65535 {
+			panic(fmt.Sprint("too many transactions ", numTransactions,
+				" maximum 65535"))
 		}
 
 		hashOfTxnsAndHeight := sha256.Sum256([]byte(allTransactionsHex + "#" + string(curHeight)))
@@ -101,16 +107,18 @@ func main() {
 		}
 
 		headerBytes, err := blockHeader.MarshalBinary()
+		if err != nil {
+			panic(fmt.Sprint("Cannot marshal block header: ", err))
+		}
+		fmt.Print(hex.EncodeToString(headerBytes))
 
 		// After the header, there's a compactsize representation of the number of transactions.
-		if numTransactions >= 253 {
-			panic("Sorry, this tool doesn't support more than 253 transactions per block.")
+		if numTransactions < 253 {
+			fmt.Printf("%02x", numTransactions)
+		} else {
+			fmt.Printf("%02x%02x%02x", 253, numTransactions%256, numTransactions/256)
 		}
-		fmt.Printf("%s%02x%s%s\n",
-			hex.EncodeToString(headerBytes),
-			numTransactions,
-			fakeCoinbase,
-			allTransactionsHex)
+		fmt.Printf("%s%s\n", fakeCoinbase, allTransactionsHex)
 
 		curHeight++
 		prevhash = blockHeader.GetEncodableHash()

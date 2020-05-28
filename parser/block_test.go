@@ -50,6 +50,9 @@ func TestBlockParser(t *testing.T) {
 			t.Error(errors.Wrap(err, fmt.Sprintf("parsing block %d", i)))
 			continue
 		}
+		if len(blockData) > 0 {
+			t.Error("Extra data remaining")
+		}
 
 		// Some basic sanity checks
 		if block.hdr.Version != 4 {
@@ -142,6 +145,9 @@ func TestGenesisBlockParser(t *testing.T) {
 			t.Error(err)
 			continue
 		}
+		if len(blockData) > 0 {
+			t.Error("Extra data remaining")
+		}
 
 		// Some basic sanity checks
 		if block.hdr.Version != 4 {
@@ -182,6 +188,9 @@ func TestCompactBlocks(t *testing.T) {
 		if err != nil {
 			t.Error(errors.Wrap(err, fmt.Sprintf("parsing testnet block %d", test.BlockHeight)))
 			continue
+		}
+		if len(blockData) > 0 {
+			t.Error("Extra data remaining")
 		}
 		if block.GetHeight() != test.BlockHeight {
 			t.Errorf("incorrect block height in testnet block %d", test.BlockHeight)

@@ -178,11 +178,32 @@ func DarksideApplyStaged(height int) error {
 			return errors.New("transaction height too high")
 		}
 		block := state.activeBlocks[tx.height-state.startHeight]
-		if block[1487] == 253 {
-			return errors.New("too many transactions in a block (max 253)")
+		// The next one or 3 bytes encode the number of transactions to follow,
+		// little endian.
+		nTxFirstByte := block[1487]
+		switch {
+		case nTxFirstByte < 252:
+			block[1487]++
+		case nTxFirstByte == 252:
+			// incrementing to 253, requires "253" followed by 2-byte length,
+			// extend the block by two bytes, shift existing transaction bytes
+			block = append(block, 0, 0)
+			copy(block[1490:], block[1488:len(block)-2])
+			block[1487] = 253
+			block[1488] = 253
+			block[1489] = 0
+		case nTxFirstByte == 253:
+			block[1488]++
+			if block[1488] == 0 {
+				// wrapped around
+				block[1489]++
+			}
+		default:
+			// no need to worry about more than 64k transactions
+			Log.Fatal("unexpected compact transaction count ", nTxFirstByte,
+				", can't support more than 64k transactions in a block")
 		}
-		block[1487]++ // one more transaction
-		block[68]++   // hack HashFinalSaplingRoot to mod the block hash
+		block[68]++ // hack HashFinalSaplingRoot to mod the block hash
 		block = append(block, tx.bytes...)
 		state.activeBlocks[tx.height-state.startHeight] = block
 	}
@@ -244,7 +265,7 @@ func DarksideStageBlockStream(blockHex string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageBlocks()")
+	Log.Info("StageBlocksStream()")
 	blockBytes, err := hex.DecodeString(blockHex)
 	if err != nil {
 		return err
@@ -445,7 +466,7 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageTransactionsURL(height=", height, "url=", url, ")")
+	Log.Info("StageTransactionsURL(height=", height, " url=", url, ")")
 	resp, err := http.Get(url)
 	if err != nil {
 		return err

@@ -129,7 +129,8 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	data = []byte(s)
 
 	vtx := make([]*Transaction, 0, txCount)
-	for i := 0; len(data) > 0; i++ {
+	var i int
+	for i = 0; i < txCount && len(data) > 0; i++ {
 		tx := NewTransaction()
 		data, err = tx.ParseFromSlice(data)
 		if err != nil {
@@ -137,7 +138,9 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 		}
 		vtx = append(vtx, tx)
 	}
-
+	if i < txCount {
+		return nil, errors.New("parsing block transactions: not enough data")
+	}
 	b.hdr = hdr
 	b.vtx = vtx
 
