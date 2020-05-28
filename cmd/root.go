@@ -48,6 +48,8 @@ var rootCmd = &cobra.Command{
 			NoTLSVeryInsecure: viper.GetBool("no-tls-very-insecure"),
 			DataDir:           viper.GetString("data-dir"),
 			Redownload:        viper.GetBool("redownload"),
+			Darkside:          viper.GetBool("darkside-very-insecure"),
+			DarksideTimeout:   viper.GetUint64("darkside-timeout"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -56,12 +58,14 @@ var rootCmd = &cobra.Command{
 			opts.TLSCertPath,
 			opts.TLSKeyPath,
 			opts.LogFile,
-			opts.ZcashConfPath,
 		}
-
 		if !fileExists(opts.LogFile) {
 			os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 		}
+		if !opts.Darkside {
+			filesThatShouldExist = append(filesThatShouldExist, opts.ZcashConfPath)
+		}
+
 		for _, filename := range filesThatShouldExist {
 			if opts.NoTLSVeryInsecure && (filename == opts.TLSCertPath || filename == opts.TLSKeyPath) {
 				continue
@@ -159,42 +163,70 @@ func startServer(opts *common.Options) error {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
-	rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
-	if err != nil {
-		common.Log.WithFields(logrus.Fields{
-			"error": err,
-		}).Fatal("setting up RPC connection to zcashd")
+	var saplingHeight int
+	var blockHeight int
+	var chainName string
+	var branchID string
+	if opts.Darkside {
+		chainName = "darkside"
+	} else {
+		rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("setting up RPC connection to zcashd")
+		}
+		// Indirect function for test mocking (so unit tests can talk to stub functions).
+		common.RawRequest = rpcClient.RawRequest
+		// Get the sapling activation height from the RPC
+		// (this first RPC also verifies that we can communicate with zcashd)
+		saplingHeight, blockHeight, chainName, branchID = common.GetSaplingInfo()
+		common.Log.Info("Got sapling height ", saplingHeight,
+			" block height ", blockHeight,
+			" chain ", chainName,
+			" branchID ", branchID)
 	}
-	// Indirect function for test mocking (so unit tests can talk to stub functions).
-	common.RawRequest = rpcClient.RawRequest
 
-	// Get the sapling activation height from the RPC
-	// (this first RPC also verifies that we can communicate with zcashd)
-	saplingHeight, blockHeight, chainName, branchID := common.GetSaplingInfo()
-	common.Log.Info("Got sapling height ", saplingHeight, " block height ", blockHeight, " chain ", chainName, " branchID ", branchID)
+	dbPath := filepath.Join(opts.DataDir, "db")
+	if opts.Darkside {
+		os.RemoveAll(filepath.Join(dbPath, chainName))
+	}
 
 	if err := os.MkdirAll(opts.DataDir, 0755); err != nil {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create data directory: %s\n\n", opts.DataDir))
 		os.Exit(1)
 	}
-	dbPath := filepath.Join(opts.DataDir, "db")
 	if err := os.MkdirAll(dbPath, 0755); err != nil {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create db directory: %s\n\n", dbPath))
 		os.Exit(1)
 	}
 	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, opts.Redownload)
-	go common.BlockIngestor(cache, 0 /*loop forever*/)
-
-	// Compact transaction service initialization
-	service, err := frontend.NewLwdStreamer(cache)
-	if err != nil {
-		common.Log.WithFields(logrus.Fields{
-			"error": err,
-		}).Fatal("couldn't create backend")
+	if !opts.Darkside {
+		go common.BlockIngestor(cache, 0 /*loop forever*/)
+	} else {
+		// Darkside wants to control starting the block ingestor.
+		common.DarksideInit(cache, int(opts.DarksideTimeout))
 	}
 
-	// Register service
-	walletrpc.RegisterCompactTxStreamerServer(server, service)
+	// Compact transaction service initialization
+	{
+		service, err := frontend.NewLwdStreamer(cache)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("couldn't create backend")
+		}
+		walletrpc.RegisterCompactTxStreamerServer(server, service)
+	}
+	if opts.Darkside {
+		service, err := frontend.NewDarksideStreamer(cache)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("couldn't create backend")
+		}
+		walletrpc.RegisterDarksideStreamerServer(server, service)
+	}
 
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
@@ -249,6 +281,8 @@ func init() {
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
+	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
+	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
@@ -270,6 +304,10 @@ func init() {
 	viper.SetDefault("redownload", false)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))
 	viper.SetDefault("data-dir", "/var/lib/lightwalletd")
+	viper.BindPFlag("darkside-very-insecure", rootCmd.Flags().Lookup("darkside-very-insecure"))
+	viper.SetDefault("darkside-very-insecure", false)
+	viper.BindPFlag("darkside-timeout", rootCmd.Flags().Lookup("darkside-timeout"))
+	viper.SetDefault("darkside-timeout", 30)
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,

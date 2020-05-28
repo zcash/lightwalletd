@@ -6,3 +6,4 @@ coverage.out
 test-log
 lwd-api.html
 *.orig
+__debug_bin

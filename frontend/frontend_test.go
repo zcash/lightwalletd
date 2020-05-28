@@ -218,9 +218,9 @@ func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, er
 	switch method {
 	case "getaddresstxids":
 		var filter struct {
-			Addresses []string `json: addresses`
-			Start     float64  `json: start`
-			End       float64  `json: end`
+			Addresses []string
+			Start     float64
+			End       float64
 		}
 		err := json.Unmarshal(params[0], &filter)
 		if err != nil {

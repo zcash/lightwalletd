@@ -1,6 +1,7 @@
 // Copyright (c) 2019-2020 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
 package frontend
 
 import (
@@ -11,6 +12,7 @@ import (
 	ini "gopkg.in/ini.v1"
 )
 
+// NewZRPCFromConf reads the zcashd configuration file.
 func NewZRPCFromConf(confPath interface{}) (*rpcclient.Client, error) {
 	connCfg, err := connFromConf(confPath)
 	if err != nil {

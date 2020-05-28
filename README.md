@@ -11,7 +11,7 @@ This is an alpha build and is currently under active development. Please be advi
 
 🔒 Security Warnings
 
-The Lightwalletd Server is experimental and a work in progress. Use it at your own risk.
+The Lightwalletd Server is experimental and a work in progress. Use it at your own risk. Developers should familiarize themselves with the [wallet app threat model](https://zcash.readthedocs.io/en/latest/rtd_pages/wallet_threat_model.html), since it contains important information about the security and privacy limitations of light wallets that use Lightwalletd.
 
 ---
 
@@ -69,7 +69,7 @@ your `$GOPATH` (`$HOME/go` by default), then build the lightwalletd server binar
 Assuming you used `make` to build the server, here's a typical developer invocation:
 
 ```
-./lightwalletd --no-tls-very-insecure --conf-file ~/.zcash/zcash.conf --data-dir . --log-file /dev/stdout
+./lightwalletd --no-tls-very-insecure --zcash-conf-path ~/.zcash/zcash.conf --data-dir . --log-file /dev/stdout
 ```
 Type `./lightwalletd help` to see the full list of options and arguments.
 
@@ -107,7 +107,7 @@ certbot certonly --standalone --preferred-challenges http -d some.forward.dns.co
 Example using server binary built from Makefile:
 
 ```
-./lightwalletd --tls-cert cert.pem --tls-key key.pem --conf-file /home/zcash/.zcash/zcash.conf --log-file /logs/server.log
+./lightwalletd --tls-cert cert.pem --tls-key key.pem --zcash-conf-path /home/zcash/.zcash/zcash.conf --log-file /logs/server.log
 ```
 
 ## Block cache
@@ -132,6 +132,11 @@ If lightwalletd detects corruption in these cache files, it will log
 a message containing the string `CORRUPTION` and also indicate the
 nature of the corruption.
 
+## Darksidewalletd & Testing
+
+Lightwalletd now supports a mode that enables integration testing of itself and
+wallets that connect to it. See the [darksidewalletd
+docs](docs/darksidewalletd.md) for more information.
 
 # Pull Requests
 

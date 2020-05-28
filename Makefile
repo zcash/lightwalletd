@@ -31,11 +31,11 @@ LDFLAGS :=-ldflags "$(LDFLAGSSTRING)"
 
 # There are some files that are generated but are also in source control
 # (so that the average clone - build doesn't need the required tools)
-GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go
+GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go walletrpc/darkside.proto
 
 PWD := $(shell pwd)
 
-.PHONY: all dep build clean test coverage lint doc simpledoc
+.PHONY: all dep build clean test coverage lint doc simpledoc proto
 
 all: first-make-timestamp build $(GENERATED_FILES)
 
@@ -82,14 +82,16 @@ coverage_html: coverage
 # Generate documents, requires docker, see https://github.com/pseudomuto/protoc-gen-doc
 doc: docs/rtd/index.html
 
-docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto
+docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto walletrpc/darkside.proto
 	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/walletrpc:/protos pseudomuto/protoc-gen-doc
 
-walletrpc/compact_formats.pb.go: walletrpc/compact_formats.proto
-	cd walletrpc; protoc compact_formats.proto --go_out=plugins=grpc:.
+proto: walletrpc/service.pb.go walletrpc/darkside.pb.go
 
 walletrpc/service.pb.go: walletrpc/service.proto
-	cd walletrpc; protoc service.proto --go_out=plugins=grpc:.
+	cd walletrpc && protoc service.proto --go_out=plugins=grpc:.
+
+walletrpc/darkside.pb.go: walletrpc/darkside.proto
+	cd walletrpc && protoc darkside.proto --go_out=plugins=grpc:.
 
 # Generate documents using a very simple wrap-in-html approach (not ideal)
 simpledoc: lwd-api.html
@@ -145,8 +147,8 @@ update-grpc:
 	go get -u github.com/golang/protobuf/proto
 	go get -u github.com/golang/protobuf/protoc-gen-go
 	go get -u google.golang.org/grpc
-	cd walletrpc; protoc compact_formats.proto --go_out=plugins=grpc:.
-	cd walletrpc; protoc service.proto --go_out=plugins=grpc:.
+	cd walletrpc && protoc service.proto --go_out=plugins=grpc:.
+	cd walletrpc && protoc darkside.proto --go_out=plugins=grpc:.
 	go mod tidy && go mod vendor
 
 clean:

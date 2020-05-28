@@ -4,7 +4,7 @@
 
 syntax = "proto3";
 package cash.z.wallet.sdk.rpc;
-option go_package = "walletrpc";
+option go_package = ".;walletrpc";
 option swift_prefix = "";
 import "compact_formats.proto";
 

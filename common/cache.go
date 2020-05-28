@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"hash/fnv"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -15,10 +16,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
-
-type blockCacheEntry struct {
-	data []byte
-}
 
 // BlockCache contains a consecutive set of recent compact blocks in marshalled form.
 type BlockCache struct {
@@ -43,7 +40,7 @@ func (c *BlockCache) GetLatestHash() []byte {
 	return c.latestHash
 }
 
-//  HashMismatch indicates if the given prev-hash doesn't match the most recent block's hash
+// HashMismatch indicates if the given prev-hash doesn't match the most recent block's hash
 // so reorgs can be detected.
 func (c *BlockCache) HashMismatch(prevhash []byte) bool {
 	c.mutex.RLock()
@@ -51,22 +48,63 @@ func (c *BlockCache) HashMismatch(prevhash []byte) bool {
 	return c.latestHash != nil && !bytes.Equal(c.latestHash, prevhash)
 }
 
+// Make the block at the given height the lowest height that we don't have.
+// In other words, wipe out this height and beyond.
+// This should never increase the size of the cache, only decrease.
+// Caller should hold c.mutex.Lock().
 func (c *BlockCache) setDbFiles(height int) {
-	index := height - c.firstBlock
-	if err := c.lengthsFile.Truncate(int64(index * 4)); err != nil {
-		Log.Fatal("truncate lengths file failed: ", err)
+	if height <= c.nextBlock {
+		if height < c.firstBlock {
+			height = c.firstBlock
+		}
+		index := height - c.firstBlock
+		if err := c.lengthsFile.Truncate(int64(index * 4)); err != nil {
+			Log.Fatal("truncate lengths file failed: ", err)
+		}
+		if err := c.blocksFile.Truncate(c.starts[index]); err != nil {
+			Log.Fatal("truncate blocks file failed: ", err)
+		}
+		c.Sync()
+		c.starts = c.starts[:index+1]
+		c.nextBlock = height
+		c.setLatestHash()
 	}
-	if err := c.blocksFile.Truncate(c.starts[index]); err != nil {
-		Log.Fatal("truncate blocks file failed: ", err)
-	}
-	c.Sync()
-	c.starts = c.starts[:index+1]
-	c.nextBlock = height
-	c.setLatestHash()
 }
 
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
+}
+
+// Caller should hold c.mutex.Lock().
 func (c *BlockCache) recoverFromCorruption(height int) {
 	Log.Warning("CORRUPTION detected in db blocks-cache files, height ", height, " redownloading")
+
+	// Save the corrupted files for post-mortem analysis.
+	save := c.lengthsName + "-corrupted"
+	if err := copyFile(c.lengthsName, save); err != nil {
+		Log.Warning("Could not copy db lengths file: ", err)
+	}
+	save = c.blocksName + "-corrupted"
+	if err := copyFile(c.blocksName, save); err != nil {
+		Log.Warning("Could not copy db lengths file: ", err)
+	}
+
 	c.setDbFiles(height)
 }
 
@@ -86,6 +124,7 @@ func checksum(height int, b []byte) []byte {
 	return cs.Sum(nil)
 }
 
+// Caller should hold (at least) c.mutex.RLock().
 func (c *BlockCache) readBlock(height int) *walletrpc.CompactBlock {
 	blockLen := c.blockLength(height)
 	b := make([]byte, blockLen+8)
@@ -116,6 +155,7 @@ func (c *BlockCache) readBlock(height int) *walletrpc.CompactBlock {
 	return block
 }
 
+// Caller should hold c.mutex.Lock().
 func (c *BlockCache) setLatestHash() {
 	c.latestHash = nil
 	// There is at least one block; get the last block's hash
@@ -123,7 +163,7 @@ func (c *BlockCache) setLatestHash() {
 		// At least one block remains; get the last block's hash
 		block := c.readBlock(c.nextBlock - 1)
 		if block == nil {
-			c.recoverFromCorruption(c.nextBlock - 1)
+			c.recoverFromCorruption(c.nextBlock - 10000)
 			return
 		}
 		c.latestHash = make([]byte, len(block.Hash))
@@ -131,7 +171,14 @@ func (c *BlockCache) setLatestHash() {
 	}
 }
 
+func (c *BlockCache) Reset(startHeight int) {
+	c.setDbFiles(c.firstBlock) // empty the cache
+	c.firstBlock = startHeight
+	c.nextBlock = startHeight
+}
+
 // NewBlockCache returns an instance of a block cache object.
+// (No locking here, we assume this is single-threaded.)
 func NewBlockCache(dbPath string, chainName string, startHeight int, redownload bool) *BlockCache {
 	c := &BlockCache{}
 	c.firstBlock = startHeight
@@ -173,7 +220,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, redownload 
 			break
 		}
 		length := binary.LittleEndian.Uint32(lengths[i*4 : (i+1)*4])
-		if length < 78 || length > 4*1000*1000 {
+		if length < 74 || length > 4*1000*1000 {
 			Log.Warning("lengths file has impossible value ", length)
 			c.recoverFromCorruption(c.nextBlock)
 			break
@@ -222,7 +269,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	}
 	bheight := int(block.Height)
 
-	// TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
+	// XXX check? TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
 	if false && bheight != height {
 		// This could only happen if zcashd returned the wrong
 		// block (not the height we requested).
@@ -298,7 +345,12 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 	}
 	block := c.readBlock(height)
 	if block == nil {
-		c.recoverFromCorruption(height)
+		go func() {
+			// We hold only the read lock, need the exclusive lock.
+			c.mutex.Lock()
+			c.recoverFromCorruption(height - 10000)
+			c.mutex.Unlock()
+		}()
 		return nil
 	}
 	return block
@@ -320,7 +372,7 @@ func (c *BlockCache) Sync() {
 	c.blocksFile.Sync()
 }
 
-// Currently used only for testing.
+// Close is Currently used only for testing.
 func (c *BlockCache) Close() {
 	// Some operating system require you to close files before you can remove them.
 	if c.lengthsFile != nil {
