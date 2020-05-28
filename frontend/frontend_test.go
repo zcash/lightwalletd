@@ -262,7 +262,7 @@ func (tg *testgettx) Context() context.Context {
 }
 
 func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
-	if !bytes.Equal(tx.Data, []byte(hex.EncodeToString(rawTxData[0]))) {
+	if !bytes.Equal(tx.Data, rawTxData[0]) {
 		testT.Fatal("mismatch transaction data")
 	}
 	if tx.Height != 1234567 {
