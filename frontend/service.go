@@ -180,8 +180,12 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		if err != nil {
 			return nil, err
 		}
+		txBytes, err := hex.DecodeString(txinfo.Hex)
+		if err != nil {
+			return nil, err
+		}
 		return &walletrpc.RawTransaction{
-			Data:   []byte(txinfo.Hex),
+			Data:   txBytes,
 			Height: uint64(txinfo.Height),
 		}, nil
 	}
