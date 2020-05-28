@@ -35,7 +35,7 @@ GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc
 
 PWD := $(shell pwd)
 
-.PHONY: all dep build clean test coverage lint doc simpledoc
+.PHONY: all dep build clean test coverage lint doc simpledoc proto
 
 all: first-make-timestamp build $(GENERATED_FILES)
 
@@ -84,6 +84,8 @@ doc: docs/rtd/index.html
 
 docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto walletrpc/darkside.proto
 	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/walletrpc:/protos pseudomuto/protoc-gen-doc
+
+proto: walletrpc/service.pb.go walletrpc/darkside.pb.go
 
 walletrpc/service.pb.go: walletrpc/service.proto
 	cd walletrpc && protoc service.proto --go_out=plugins=grpc:.
