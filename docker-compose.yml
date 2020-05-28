@@ -78,6 +78,7 @@ services:
     volumes:
       - ./docker/prometheus/config.yml:/etc/prometheus/prometheus.yml
       - promethus_data:/promethus_data
+    mem_limit: 2G
     logging:
       driver: loki
       options:
