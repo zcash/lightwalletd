@@ -331,6 +331,9 @@ func (s *DarksideStreamer) StageTransactionsStream(tx walletrpc.DarksideStreamer
 			tx.SendAndClose(&walletrpc.Empty{})
 			return nil
 		}
+		if err != nil {
+			return err
+		}
 		err = common.DarksideStageTransaction(int(transaction.Height), transaction.Data)
 		if err != nil {
 			return err
