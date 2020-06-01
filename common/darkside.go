@@ -135,8 +135,9 @@ func setPrevhash() {
 			copy(blockBytes[4:4+32], prevhash)
 		}
 		prevhash = block.GetEncodableHash()
-		Log.Info("height ", block.GetHeight(), " hash ",
-			hex.EncodeToString(block.GetDisplayHash()))
+		Log.Info("active block height ", block.GetHeight(), " hash ",
+			hex.EncodeToString(block.GetDisplayHash()),
+			" txcount ", block.GetTxCount())
 	}
 }
 
@@ -150,6 +151,10 @@ func DarksideApplyStaged(height int) error {
 		return errors.New("please call Reset first")
 	}
 	Log.Info("ApplyStaged(height=", height, ")")
+	if height < state.startHeight {
+		return errors.New(fmt.Sprint("height ", height,
+			" is less than sapling activation height ", state.startHeight))
+	}
 	// Move the staged blocks into active list
 	stagedBlocks := state.stagedBlocks
 	state.stagedBlocks = nil
@@ -158,11 +163,8 @@ func DarksideApplyStaged(height int) error {
 			return err
 		}
 	}
-	if height > state.startHeight+len(state.activeBlocks)-1 {
-		// this is hard to recover from
-		Log.Fatal("ApplyStaged height ", height,
-			" is greater than the highest height ",
-			state.startHeight+len(state.activeBlocks)-1)
+	if len(state.activeBlocks) == 0 {
+		return errors.New("No active blocks after applying staged blocks")
 	}
 
 	// Add staged transactions into blocks. Note we're not trying to
@@ -228,6 +230,26 @@ func DarksideGetIncomingTransactions() [][]byte {
 	return state.incomingTransactions
 }
 
+// Add the serialized block to the staging list, but do some sanity checks first.
+func darksideStageBlock(caller string, b []byte) error {
+	block := parser.NewBlock()
+	rest, err := block.ParseFromSlice(b)
+	if err != nil {
+		Log.Error("stage block error: ", err)
+		return err
+	}
+	if len(rest) != 0 {
+		return errors.New("block serialization is too long")
+	}
+	Log.Info(caller, "(height=", block.GetHeight(), ")")
+	if block.GetHeight() < state.startHeight {
+		return errors.New(fmt.Sprint("block height ", block.GetHeight(),
+			" is less than sapling activation height ", state.startHeight))
+	}
+	state.stagedBlocks = append(state.stagedBlocks, b)
+	return nil
+}
+
 // DarksideStageBlocks opens and reads blocks from the given URL and
 // adds them to the staging area.
 func DarksideStageBlocks(url string) error {
@@ -255,7 +277,9 @@ func DarksideStageBlocks(url string) error {
 		if err != nil {
 			return err
 		}
-		state.stagedBlocks = append(state.stagedBlocks, blockBytes)
+		if err = darksideStageBlock("DarksideStageBlocks", blockBytes); err != nil {
+			return err
+		}
 	}
 	return scan.Err()
 }
@@ -270,7 +294,9 @@ func DarksideStageBlockStream(blockHex string) error {
 	if err != nil {
 		return err
 	}
-	state.stagedBlocks = append(state.stagedBlocks, blockBytes)
+	if err = darksideStageBlock("DarksideStageBlockStream", blockBytes); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -279,7 +305,7 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageBlocksCreate(height=", height, ", nonce=", nonce, "count=", count, ")")
+	Log.Info("StageBlocksCreate(height=", height, ", nonce=", nonce, ", count=", count, ")")
 	for i := 0; i < int(count); i++ {
 
 		fakeCoinbase := "0400008085202f890100000000000000000000000000000000000000000000000000" +
@@ -323,7 +349,10 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 		blockBytes = append(blockBytes, headerBytes...)
 		blockBytes = append(blockBytes, byte(1))
 		blockBytes = append(blockBytes, fakeCoinbaseBytes...)
-		state.stagedBlocks = append(state.stagedBlocks, blockBytes)
+		if err = darksideStageBlock("DarksideStageBlockCreate", blockBytes); err != nil {
+			// This should never fail since we created the block ourselves.
+			return err
+		}
 		height++
 	}
 	return nil
@@ -451,7 +480,15 @@ func DarksideStageTransaction(height int, txBytes []byte) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageTransactions(height=", height, ")")
+	Log.Info("DarksideStageTransaction(height=", height, ")")
+	tx := parser.NewTransaction()
+	rest, err := tx.ParseFromSlice(txBytes)
+	if err != nil {
+		return err
+	}
+	if len(rest) != 0 {
+		return errors.New("transaction serialization is too long")
+	}
 	state.stagedTransactions = append(state.stagedTransactions,
 		stagedTx{
 			height: height,
@@ -466,7 +503,7 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
-	Log.Info("StageTransactionsURL(height=", height, " url=", url, ")")
+	Log.Info("StageTransactionsURL(height=", height, ", url=", url, ")")
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -487,10 +524,9 @@ func DarksideStageTransactionsURL(height int, url string) error {
 		if err != nil {
 			return err
 		}
-		state.stagedTransactions = append(state.stagedTransactions, stagedTx{
-			height: height,
-			bytes:  transactionBytes,
-		})
+		if err = DarksideStageTransaction(height, transactionBytes); err != nil {
+			return err
+		}
 	}
 	return scan.Err()
 
