@@ -249,7 +249,7 @@ func TestWriteCompactLengthPrefixedLen(t *testing.T) {
 func TestWriteCompactLengthPrefixed(t *testing.T) {
 	var b bytes.Buffer
 	val := []byte{22, 33, 44}
-	WriteCompactLengthPrefixed(&b, val)
+	writeCompactLengthPrefixed(&b, val)
 	r := make([]byte, 4)
 	b.Read(r)
 	expected := []byte{3, 22, 33, 44}

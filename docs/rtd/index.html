@@ -738,8 +738,8 @@ from the given URL. Blocks are one per line, hex-encoded (not JSON).</p></td>
                 <td><p>StageBlocksCreate is like the previous two, except it creates &#39;count&#39;
 empty blocks at consecutive heights starting at height &#39;height&#39;. The
 &#39;nonce&#39; is part of the header, so it contributes to the block hash; this
-lets you create two fake blocks with the same transactions (or no
-transactions) and same height, with two different hashes.</p></td>
+lets you create identical blocks (same transactions and height), but with
+different hashes.</p></td>
               </tr>
             
               <tr>
@@ -757,10 +757,9 @@ by the mock zcashd).</p></td>
                 <td>StageTransactions</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageTransactions is the same except the transactions are fetched
-from the given url. They are all staged into the block at the given
-height. Staging transactions at multiple different heights requires
-multiple calls.</p></td>
+                <td><p>StageTransactions is the same except the transactions are fetched from
+the given url. They are all staged into the block at the given height.
+Staging transactions to different heights requires multiple calls.</p></td>
               </tr>
             
               <tr>
@@ -770,12 +769,14 @@ multiple calls.</p></td>
                 <td><p>ApplyStaged iterates the list of blocks that were staged by the
 StageBlocks*() gRPCs, in the order they were staged, and &#34;merges&#34; each
 into the active, working blocks list that the mock zcashd is presenting
-to lightwalletd. The resulting working block list can&#39;t have gaps; if the
-working block range is 1000-1006, and the staged block range is 1003-1004,
-the resulting range is 1000-1004, with 1000-1002 unchanged, blocks
-1003-1004 from the new range, and 1005-1006 dropped. After merging all
-blocks, ApplyStaged() appends staged transactions (in the order received)
-into each one&#39;s corresponding block. The staging area is then cleared.
+to lightwalletd. Even as each block is applied, the active list can&#39;t
+have gaps; if the active block range is 1000-1006, and the staged block
+range is 1003-1004, the resulting range is 1000-1004, with 1000-1002
+unchanged, blocks 1003-1004 from the new range, and 1005-1006 dropped.
+
+After merging all blocks, ApplyStaged() appends staged transactions (in
+the order received) into each one&#39;s corresponding (by height) block
+The staging area is then cleared.
 
 The argument specifies the latest block height that mock zcashd reports
 (i.e. what&#39;s returned by GetLatestBlock). Note that ApplyStaged() can
