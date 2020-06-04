@@ -192,6 +192,130 @@ sed 's/^/{"block":"/;s/$/"}/' |
 grpcurl -plaintext -d @ localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/SetBlocks
 ```
 
+### Simulating a reorg that moves a transaction
+
+First, mine a transaction that receives funds into the developer wallet:
+- Stage real mainnet block 663150 (since this is the checkpoint, needs to have the expected block hash)
+- Create and stage 100 "synthetic" (manufactured, empty) blocks starting at 663151 (being careful not to overwrite the mainnet block)
+- Stage a particular "receive" transaction by its txid
+- Apply the staged blocks and transactions and make height 663210 visible
+
+This will do those steps:
+
+```
+grpcurl -plaintext -d '{"saplingActivation": 663150,"branchID": "bad", "chainName":"x"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Reset
+grpcurl -plaintext -d '{"url": "https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/basic-reorg/663150.txt"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks
+grpcurl -plaintext -d '{"height":663151,"count":100}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate
+grpcurl -plaintext -d '{"height":663190,"url":"https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/transactions/recv/0821a89be7f2fc1311792c3fa1dd2171a8cdfb2effd98590cbd5ebcdcfcf491f.txt"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactions
+grpcurl -plaintext -d '{"height":663210}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged
+```
+
+(Note that it doesn't matter whether you stage transactions before blocks
+or the other way around.)
+
+Now check that the transaction is in block 663190:
+
+```
+$ grpcurl -plaintext -d '{"height":663190}' localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlock
+{
+  "height": "663190",
+  "hash": "Ax/AHLeTfnDuXWX3ZiYo+nWvh24lyMjvR0e2CAfqEok=",
+  "prevHash": "m5/epQ9d3wl4Z8bctOB/ZCuSl8Uko4DeIpKtKZayK4U=",
+  "time": 1,
+  "vtx": [
+    {
+      "index": "1",
+      "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
+      "spends": [
+        {
+          "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
+        }
+      ],
+      "outputs": [
+        {
+          "cmu": "pe/G9q13FyE6vAhrTPzIGpU5Dht5DvJTuc9zmTEx0gU=",
+          "epk": "qw5MPsRoe8aOnvZ/VB3r1Ja/WkHb52TVU1vyHjGEOqc=",
+          "ciphertext": "R2uN3CHagj7Oo+6O9VeBrE6x4dQ07Jl18rVM27vGhl1Io75lFYCHA1SrV72Zu+bgwMilTA=="
+        },
+        {
+          "cmu": "3rQ9DMmk7RaWGf9q0uOYQ7FieHL/TE8Z+QCcS/IJfkA=",
+          "epk": "U1NCOlTzIF1qlprAjuGUUj591GpO5Vs5WTsmCW35Pio=",
+          "ciphertext": "2MbBHjPbkDT/GVsXgDHhihFQizxvizHINXKVbXKnv3Ih1P4c1f3By+TLH2g1yAG3lSARuQ=="
+        }
+      ]
+    }
+  ]
+}
+$ 
+```
+
+Now, stage that same transaction into a different height, and force a reorg:
+
+- Stage transaction to height 663195
+- Create and stage 100 synthetic blocks starting at 663180
+- Apply the staged transaction and blocks
+
+This will simulate a reorg back to 663180 (new versions of 663180 and
+beyond, same 663179), and the transaction will now be included in 663195
+and will _not_ be in 663190. Here are the commands to do this:
+
+```
+grpcurl -plaintext -d '{"height":663195,"url":"https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/transactions/recv/0821a89be7f2fc1311792c3fa1dd2171a8cdfb2effd98590cbd5ebcdcfcf491f.txt"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactions
+grpcurl -plaintext -d '{"height":663180,"count":100}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate
+grpcurl -plaintext -d '{"height":663210}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged
+```
+
+After the `ApplyStaged`, we should see "reorg" messages in the lightwalletd log file. 
+
+Now check that the transaction is no longer in 663190:
+
+```
+$ grpcurl -plaintext -d '{"height":663190}' localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlock
+{
+  "height": "663190",
+  "hash": "btosPfiJBX9m3nNSCP+vjAxWpEDS7Kfut9H7FY+mSYo=",
+  "prevHash": "m5/epQ9d3wl4Z8bctOB/ZCuSl8Uko4DeIpKtKZayK4U=",
+  "time": 1
+}
+$
+```
+
+Instead, it has "moved" to 663195:
+
+```
+$ grpcurl -plaintext -d '{"height":663195}' localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlock
+{
+  "height": "663195",
+  "hash": "CmcEQ/NZ9nSk+VdNfCEHvKu9MTNeWKoF1dZ7cWUTnCc=",
+  "prevHash": "04i1neRIgx7vgtDkrydYJu3KWjbY5g7QvUygNBfu6ug=",
+  "time": 1,
+  "vtx": [
+    {
+      "index": "1",
+      "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
+      "spends": [
+        {
+          "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
+        }
+      ],
+      "outputs": [
+        {
+          "cmu": "pe/G9q13FyE6vAhrTPzIGpU5Dht5DvJTuc9zmTEx0gU=",
+          "epk": "qw5MPsRoe8aOnvZ/VB3r1Ja/WkHb52TVU1vyHjGEOqc=",
+          "ciphertext": "R2uN3CHagj7Oo+6O9VeBrE6x4dQ07Jl18rVM27vGhl1Io75lFYCHA1SrV72Zu+bgwMilTA=="
+        },
+        {
+          "cmu": "3rQ9DMmk7RaWGf9q0uOYQ7FieHL/TE8Z+QCcS/IJfkA=",
+          "epk": "U1NCOlTzIF1qlprAjuGUUj591GpO5Vs5WTsmCW35Pio=",
+          "ciphertext": "2MbBHjPbkDT/GVsXgDHhihFQizxvizHINXKVbXKnv3Ih1P4c1f3By+TLH2g1yAG3lSARuQ=="
+        }
+      ]
+    }
+  ]
+}
+$
+```
+
 ## Use cases
 
 Check out some of the potential security test cases here: [wallet <->
