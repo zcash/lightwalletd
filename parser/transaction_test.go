@@ -51,7 +51,7 @@ type outputTestVector struct {
 
 type txTestVector struct {
 	// Sprout and Sapling
-	txid, header, nVersionGroupId, nLockTime, nExpiryHeight string
+	txid, header, nVersionGroupID, nLockTime, nExpiryHeight string
 	vin, vout                                               [][]string
 	vJoinSplits                                             []joinSplitTestVector
 	joinSplitPubKey, joinSplitSig                           string
@@ -69,7 +69,7 @@ var zip143tests = []txTestVector{
 		// Test vector 1
 		txid:            "f0b22277ac851b5f4df590fe6a128aad9d0ce8063235eb2b328c2dc6a23c1ec5",
 		header:          "03000080",
-		nVersionGroupId: "7082c403",
+		nVersionGroupID: "7082c403",
 		nLockTime:       "481cdd86",
 		nExpiryHeight:   "b3cc4318",
 		vin:             nil,
@@ -83,7 +83,7 @@ var zip143tests = []txTestVector{
 		//raw: "we have some raw data for this tx, which this comment is too small to contain",
 		txid:            "39fe585a56b005f568c3171d22afa916e946e2a8aff5971d58ee8a6fc1482059",
 		header:          "03000080",
-		nVersionGroupId: "7082c403",
+		nVersionGroupID: "7082c403",
 		nLockTime:       "97b0e4e4",
 		nExpiryHeight:   "c705fc05",
 		vin: [][]string{
@@ -242,9 +242,9 @@ func subTestCommonBlockMeta(tt *txTestVector, tx *Transaction, t *testing.T, cas
 		return false
 	}
 
-	versionGroupBytes, _ := hex.DecodeString(tt.nVersionGroupId)
+	versionGroupBytes, _ := hex.DecodeString(tt.nVersionGroupID)
 	versionGroup := binary.LittleEndian.Uint32(versionGroupBytes)
-	if versionGroup != tx.nVersionGroupId {
+	if versionGroup != tx.nVersionGroupID {
 		t.Errorf("Test %d: unexpected versionGroupId", caseNum)
 		return false
 	}
@@ -514,7 +514,7 @@ var zip243tests = []txTestVector{
 	{
 		txid:            "5fc4867a1b8bd5ab709799adf322a85d10607e053726d5f5ab4b1c9ab897e6bc",
 		header:          "04000080",
-		nVersionGroupId: "85202f89",
+		nVersionGroupID: "85202f89",
 		vin:             nil,
 		vout: [][]string{
 			{"e7719811893e0000", "095200ac6551ac636565"},
@@ -617,7 +617,7 @@ var zip243tests = []txTestVector{
 	{
 		txid:            "6732cf8d67aac5b82a2a0f0217a7d4aa245b2adb0b97fd2d923dfc674415e221",
 		header:          "04000080",
-		nVersionGroupId: "85202f89",
+		nVersionGroupID: "85202f89",
 		vin: [][]string{
 			{"56e551406a7ee8355656a21e43e38ce129fdadb759eddfa08f00fc8e567cef93", "c6792d01", "0763656300ac63ac", "8df04245"},
 			{"1a33590d3e8cf49b2627218f0c292fa66ada945fa55bb23548e33a83a562957a", "3149a993", "086a5352516a65006a", "78d97ce4"},

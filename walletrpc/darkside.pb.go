@@ -630,8 +630,8 @@ type DarksideStreamerClient interface {
 	// StageBlocksCreate is like the previous two, except it creates 'count'
 	// empty blocks at consecutive heights starting at height 'height'. The
 	// 'nonce' is part of the header, so it contributes to the block hash; this
-	// lets you create two fake blocks with the same transactions (or no
-	// transactions) and same height, with two different hashes.
+	// lets you create identical blocks (same transactions and height), but with
+	// different hashes.
 	StageBlocksCreate(ctx context.Context, in *DarksideEmptyBlocks, opts ...grpc.CallOption) (*Empty, error)
 	// StageTransactionsStream stores the given transaction-height pairs in the
 	// staging area until ApplyStaged() is called. Note that these transactions
@@ -639,20 +639,21 @@ type DarksideStreamerClient interface {
 	// appear in a "mined" block (contained in the active blockchain presented
 	// by the mock zcashd).
 	StageTransactionsStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageTransactionsStreamClient, error)
-	// StageTransactions is the same except the transactions are fetched
-	// from the given url. They are all staged into the block at the given
-	// height. Staging transactions at multiple different heights requires
-	// multiple calls.
+	// StageTransactions is the same except the transactions are fetched from
+	// the given url. They are all staged into the block at the given height.
+	// Staging transactions to different heights requires multiple calls.
 	StageTransactions(ctx context.Context, in *DarksideTransactionsURL, opts ...grpc.CallOption) (*Empty, error)
 	// ApplyStaged iterates the list of blocks that were staged by the
 	// StageBlocks*() gRPCs, in the order they were staged, and "merges" each
 	// into the active, working blocks list that the mock zcashd is presenting
-	// to lightwalletd. The resulting working block list can't have gaps; if the
-	// working block range is 1000-1006, and the staged block range is 1003-1004,
-	// the resulting range is 1000-1004, with 1000-1002 unchanged, blocks
-	// 1003-1004 from the new range, and 1005-1006 dropped. After merging all
-	// blocks, ApplyStaged() appends staged transactions (in the order received)
-	// into each one's corresponding block. The staging area is then cleared.
+	// to lightwalletd. Even as each block is applied, the active list can't
+	// have gaps; if the active block range is 1000-1006, and the staged block
+	// range is 1003-1004, the resulting range is 1000-1004, with 1000-1002
+	// unchanged, blocks 1003-1004 from the new range, and 1005-1006 dropped.
+	//
+	// After merging all blocks, ApplyStaged() appends staged transactions (in
+	// the order received) into each one's corresponding (by height) block
+	// The staging area is then cleared.
 	//
 	// The argument specifies the latest block height that mock zcashd reports
 	// (i.e. what's returned by GetLatestBlock). Note that ApplyStaged() can
@@ -853,8 +854,8 @@ type DarksideStreamerServer interface {
 	// StageBlocksCreate is like the previous two, except it creates 'count'
 	// empty blocks at consecutive heights starting at height 'height'. The
 	// 'nonce' is part of the header, so it contributes to the block hash; this
-	// lets you create two fake blocks with the same transactions (or no
-	// transactions) and same height, with two different hashes.
+	// lets you create identical blocks (same transactions and height), but with
+	// different hashes.
 	StageBlocksCreate(context.Context, *DarksideEmptyBlocks) (*Empty, error)
 	// StageTransactionsStream stores the given transaction-height pairs in the
 	// staging area until ApplyStaged() is called. Note that these transactions
@@ -862,20 +863,21 @@ type DarksideStreamerServer interface {
 	// appear in a "mined" block (contained in the active blockchain presented
 	// by the mock zcashd).
 	StageTransactionsStream(DarksideStreamer_StageTransactionsStreamServer) error
-	// StageTransactions is the same except the transactions are fetched
-	// from the given url. They are all staged into the block at the given
-	// height. Staging transactions at multiple different heights requires
-	// multiple calls.
+	// StageTransactions is the same except the transactions are fetched from
+	// the given url. They are all staged into the block at the given height.
+	// Staging transactions to different heights requires multiple calls.
 	StageTransactions(context.Context, *DarksideTransactionsURL) (*Empty, error)
 	// ApplyStaged iterates the list of blocks that were staged by the
 	// StageBlocks*() gRPCs, in the order they were staged, and "merges" each
 	// into the active, working blocks list that the mock zcashd is presenting
-	// to lightwalletd. The resulting working block list can't have gaps; if the
-	// working block range is 1000-1006, and the staged block range is 1003-1004,
-	// the resulting range is 1000-1004, with 1000-1002 unchanged, blocks
-	// 1003-1004 from the new range, and 1005-1006 dropped. After merging all
-	// blocks, ApplyStaged() appends staged transactions (in the order received)
-	// into each one's corresponding block. The staging area is then cleared.
+	// to lightwalletd. Even as each block is applied, the active list can't
+	// have gaps; if the active block range is 1000-1006, and the staged block
+	// range is 1003-1004, the resulting range is 1000-1004, with 1000-1002
+	// unchanged, blocks 1003-1004 from the new range, and 1005-1006 dropped.
+	//
+	// After merging all blocks, ApplyStaged() appends staged transactions (in
+	// the order received) into each one's corresponding (by height) block
+	// The staging area is then cleared.
 	//
 	// The argument specifies the latest block height that mock zcashd reports
 	// (i.e. what's returned by GetLatestBlock). Note that ApplyStaged() can

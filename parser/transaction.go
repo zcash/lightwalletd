@@ -1,6 +1,8 @@
 // Copyright (c) 2019-2020 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+// Package parser deserializes (full) transactions (zcashd).
 package parser
 
 import (
@@ -14,7 +16,7 @@ import (
 type rawTransaction struct {
 	fOverwintered      bool
 	version            uint32
-	nVersionGroupId    uint32
+	nVersionGroupID    uint32
 	transparentInputs  []*txIn
 	transparentOutputs []*txOut
 	nLockTime          uint32
@@ -266,16 +268,17 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
+// Transaction encodes a full (zcashd) transaction.
 type Transaction struct {
 	*rawTransaction
 	rawBytes []byte
-	txId     []byte
+	txID     []byte
 }
 
 // GetDisplayHash returns the transaction hash in big-endian display order.
 func (tx *Transaction) GetDisplayHash() []byte {
-	if tx.txId != nil {
-		return tx.txId
+	if tx.txID != nil {
+		return tx.txID
 	}
 
 	// SHA256d
@@ -288,8 +291,8 @@ func (tx *Transaction) GetDisplayHash() []byte {
 		digest[i], digest[j] = digest[j], digest[i]
 	}
 
-	tx.txId = digest[:]
-	return tx.txId
+	tx.txID = digest[:]
+	return tx.txID
 }
 
 // GetEncodableHash returns the transaction hash in little-endian wire format order.
@@ -299,14 +302,18 @@ func (tx *Transaction) GetEncodableHash() []byte {
 	return digest[:]
 }
 
+// Bytes returns a full transaction's raw bytes.
 func (tx *Transaction) Bytes() []byte {
 	return tx.rawBytes
 }
 
+// HasSaplingElements indicates whether a transaction has
+// at least one shielded input or output.
 func (tx *Transaction) HasSaplingElements() bool {
 	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
 }
 
+// ToCompact converts the given (full) transaction to compact format.
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
@@ -324,6 +331,7 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	return ctx
 }
 
+// ParseFromSlice deserializes a single transaction from the given data.
 func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
@@ -339,7 +347,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	tx.version = header & 0x7FFFFFFF
 
 	if tx.version >= 3 {
-		if !s.ReadUint32(&tx.nVersionGroupId) {
+		if !s.ReadUint32(&tx.nVersionGroupID) {
 			return nil, errors.New("could not read nVersionGroupId")
 		}
 	}
@@ -472,6 +480,7 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
+// NewTransaction is the constructor for a full transaction.
 func NewTransaction() *Transaction {
 	return &Transaction{
 		rawTransaction: new(rawTransaction),

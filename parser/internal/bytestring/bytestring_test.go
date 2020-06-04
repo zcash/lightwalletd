@@ -185,6 +185,8 @@ func TestString_ReadBytes(t *testing.T) {
 	}
 }
 
+// compact sizes are little-endian (least significant byte first, lower memory addr),
+// see https://en.bitcoin.it/wiki/Protocol_documentation#Variable_length_integer
 var readCompactSizeTests = []struct {
 	s        String
 	ok       bool
