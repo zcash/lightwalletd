@@ -1,6 +1,8 @@
 // Copyright (c) 2019-2020 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+// Package common contains utilities that are shared by other packages.
 package common
 
 import (
@@ -28,12 +30,14 @@ type BlockCache struct {
 	mutex                   sync.RWMutex
 }
 
+// GetNextHeight returns the height of the lowest unobtained block.
 func (c *BlockCache) GetNextHeight() int {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.nextBlock
 }
 
+// GetLatestHash returns the hash (block ID) of the most recent (highest) known block.
 func (c *BlockCache) GetLatestHash() []byte {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -171,6 +175,7 @@ func (c *BlockCache) setLatestHash() {
 	}
 }
 
+// Reset is used only for darkside testing.
 func (c *BlockCache) Reset(startHeight int) {
 	c.setDbFiles(c.firstBlock) // empty the cache
 	c.firstBlock = startHeight
@@ -367,6 +372,7 @@ func (c *BlockCache) GetLatestHeight() int {
 	return c.nextBlock - 1
 }
 
+// Sync ensures that the db files are flushed to disk, can be called unnecessarily.
 func (c *BlockCache) Sync() {
 	c.lengthsFile.Sync()
 	c.blocksFile.Sync()
