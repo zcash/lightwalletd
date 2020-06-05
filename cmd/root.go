@@ -38,25 +38,24 @@ var rootCmd = &cobra.Command{
          bandwidth-efficient interface to the Zcash blockchain`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := &common.Options{
-			GRPCBindAddr:      viper.GetString("grpc-bind-addr"),
-			HTTPBindAddr:      viper.GetString("http-bind-addr"),
-			TLSCertPath:       viper.GetString("tls-cert"),
-			TLSKeyPath:        viper.GetString("tls-key"),
-			LogLevel:          viper.GetUint64("log-level"),
-			LogFile:           viper.GetString("log-file"),
-			ZcashConfPath:     viper.GetString("zcash-conf-path"),
-			NoTLSVeryInsecure: viper.GetBool("no-tls-very-insecure"),
-			DataDir:           viper.GetString("data-dir"),
-			Redownload:        viper.GetBool("redownload"),
-			Darkside:          viper.GetBool("darkside-very-insecure"),
-			DarksideTimeout:   viper.GetUint64("darkside-timeout"),
+			GRPCBindAddr:        viper.GetString("grpc-bind-addr"),
+			HTTPBindAddr:        viper.GetString("http-bind-addr"),
+			TLSCertPath:         viper.GetString("tls-cert"),
+			TLSKeyPath:          viper.GetString("tls-key"),
+			LogLevel:            viper.GetUint64("log-level"),
+			LogFile:             viper.GetString("log-file"),
+			ZcashConfPath:       viper.GetString("zcash-conf-path"),
+			NoTLSVeryInsecure:   viper.GetBool("no-tls-very-insecure"),
+			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
+			DataDir:             viper.GetString("data-dir"),
+			Redownload:          viper.GetBool("redownload"),
+			Darkside:            viper.GetBool("darkside-very-insecure"),
+			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
 
 		filesThatShouldExist := []string{
-			opts.TLSCertPath,
-			opts.TLSKeyPath,
 			opts.LogFile,
 		}
 		if !fileExists(opts.LogFile) {
@@ -65,14 +64,15 @@ var rootCmd = &cobra.Command{
 		if !opts.Darkside {
 			filesThatShouldExist = append(filesThatShouldExist, opts.ZcashConfPath)
 		}
+		if !opts.NoTLSVeryInsecure && !opts.GenCertVeryInsecure {
+			filesThatShouldExist = append(filesThatShouldExist,
+				opts.TLSCertPath, opts.TLSKeyPath)
+		}
 
 		for _, filename := range filesThatShouldExist {
-			if opts.NoTLSVeryInsecure && (filename == opts.TLSCertPath || filename == opts.TLSKeyPath) {
-				continue
-			}
 			if !fileExists(filename) {
 				os.Stderr.WriteString(fmt.Sprintf("\n  ** File does not exist: %s\n\n", filename))
-				os.Exit(1)
+				common.Log.Fatal("required file ", filename, " does not exist")
 			}
 		}
 
@@ -120,7 +120,7 @@ func startServer(opts *common.Options) error {
 	var server *grpc.Server
 
 	if opts.NoTLSVeryInsecure {
-		common.Log.Warningln("Starting insecure server")
+		common.Log.Warningln("Starting insecure no-TLS (plaintext) server")
 		fmt.Println("Starting insecure server")
 		server = grpc.NewServer(
 			grpc.StreamInterceptor(
@@ -132,13 +132,22 @@ func startServer(opts *common.Options) error {
 				grpc_prometheus.UnaryServerInterceptor),
 			))
 	} else {
-		transportCreds, err := credentials.NewServerTLSFromFile(opts.TLSCertPath, opts.TLSKeyPath)
-		if err != nil {
-			common.Log.WithFields(logrus.Fields{
-				"cert_file": opts.TLSCertPath,
-				"key_path":  opts.TLSKeyPath,
-				"error":     err,
-			}).Fatal("couldn't load TLS credentials")
+		var transportCreds credentials.TransportCredentials
+		if opts.GenCertVeryInsecure {
+			common.Log.Warning("Certificate and key not provided, generating self signed values")
+			fmt.Println("Starting insecure self-certificate server")
+			tlsCert := common.GenerateCerts()
+			transportCreds = credentials.NewServerTLSFromCert(tlsCert)
+		} else {
+			var err error
+			transportCreds, err = credentials.NewServerTLSFromFile(opts.TLSCertPath, opts.TLSKeyPath)
+			if err != nil {
+				common.Log.WithFields(logrus.Fields{
+					"cert_file": opts.TLSCertPath,
+					"key_path":  opts.TLSKeyPath,
+					"error":     err,
+				}).Fatal("couldn't load TLS credentials")
+			}
 		}
 		server = grpc.NewServer(
 			grpc.Creds(transportCreds),
@@ -279,6 +288,7 @@ func init() {
 	rootCmd.Flags().String("log-file", "./server.log", "log file to write to")
 	rootCmd.Flags().String("zcash-conf-path", "./zcash.conf", "conf file to pull RPC creds from")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
+	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
@@ -300,6 +310,8 @@ func init() {
 	viper.SetDefault("zcash-conf-path", "./zcash.conf")
 	viper.BindPFlag("no-tls-very-insecure", rootCmd.Flags().Lookup("no-tls-very-insecure"))
 	viper.SetDefault("no-tls-very-insecure", false)
+	viper.BindPFlag("gen-cert-very-insecure", rootCmd.Flags().Lookup("gen-cert-very-insecure"))
+	viper.SetDefault("gen-cert-very-insecure", false)
 	viper.BindPFlag("redownload", rootCmd.Flags().Lookup("redownload"))
 	viper.SetDefault("redownload", false)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))

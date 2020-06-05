@@ -18,24 +18,27 @@ import (
 )
 
 // 'make build' will overwrite this string with the output of git-describe (tag)
-var Version = "v0.0.0.0-dev"
-var GitCommit = ""
-var BuildDate = ""
-var BuildUser = ""
+var (
+	Version   = "v0.0.0.0-dev"
+	GitCommit = ""
+	BuildDate = ""
+	BuildUser = ""
+)
 
 type Options struct {
-	GRPCBindAddr      string `json:"grpc_bind_address,omitempty"`
-	HTTPBindAddr      string `json:"http_bind_address,omitempty"`
-	TLSCertPath       string `json:"tls_cert_path,omitempty"`
-	TLSKeyPath        string `json:"tls_cert_key,omitempty"`
-	LogLevel          uint64 `json:"log_level,omitempty"`
-	LogFile           string `json:"log_file,omitempty"`
-	ZcashConfPath     string `json:"zcash_conf,omitempty"`
-	NoTLSVeryInsecure bool   `json:"no_tls_very_insecure,omitempty"`
-	Redownload        bool   `json:"redownload"`
-	DataDir           string `json:"data-dir"`
-	Darkside          bool   `json:"darkside"`
-	DarksideTimeout   uint64 `json:"darkside-timeout"`
+	GRPCBindAddr        string `json:"grpc_bind_address,omitempty"`
+	HTTPBindAddr        string `json:"http_bind_address,omitempty"`
+	TLSCertPath         string `json:"tls_cert_path,omitempty"`
+	TLSKeyPath          string `json:"tls_cert_key,omitempty"`
+	LogLevel            uint64 `json:"log_level,omitempty"`
+	LogFile             string `json:"log_file,omitempty"`
+	ZcashConfPath       string `json:"zcash_conf,omitempty"`
+	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
+	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
+	Redownload          bool   `json:"redownload"`
+	DataDir             string `json:"data_dir"`
+	Darkside            bool   `json:"darkside"`
+	DarksideTimeout     uint64 `json:"darkside_timeout"`
 }
 
 // RawRequest points to the function to send a an RPC request to zcashd;
