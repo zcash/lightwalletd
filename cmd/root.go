@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -45,6 +46,10 @@ var rootCmd = &cobra.Command{
 			LogLevel:            viper.GetUint64("log-level"),
 			LogFile:             viper.GetString("log-file"),
 			ZcashConfPath:       viper.GetString("zcash-conf-path"),
+			RPCUser:             viper.GetString("rpcuser"),
+			RPCPassword:         viper.GetString("rpcpassword"),
+			RPCHost:             viper.GetString("rpchost"),
+			RPCPort:             viper.GetString("rpcport"),
 			NoTLSVeryInsecure:   viper.GetBool("no-tls-very-insecure"),
 			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
 			DataDir:             viper.GetString("data-dir"),
@@ -61,7 +66,7 @@ var rootCmd = &cobra.Command{
 		if !fileExists(opts.LogFile) {
 			os.OpenFile(opts.LogFile, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
 		}
-		if !opts.Darkside {
+		if !opts.Darkside && (opts.RPCUser == "" || opts.RPCPassword == "" || opts.RPCHost == "" || opts.RPCPort == "") {
 			filesThatShouldExist = append(filesThatShouldExist, opts.ZcashConfPath)
 		}
 		if !opts.NoTLSVeryInsecure && !opts.GenCertVeryInsecure {
@@ -176,10 +181,16 @@ func startServer(opts *common.Options) error {
 	var blockHeight int
 	var chainName string
 	var branchID string
+	var rpcClient *rpcclient.Client
+	var err error
 	if opts.Darkside {
 		chainName = "darkside"
 	} else {
-		rpcClient, err := frontend.NewZRPCFromConf(opts.ZcashConfPath)
+		if opts.RPCUser != "" && opts.RPCPassword != "" && opts.RPCHost != "" && opts.RPCPort != "" {
+			rpcClient, err = frontend.NewZRPCFromFlags(opts)
+		} else {
+			rpcClient, err = frontend.NewZRPCFromConf(opts.ZcashConfPath)
+		}
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -287,6 +298,10 @@ func init() {
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
 	rootCmd.Flags().String("log-file", "./server.log", "log file to write to")
 	rootCmd.Flags().String("zcash-conf-path", "./zcash.conf", "conf file to pull RPC creds from")
+	rootCmd.Flags().String("rpcuser", "", "RPC user name")
+	rootCmd.Flags().String("rpcpassword", "", "RPC password")
+	rootCmd.Flags().String("rpchost", "", "RPC host")
+	rootCmd.Flags().String("rpcport", "", "RPC host port")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
@@ -308,6 +323,10 @@ func init() {
 	viper.SetDefault("log-file", "./server.log")
 	viper.BindPFlag("zcash-conf-path", rootCmd.Flags().Lookup("zcash-conf-path"))
 	viper.SetDefault("zcash-conf-path", "./zcash.conf")
+	viper.BindPFlag("rpcuser", rootCmd.Flags().Lookup("rpcuser"))
+	viper.BindPFlag("rpcpassword", rootCmd.Flags().Lookup("rpcpassword"))
+	viper.BindPFlag("rpchost", rootCmd.Flags().Lookup("rpchost"))
+	viper.BindPFlag("rpcport", rootCmd.Flags().Lookup("rpcport"))
 	viper.BindPFlag("no-tls-very-insecure", rootCmd.Flags().Lookup("no-tls-very-insecure"))
 	viper.SetDefault("no-tls-very-insecure", false)
 	viper.BindPFlag("gen-cert-very-insecure", rootCmd.Flags().Lookup("gen-cert-very-insecure"))

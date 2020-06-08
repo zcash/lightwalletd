@@ -33,6 +33,10 @@ type Options struct {
 	LogLevel            uint64 `json:"log_level,omitempty"`
 	LogFile             string `json:"log_file,omitempty"`
 	ZcashConfPath       string `json:"zcash_conf,omitempty"`
+	RPCUser             string `json:"rpcuser"`
+	RPCPassword         string `json:"rpcpassword"`
+	RPCHost             string `json:"rpchost"`
+	RPCPort             string `json:"rpcport"`
 	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`
