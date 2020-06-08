@@ -1,0 +1,13 @@
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: lightwalletd-tag-binding
+spec:
+  params:
+    - name: dockerImageName
+      value: electriccoinco/lightwalletd
+    - name: tagName
+      value: $(body.extensions.tag)
+    - name: gitRepositoryURL
+      value: $(body.repository.clone_url)

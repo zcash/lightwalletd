@@ -1,0 +1,43 @@
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: lightwalletd-tag-pipeline-template
+spec:
+  params:
+    - name: gitRepositoryURL
+      description: Git repo url
+    - name: tagName
+      description: Release tag name      
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: lightwalletd-tag-pipeline-
+      spec:
+        serviceAccountName: ecc-tekton
+        pipelineRef:
+          name: lightwalletd-tag-pipeline
+        resources:
+          - name: source
+            resourceSpec:
+              type: git
+              params:
+                - name: revision
+                  value: $(params.tagName)
+                - name: url
+                  value: $(params.gitRepositoryURL)
+          - name: lightwalletd-image
+            resourceSpec:
+              type: image
+              params:
+                - name: url
+                  value: electriccoinco/lightwalletd:$(params.tagName)
+          - name: cloudlog
+            resourceRef:
+              name: cloudlog
+        params:
+          - name: gitRepositoryURL
+            value: $(params.gitRepositoryURL)
+          - name: tagName
+            value: $(params.tagName)
