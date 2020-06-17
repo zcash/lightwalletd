@@ -27,6 +27,8 @@ spec:
                   value: $(params.tagName)
                 - name: url
                   value: $(params.gitRepositoryURL)
+                - name: refspec
+                  value: "+refs/tags/*:refs/remotes/origin/tags/*"
           - name: lightwalletd-image
             resourceSpec:
               type: image
@@ -34,8 +36,11 @@ spec:
                 - name: url
                   value: electriccoinco/lightwalletd:$(params.tagName)
           - name: cloudlog
-            resourceRef:
-              name: cloudlog
+            resourceSpec:
+              type: cloudEvent
+              params:
+                - name: targetURI
+                  value: http://cloudlog:8080/inbox
         params:
           - name: gitRepositoryURL
             value: $(params.gitRepositoryURL)
