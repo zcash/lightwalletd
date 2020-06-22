@@ -10,7 +10,7 @@ services:
     command:
       - --grpc-bind-addr=0.0.0.0:$LWD_GRPC_PORT
       - --http-bind-addr=0.0.0.0:$LWD_HTTP_PORT
-      - --conf-file=$ZCASHD_CONF_PATH
+      - --zcash-conf-path=$ZCASHD_CONF_PATH
       - --log-file=/dev/stdout
       - --log-level=7
     ports:
