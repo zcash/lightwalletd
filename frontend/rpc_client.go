@@ -9,6 +9,7 @@ import (
 
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/pkg/errors"
+	"github.com/zcash/lightwalletd/common"
 	ini "gopkg.in/ini.v1"
 )
 
@@ -17,6 +18,19 @@ func NewZRPCFromConf(confPath interface{}) (*rpcclient.Client, error) {
 	connCfg, err := connFromConf(confPath)
 	if err != nil {
 		return nil, err
+	}
+	return rpcclient.New(connCfg, nil)
+}
+
+// NewZRPCFromFlags gets zcashd rpc connection information from provided flags.
+func NewZRPCFromFlags(opts *common.Options) (*rpcclient.Client, error) {
+	// Connect to local Zcash RPC server using HTTP POST mode.
+	connCfg := &rpcclient.ConnConfig{
+		Host:         net.JoinHostPort(opts.RPCHost, opts.RPCPort),
+		User:         opts.RPCUser,
+		Pass:         opts.RPCPassword,
+		HTTPPostMode: true, // Zcash only supports HTTP POST mode
+		DisableTLS:   true, // Zcash does not provide TLS by default
 	}
 	return rpcclient.New(connCfg, nil)
 }
