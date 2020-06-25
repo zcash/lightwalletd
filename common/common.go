@@ -215,11 +215,18 @@ func BlockIngestor(c *BlockCache, rep int) {
 		retryCount = 0
 		if block == nil {
 			// No block at this height.
+			if height == c.GetFirstHeight() {
+				Log.Info("Waiting for zcashd height to reach Sapling activation height ",
+					"(", c.GetFirstHeight(), ")...")
+				reorgCount = 0
+				Sleep(20 * time.Second)
+				continue
+			}
 			if wait {
 				// Wait a bit then retry the same height.
 				c.Sync()
 				if lastHeightLogged+1 != height {
-					Log.Info("Ingestor: waiting for block: ", height)
+					Log.Info("Ingestor waiting for block: ", height)
 					lastHeightLogged = height - 1
 				}
 				Sleep(2 * time.Second)
