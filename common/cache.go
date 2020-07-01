@@ -37,6 +37,13 @@ func (c *BlockCache) GetNextHeight() int {
 	return c.nextBlock
 }
 
+// GetFirstHeight returns the height of the lowest block (usually Sapling activation).
+func (c *BlockCache) GetFirstHeight() int {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.firstBlock
+}
+
 // GetLatestHash returns the hash (block ID) of the most recent (highest) known block.
 func (c *BlockCache) GetLatestHash() []byte {
 	c.mutex.RLock()
