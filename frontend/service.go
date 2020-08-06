@@ -259,6 +259,44 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	}, nil
 }
 
+// SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
+func (s *lwdStreamer) GetAddressBalance(addresses walletrpc.CompactTxStreamer_GetAddressBalanceServer) error {
+	params := make([]json.RawMessage, 1)
+	addrList := "{\"addresses\":["
+	notFirst := false
+	for {
+		addr, err := addresses.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if notFirst {
+			addrList += ","
+		}
+		addrList += "\"" + addr.Address + "\""
+		notFirst = true
+	}
+	addrList += "]}"
+
+	params[0] = json.RawMessage(addrList)
+	result, rpcErr := common.RawRequest("getaddressbalance", params)
+	if rpcErr != nil {
+		return rpcErr
+	}
+	var balanceReply struct {
+		Balance int64
+	}
+	err := json.Unmarshal(result, &balanceReply)
+	if err != nil {
+		return err
+	}
+	addresses.SendAndClose(&walletrpc.Amount{Zatoshis: balanceReply.Balance})
+
+	return nil
+}
+
 // This rpc is used only for testing.
 var concurrent int64
 
