@@ -86,6 +86,13 @@ message PingResponse {
     int64 exit = 2;
 }
 
+message Address {
+    string address = 1;
+}
+message Amount {
+    int64 zatoshis = 1;
+}
+
 service CompactTxStreamer {
     // Return the height of the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -101,6 +108,7 @@ service CompactTxStreamer {
 
     // Return the txids corresponding to the given t-address within the given block range
     rpc GetAddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
+    rpc GetAddressBalance(stream Address) returns (Amount) {}
 
     // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
