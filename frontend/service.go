@@ -259,8 +259,38 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	}, nil
 }
 
-// SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
-func (s *lwdStreamer) GetAddressBalance(addresses walletrpc.CompactTxStreamer_GetAddressBalanceServer) error {
+// GetAddressBalance returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetAddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
+	params := make([]json.RawMessage, 1)
+	addrList := "{\"addresses\":["
+	notFirst := false
+	for _, addr := range addresses.Address {
+		if notFirst {
+			addrList += ","
+		}
+		addrList += "\"" + addr + "\""
+		notFirst = true
+	}
+	addrList += "]}"
+
+	params[0] = json.RawMessage(addrList)
+	result, rpcErr := common.RawRequest("getaddressbalance", params)
+	if rpcErr != nil {
+		return &walletrpc.Balance{}, rpcErr
+	}
+	var balanceReply struct {
+		Balance int64
+	}
+	err := json.Unmarshal(result, &balanceReply)
+	if err != nil {
+		return &walletrpc.Balance{}, err
+	}
+	return &walletrpc.Balance{ValueZat: balanceReply.Balance}, nil
+}
+
+// GetAddressBalanceStream returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetAddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetAddressBalanceStreamServer) error {
+	// This code should probably be refactored
 	params := make([]json.RawMessage, 1)
 	addrList := "{\"addresses\":["
 	notFirst := false
@@ -292,7 +322,7 @@ func (s *lwdStreamer) GetAddressBalance(addresses walletrpc.CompactTxStreamer_Ge
 	if err != nil {
 		return err
 	}
-	addresses.SendAndClose(&walletrpc.Amount{Zatoshis: balanceReply.Balance})
+	addresses.SendAndClose(&walletrpc.Balance{ValueZat: balanceReply.Balance})
 
 	return nil
 }
