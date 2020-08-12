@@ -90,7 +90,7 @@ message Address {
     string address = 1;
 }
 message AddressList {
-    repeated string address = 1;
+    repeated string addresses = 1;
 }
 message Balance {
     int64 valueZat = 1;
@@ -110,9 +110,9 @@ service CompactTxStreamer {
     rpc SendTransaction(RawTransaction) returns (SendResponse) {}
 
     // Return the txids corresponding to the given t-address within the given block range
-    rpc GetAddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
-    rpc GetAddressBalance(AddressList) returns (Balance) {}
-    rpc GetAddressBalanceStream(stream Address) returns (Balance) {}
+    rpc GetTaddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
+    rpc GetTaddressBalance(AddressList) returns (Balance) {}
+    rpc GetTaddressBalanceStream(stream Address) returns (Balance) {}
 
     // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}

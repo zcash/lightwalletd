@@ -52,9 +52,9 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	return &walletrpc.BlockID{Height: uint64(latestBlock)}, nil
 }
 
-// GetAddressTxids is a streaming RPC that returns transaction IDs that have
+// GetTaddressTxids is a streaming RPC that returns transaction IDs that have
 // the given transparent address (taddr) as either an input or output.
-func (s *lwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetAddressTxidsServer) error {
+func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTxidsServer) error {
 	// Test to make sure Address is a single t address
 	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(addressBlockFilter.Address))
 	if err != nil || !match {
@@ -73,14 +73,14 @@ func (s *lwdStreamer) GetAddressTxids(addressBlockFilter *walletrpc.TransparentA
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
-		common.Log.Errorf("GetAddressTxids error: %s", rpcErr.Error())
+		common.Log.Errorf("GetTaddressTxids error: %s", rpcErr.Error())
 		return err
 	}
 
 	var txids []string
 	err = json.Unmarshal(result, &txids)
 	if err != nil {
-		common.Log.Errorf("GetAddressTxids error: %s", err.Error())
+		common.Log.Errorf("GetTaddressTxids error: %s", err.Error())
 		return err
 	}
 
@@ -259,12 +259,12 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	}, nil
 }
 
-// GetAddressBalance returns the total balance for a list of taddrs
-func (s *lwdStreamer) GetAddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
+// GetTaddressBalance returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
 	params := make([]json.RawMessage, 1)
 	addrList := "{\"addresses\":["
 	notFirst := false
-	for _, addr := range addresses.Address {
+	for _, addr := range addresses.Addresses {
 		if notFirst {
 			addrList += ","
 		}
@@ -288,8 +288,8 @@ func (s *lwdStreamer) GetAddressBalance(ctx context.Context, addresses *walletrp
 	return &walletrpc.Balance{ValueZat: balanceReply.Balance}, nil
 }
 
-// GetAddressBalanceStream returns the total balance for a list of taddrs
-func (s *lwdStreamer) GetAddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetAddressBalanceStreamServer) error {
+// GetTaddressBalanceStream returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer) error {
 	// This code should probably be refactored
 	params := make([]json.RawMessage, 1)
 	addrList := "{\"addresses\":["
