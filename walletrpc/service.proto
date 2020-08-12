@@ -89,8 +89,11 @@ message PingResponse {
 message Address {
     string address = 1;
 }
-message Amount {
-    int64 zatoshis = 1;
+message AddressList {
+    repeated string address = 1;
+}
+message Balance {
+    int64 valueZat = 1;
 }
 
 service CompactTxStreamer {
@@ -108,7 +111,8 @@ service CompactTxStreamer {
 
     // Return the txids corresponding to the given t-address within the given block range
     rpc GetAddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
-    rpc GetAddressBalance(stream Address) returns (Amount) {}
+    rpc GetAddressBalance(AddressList) returns (Balance) {}
+    rpc GetAddressBalanceStream(stream Address) returns (Balance) {}
 
     // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
