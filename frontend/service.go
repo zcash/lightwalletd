@@ -259,12 +259,11 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	}, nil
 }
 
-// GetTaddressBalance returns the total balance for a list of taddrs
-func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
+func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
 	params := make([]json.RawMessage, 1)
 	addrList := "{\"addresses\":["
 	notFirst := false
-	for _, addr := range addresses.Addresses {
+	for _, addr := range addressList {
 		if notFirst {
 			addrList += ","
 		}
@@ -288,12 +287,14 @@ func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletr
 	return &walletrpc.Balance{ValueZat: balanceReply.Balance}, nil
 }
 
+// GetTaddressBalance returns the total balance for a list of taddrs
+func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
+	return getTaddressBalanceZcashdRpc(addresses.Addresses)
+}
+
 // GetTaddressBalanceStream returns the total balance for a list of taddrs
 func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer) error {
-	// This code should probably be refactored
-	params := make([]json.RawMessage, 1)
-	addrList := "{\"addresses\":["
-	notFirst := false
+	addressList := make([]string, 0)
 	for {
 		addr, err := addresses.Recv()
 		if err == io.EOF {
@@ -302,28 +303,13 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 		if err != nil {
 			return err
 		}
-		if notFirst {
-			addrList += ","
-		}
-		addrList += "\"" + addr.Address + "\""
-		notFirst = true
+		addressList = append(addressList, addr.Address)
 	}
-	addrList += "]}"
-
-	params[0] = json.RawMessage(addrList)
-	result, rpcErr := common.RawRequest("getaddressbalance", params)
-	if rpcErr != nil {
-		return rpcErr
-	}
-	var balanceReply struct {
-		Balance int64
-	}
-	err := json.Unmarshal(result, &balanceReply)
+	balance, err := getTaddressBalanceZcashdRpc(addressList)
 	if err != nil {
 		return err
 	}
-	addresses.SendAndClose(&walletrpc.Balance{ValueZat: balanceReply.Balance})
-
+	addresses.SendAndClose(balance)
 	return nil
 }
 

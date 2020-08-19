@@ -111,7 +111,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetTransaction(t *testing.T) {
-	// GetTransaction() will mostly be tested below via TestGetAddressTxids
+	// GetTransaction() will mostly be tested below via TestGetTaddressTxids
 	lwd, _ := testsetup()
 
 	rawtx, err := lwd.GetTransaction(context.Background(),
@@ -254,7 +254,7 @@ func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, er
 }
 
 type testgettx struct {
-	walletrpc.CompactTxStreamer_GetAddressTxidsServer
+	walletrpc.CompactTxStreamer_GetTaddressTxidsServer
 }
 
 func (tg *testgettx) Context() context.Context {
@@ -271,7 +271,7 @@ func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
 	return nil
 }
 
-func TestGetAddressTxids(t *testing.T) {
+func TestGetTaddressTxids(t *testing.T) {
 	testT = t
 	common.RawRequest = zcashdrpcStub
 	lwd, _ := testsetup()
@@ -286,26 +286,26 @@ func TestGetAddressTxids(t *testing.T) {
 	// Ensure that a bad address is detected
 	for i, addressTest := range addressTests {
 		addressBlockFilter.Address = addressTest
-		err := lwd.GetAddressTxids(addressBlockFilter, &testgettx{})
+		err := lwd.GetTaddressTxids(addressBlockFilter, &testgettx{})
 		if err == nil {
-			t.Fatal("GetAddressTxids should have failed on bad address, case", i)
+			t.Fatal("GetTaddressTxids should have failed on bad address, case", i)
 		}
 		if err.Error() != "Invalid address" {
-			t.Fatal("GetAddressTxids incorrect error on bad address, case", i)
+			t.Fatal("GetTaddressTxids incorrect error on bad address, case", i)
 		}
 	}
 
 	// valid address
 	addressBlockFilter.Address = "t1234567890123456789012345678901234"
-	err := lwd.GetAddressTxids(addressBlockFilter, &testgettx{})
+	err := lwd.GetTaddressTxids(addressBlockFilter, &testgettx{})
 	if err != nil {
-		t.Fatal("GetAddressTxids failed", err)
+		t.Fatal("GetTaddressTxids failed", err)
 	}
 
 	// this time GetTransaction() will return an error
-	err = lwd.GetAddressTxids(addressBlockFilter, &testgettx{})
+	err = lwd.GetTaddressTxids(addressBlockFilter, &testgettx{})
 	if err == nil {
-		t.Fatal("GetAddressTxids succeeded")
+		t.Fatal("GetTaddressTxids succeeded")
 	}
 	step = 0
 }
@@ -351,7 +351,7 @@ func TestGetBlock(t *testing.T) {
 }
 
 type testgetbrange struct {
-	walletrpc.CompactTxStreamer_GetAddressTxidsServer
+	walletrpc.CompactTxStreamer_GetTaddressTxidsServer
 }
 
 func (tg *testgetbrange) Context() context.Context {
