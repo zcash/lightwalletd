@@ -1,0 +1,51 @@
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerBinding
+metadata:
+  name: lightwalletd-tag-binding
+spec:
+  params:
+  - name: gitTag
+    value: $(body.tag)
+  - name: gitRepositoryURL
+    value: $(body.repository.git_http_url)
+  - name: dockerHubRepo
+    value: electriccoinco/zcashd_exporter
+---
+apiVersion: triggers.tekton.dev/v1alpha1
+kind: TriggerTemplate
+metadata:
+  name: lightwalletd-tag-pipeline-template
+spec:
+  params:
+    - name: gitTag
+      description: Git tag
+    - name: gitRepositoryURL
+      description: Git repo url
+    - name: dockerHubRepo
+      description: Docker Hub repository name
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1beta1
+      kind: PipelineRun
+      metadata:
+        generateName: lightwalletd-tag-pipeline-
+      spec:
+        serviceAccountName: ecc-tekton
+        pipelineRef:
+          name: lightwalletd-tag-pipeline
+        workspaces:
+          - name: source
+            volumeClaimTemplate:
+              spec:
+                accessModes: 
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+        params:
+          - name: gitRepositoryURL
+            value: $(params.gitRepositoryURL)
+          - name: gitTag
+            value: $(params.gitTag)
+          - name: dockerHubRepo
+            value: $(params.dockerHubRepo)

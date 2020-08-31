@@ -1,0 +1,39 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: lightwalletd-tag-pipeline
+spec:
+  params:
+    - name: gitTag
+    - name: gitRepositoryURL
+    - name: dockerHubRepo
+  workspaces:
+    - name: source
+  tasks:
+    - name: git-clone
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: source
+      params:
+        - name: url
+          value: $(params.gitRepositoryURL)
+        - name: revision
+          value: $(params.gitTag)
+        - name: refspec
+          value: +refs/tags/*:refs/remotes/origin/tags/* +refs/heads/*:refs/heads/*
+        - name: verbose
+          value: "true"                 
+    - name: kaniko-build
+      taskRef:
+        name: kaniko
+      runAfter:
+        - git-clone
+      params:
+        - name: IMAGE
+          value: $(params.dockerHubRepo):$(params.gitTag)
+      workspaces:
+        - name: source
+          workspace: source
