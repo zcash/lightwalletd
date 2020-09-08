@@ -2,16 +2,17 @@
 [![pipeline status](https://gitlab.com/zcash/lightwalletd/badges/master/pipeline.svg)](https://gitlab.com/zcash/lightwalletd/commits/master)
 [![codecov](https://codecov.io/gh/zcash/lightwalletd/branch/master/graph/badge.svg)](https://codecov.io/gh/zcash/lightwalletd)
 
-# Disclaimer
-This is an alpha build and is currently under active development. Please be advised of the following:
+# Security Disclaimer
 
-- This code currently is not audited by an external security auditor, use it at your own risk
-- The code **has not been subjected to thorough review** by engineers at the Electric Coin Company
-- We **are actively changing** the codebase and adding features where/when needed
+Lightwalletd is under active development, some features are more stable than
+others. The code has not been subjected to a thorough review by an external
+auditor, and recent code changes have not yet received security review from
+Electric Coin Company's security team.
 
-🔒 Security Warnings
-
-The Lightwalletd Server is experimental and a work in progress. Use it at your own risk. Developers should familiarize themselves with the [wallet app threat model](https://zcash.readthedocs.io/en/latest/rtd_pages/wallet_threat_model.html), since it contains important information about the security and privacy limitations of light wallets that use Lightwalletd.
+Developers should familiarize themselves with the [wallet app threat
+model](https://zcash.readthedocs.io/en/latest/rtd_pages/wallet_threat_model.html),
+since it contains important information about the security and privacy
+limitations of light wallets that use Lightwalletd.
 
 ---
 
@@ -20,8 +21,6 @@ The Lightwalletd Server is experimental and a work in progress. Use it at your o
 [lightwalletd](https://github.com/zcash/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version and beyond as its primary concern. The intended purpose of lightwalletd is to support the development and operation of mobile-friendly shielded light wallets.
 
 lightwalletd is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain for mobile and other wallets, such as [Zecwallet](https://github.com/adityapk00/zecwallet-lite-lib).
-
-Lightwalletd has not yet undergone audits or been subject to rigorous testing. It lacks some affordances necessary for production-level reliability. We do not recommend using it to handle customer funds at this time (April 2020).
 
 To view status of [CI pipeline](https://gitlab.com/zcash/lightwalletd/pipelines)
 
