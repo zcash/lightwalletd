@@ -1,0 +1,25 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: lightwalletd-tag-pipeline-
+spec:
+  serviceAccountName: ecc-tekton
+  pipelineRef:
+    name: lightwalletd-tag-pipeline
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes: 
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+  params:
+    - name: gitTag
+      value: GetMempoolTx
+    - name: gitRepositoryURL
+      value: https://github.com/zcash/lightwalletd.git
+    - name: dockerHubRepo
+      value: electriccoinco/lightwalletd
