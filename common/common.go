@@ -117,7 +117,11 @@ func GetSaplingInfo() (int, int, string, string) {
 
 func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	params := make([]json.RawMessage, 2)
-	params[0] = json.RawMessage("\"" + strconv.Itoa(height) + "\"")
+	heightJSON, err := json.Marshal(strconv.Itoa(height))
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshaling height")
+	}
+	params[0] = heightJSON
 	params[1] = json.RawMessage("0") // non-verbose (raw hex)
 	result, rpcErr := RawRequest("getblock", params)
 
@@ -131,7 +135,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	}
 
 	var blockDataHex string
-	err := json.Unmarshal(result, &blockDataHex)
+	err = json.Unmarshal(result, &blockDataHex)
 	if err != nil {
 		return nil, errors.Wrap(err, "error reading JSON response")
 	}
@@ -314,13 +318,16 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 	errOut <- nil
 }
 
-func displayHash(hash []byte) string {
-	rhash := make([]byte, len(hash))
-	copy(rhash, hash)
-	// Reverse byte order
-	for i := 0; i < len(rhash)/2; i++ {
-		j := len(rhash) - 1 - i
-		rhash[i], rhash[j] = rhash[j], rhash[i]
+// Reverse the given byte slice, returning a slice pointing to new data;
+// the input slice is unchanged.
+func Reverse(a []byte) []byte {
+	r := make([]byte, len(a), len(a))
+	for left, right := 0, len(a)-1; left < right; left, right = left+1, right-1 {
+		r[left], r[right] = a[right], a[left]
 	}
-	return hex.EncodeToString(rhash)
+	return r
+}
+
+func displayHash(hash []byte) string {
+	return hex.EncodeToString(Reverse(hash))
 }

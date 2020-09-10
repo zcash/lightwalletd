@@ -66,11 +66,8 @@ func TestMain(m *testing.M) {
 	}
 	scan := bufio.NewScanner(testBlocks)
 	for scan.Scan() { // each line (block)
-		block := scan.Bytes()
-		// Enclose the hex string in quotes (to make it json, to match what's
-		// returned by the RPC)
-		block = []byte("\"" + string(block) + "\"")
-		blocks = append(blocks, block)
+		blockJSON, _ := json.Marshal(scan.Text())
+		blocks = append(blocks, blockJSON)
 	}
 
 	// Setup is done; run all tests.

@@ -404,7 +404,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		if index >= len(state.activeBlocks) {
 			return nil, errors.New(notFoundErr)
 		}
-		return []byte("\"" + hex.EncodeToString(state.activeBlocks[index]) + "\""), nil
+		return json.Marshal(hex.EncodeToString(state.activeBlocks[index]))
 
 	case "getaddresstxids":
 		// Not required for minimal reorg testing.
@@ -435,6 +435,26 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		state.incomingTransactions = append(state.incomingTransactions, txBytes)
 
 		return []byte(hex.EncodeToString(tx.GetDisplayHash())), nil
+
+	case "getrawmempool":
+		reply := make([]string, 0)
+		addTxToReply := func(txBytes []byte) {
+			ctx := parser.NewTransaction()
+			ctx.ParseFromSlice(txBytes)
+			reply = append(reply, hex.EncodeToString(ctx.GetDisplayHash()))
+		}
+		for _, blockBytes := range state.stagedBlocks {
+			block := parser.NewBlock()
+			block.ParseFromSlice(blockBytes)
+			for _, tx := range block.Transactions() {
+				addTxToReply(tx.Bytes())
+			}
+		}
+		for _, tx := range state.stagedTransactions {
+			addTxToReply(tx.bytes)
+		}
+		return json.Marshal(reply)
+
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC")
 	}
@@ -444,32 +464,62 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 	if !state.resetted {
 		return nil, errors.New("please call Reset first")
 	}
-	// remove the double-quotes from the beginning and end of the hex txid string
-	txbytes, err := hex.DecodeString(string(params[0][1 : 1+64]))
+	var rawtx string
+	err := json.Unmarshal(params[0], &rawtx)
+	if err != nil {
+		return nil, errors.New("failed to parse getrawtransaction JSON")
+	}
+	txid, err := hex.DecodeString(rawtx)
 	if err != nil {
 		return nil, errors.New("-9: " + err.Error())
+	}
+	marshalReply := func(tx *parser.Transaction, height int) []byte {
+		switch string(params[1]) {
+		case "0":
+			txJSON, _ := json.Marshal(hex.EncodeToString(tx.Bytes()))
+			return txJSON
+		case "1":
+			reply := struct {
+				Hex    string
+				Height int
+			}{hex.EncodeToString(tx.Bytes()), height}
+			txVerboseJSON, _ := json.Marshal(reply)
+			return txVerboseJSON
+		default:
+			Log.Fatal("darkside only recognizes verbose 0 or 1")
+			return nil
+
+		}
 	}
 	// Linear search for the tx, somewhat inefficient but this is test code
 	// and there aren't many blocks. If this becomes a performance problem,
 	// we can maintain a map of transactions indexed by txid.
-	for _, b := range state.activeBlocks {
-		block := parser.NewBlock()
-		rest, err := block.ParseFromSlice(b)
-		if err != nil {
-			// this would be strange; we've already parsed this block
-			return nil, errors.New("-9: " + err.Error())
-		}
-		if len(rest) != 0 {
-			return nil, errors.New("-9: block serialization is too long")
-		}
-		for _, tx := range block.Transactions() {
-			if bytes.Equal(tx.GetDisplayHash(), txbytes) {
-				reply := struct {
-					Hex    string `json:"hex"`
-					Height int    `json:"height"`
-				}{hex.EncodeToString(tx.Bytes()), block.GetHeight()}
-				return json.Marshal(reply)
+	findTxInBlocks := func(blocks [][]byte) json.RawMessage {
+		for _, b := range blocks {
+			block := parser.NewBlock()
+			_, _ = block.ParseFromSlice(b)
+			for _, tx := range block.Transactions() {
+				if bytes.Equal(tx.GetDisplayHash(), txid) {
+					return marshalReply(tx, block.GetHeight())
+				}
 			}
+		}
+		return nil
+	}
+	// Search for the transaction (by txid) in the 3 places it could be.
+	reply := findTxInBlocks(state.activeBlocks)
+	if reply != nil {
+		return reply, nil
+	}
+	reply = findTxInBlocks(state.stagedBlocks)
+	if reply != nil {
+		return reply, nil
+	}
+	for _, stx := range state.stagedTransactions {
+		tx := parser.NewTransaction()
+		_, _ = tx.ParseFromSlice(stx.bytes)
+		if bytes.Equal(tx.GetDisplayHash(), txid) {
+			return marshalReply(tx, 0), nil
 		}
 	}
 	return nil, errors.New("-5: No information available about transaction")
