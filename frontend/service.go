@@ -12,12 +12,14 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
 
@@ -63,11 +65,16 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	}
 
 	params := make([]json.RawMessage, 1)
-	st := "{\"addresses\": [\"" + addressBlockFilter.Address + "\"]," +
-		"\"start\": " + strconv.FormatUint(addressBlockFilter.Range.Start.Height, 10) +
-		", \"end\": " + strconv.FormatUint(addressBlockFilter.Range.End.Height, 10) + "}"
-
-	params[0] = json.RawMessage(st)
+	request := &struct {
+		Addresses []string `json:"addresses"`
+		Start     uint64   `json:"start"`
+		End       uint64   `json:"end"`
+	}{
+		Addresses: []string{addressBlockFilter.Address},
+		Start:     addressBlockFilter.Range.Start.Height,
+		End:       addressBlockFilter.Range.End.Height,
+	}
+	params[0], _ = json.Marshal(request)
 
 	result, rpcErr := common.RawRequest("getaddresstxids", params)
 
@@ -91,10 +98,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		txid, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
-		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
-			txid[left], txid[right] = txid[right], txid[left]
-		}
-		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txid})
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: common.Reverse(txid)})
 		if err != nil {
 			common.Log.Errorf("GetTransaction error: %s", err.Error())
 			return err
@@ -154,17 +158,15 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 // by the zcashd 'getrawtransaction' RPC.
 func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	if txf.Hash != nil {
-		txid := txf.Hash
-		for left, right := 0, len(txid)-1; left < right; left, right = left+1, right-1 {
-			txid[left], txid[right] = txid[right], txid[left]
+		leHashStringJSON, err := json.Marshal(hex.EncodeToString(txf.Hash))
+		if err != nil {
+			common.Log.Errorf("GetTransaction: cannot encode txid: %s", err.Error())
+			return nil, err
 		}
-		leHashString := hex.EncodeToString(txid)
-
 		params := []json.RawMessage{
-			json.RawMessage("\"" + leHashString + "\""),
+			leHashStringJSON,
 			json.RawMessage("1"),
 		}
-
 		result, rpcErr := common.RawRequest("getrawtransaction", params)
 
 		// For some reason, the error responses are not JSON
@@ -172,11 +174,12 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 			common.Log.Errorf("GetTransaction error: %s", rpcErr.Error())
 			return nil, errors.New((strings.Split(rpcErr.Error(), ":"))[0])
 		}
+		// Many other fields are returned, but we need only these two.
 		var txinfo struct {
 			Hex    string
 			Height int
 		}
-		err := json.Unmarshal(result, &txinfo)
+		err = json.Unmarshal(result, &txinfo)
 		if err != nil {
 			return nil, err
 		}
@@ -229,8 +232,8 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
-	txHexString := hex.EncodeToString(rawtx.Data)
-	params[0] = json.RawMessage("\"" + txHexString + "\"")
+	txJSON, _ := json.Marshal(hex.EncodeToString(rawtx.Data))
+	params[0] = txJSON
 	result, rpcErr := common.RawRequest("sendrawtransaction", params)
 
 	var err error
@@ -261,18 +264,13 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
 	params := make([]json.RawMessage, 1)
-	addrList := "{\"addresses\":["
-	notFirst := false
-	for _, addr := range addressList {
-		if notFirst {
-			addrList += ","
-		}
-		addrList += "\"" + addr + "\""
-		notFirst = true
+	addrList := &struct {
+		Addresses []string `json:"addresses"`
+	}{
+		Addresses: addressList,
 	}
-	addrList += "]}"
+	params[0], _ = json.Marshal(addrList)
 
-	params[0] = json.RawMessage(addrList)
 	result, rpcErr := common.RawRequest("getaddressbalance", params)
 	if rpcErr != nil {
 		return &walletrpc.Balance{}, rpcErr
@@ -313,6 +311,132 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 	return nil
 }
 
+// Key is 32-byte txid (as a 64-character string), data is pointer to compact tx.
+var mempoolMap *map[string]*walletrpc.CompactTx
+var mempoolList []string
+
+// Last time we pulled a copy of the mempool from zcashd.
+var lastMempool time.Time
+
+func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
+	if time.Now().Sub(lastMempool).Seconds() >= 2 {
+		lastMempool = time.Now()
+		// Refresh our copy of the mempool.
+		newmempoolMap := make(map[string]*walletrpc.CompactTx)
+		params := make([]json.RawMessage, 0)
+		result, rpcErr := common.RawRequest("getrawmempool", params)
+		if rpcErr != nil {
+			return rpcErr
+		}
+		err := json.Unmarshal(result, &mempoolList)
+		if err != nil {
+			return err
+		}
+		if mempoolMap == nil {
+			mempoolMap = &newmempoolMap
+		}
+		for _, txidstr := range mempoolList {
+			if ctx, ok := (*mempoolMap)[txidstr]; ok {
+				// This ctx has already been fetched, copy pointer to it.
+				newmempoolMap[txidstr] = ctx
+				continue
+			}
+			txidJSON, _ := json.Marshal(txidstr)
+			// The "0" is because we only need the raw hex, which is returned as
+			// just a hex string, and not even a json string (with quotes).
+			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+			result, rpcErr := common.RawRequest("getrawtransaction", params)
+			if rpcErr != nil {
+				// Not an error; mempool transactions can disappear
+				common.Log.Errorf("GetTransaction error: %s", rpcErr.Error())
+				continue
+			}
+			// strip the quotes
+			var txStr string
+			err := json.Unmarshal(result, &txStr)
+			if err != nil {
+				return err
+			}
+
+			// conver to binary
+			txBytes, err := hex.DecodeString(txStr)
+			if err != nil {
+				return err
+			}
+			tx := parser.NewTransaction()
+			txdata, err := tx.ParseFromSlice(txBytes)
+			if len(txdata) > 0 {
+				return errors.New("extra data deserializing transaction")
+			}
+			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
+			if tx.HasSaplingElements() {
+				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+			}
+		}
+		mempoolMap = &newmempoolMap
+	}
+	excludeHex := make([]string, len(exclude.Txid))
+	for i := 0; i < len(exclude.Txid); i++ {
+		excludeHex[i] = hex.EncodeToString(common.Reverse(exclude.Txid[i]))
+	}
+	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
+		tx := (*mempoolMap)[txid]
+		if len(tx.Hash) > 0 {
+			err := resp.Send(tx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Return the subset of items that aren't excluded, but
+// if more than one item matches an exclude entry, return
+// all those items.
+func MempoolFilter(items, exclude []string) []string {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i] < items[j]
+	})
+	sort.Slice(exclude, func(i, j int) bool {
+		return exclude[i] < exclude[j]
+	})
+	// Determine how many items match each exclude item.
+	nmatches := make([]int, len(exclude))
+	// is the exclude string less than the item string?
+	lessthan := func(e, i string) bool {
+		l := len(e)
+		if l > len(i) {
+			l = len(i)
+		}
+		return e < i[0:l]
+	}
+	ei := 0
+	for _, item := range items {
+		for ei < len(exclude) && lessthan(exclude[ei], item) {
+			ei++
+		}
+		match := ei < len(exclude) && strings.HasPrefix(item, exclude[ei])
+		if match {
+			nmatches[ei]++
+		}
+	}
+
+	// Add each item that isn't uniquely excluded to the results.
+	tosend := make([]string, 0)
+	ei = 0
+	for _, item := range items {
+		for ei < len(exclude) && lessthan(exclude[ei], item) {
+			ei++
+		}
+		match := ei < len(exclude) && strings.HasPrefix(item, exclude[ei])
+		if !match || nmatches[ei] > 1 {
+			tosend = append(tosend, item)
+		}
+	}
+	return tosend
+}
+
 // This rpc is used only for testing.
 var concurrent int64
 
@@ -339,6 +463,8 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 	if err != nil {
 		return nil, err
 	}
+	mempoolMap = nil
+	mempoolList = nil
 	return &walletrpc.Empty{}, nil
 }
 

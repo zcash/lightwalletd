@@ -339,6 +339,16 @@ block files. The sochain block explorer makes it easy to obtain the raw
 transaction hex, by viewing the transaction (example), clicking “Raw Data”, then
 copying the “tx_hex” field.
 
+### Simulating the mempool
+
+The `GetMempoolTx` gRPC will return staged transactions that are either within
+staged blocks or that have been staged separately. Here is an example:
+```
+grpcurl -plaintext -d '{"saplingActivation": 663150,"branchID": "bad", "chainName":"x"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Reset
+grpcurl -plaintext -d '{"url": "https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/tx-incoming/blocks.txt"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks
+grpcurl -plaintext -d '{"txid":["qg=="]}' localhost:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx
+```
+
 ## Use cases
 
 Check out some of the potential security test cases here: [wallet <->
