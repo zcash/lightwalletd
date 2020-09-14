@@ -209,13 +209,8 @@ func (hdr *BlockHeader) GetDisplayHash() []byte {
 	digest := sha256.Sum256(serializedHeader)
 	digest = sha256.Sum256(digest[:])
 
-	// Reverse byte order
-	for i := 0; i < len(digest)/2; i++ {
-		j := len(digest) - 1 - i
-		digest[i], digest[j] = digest[j], digest[i]
-	}
-
-	hdr.cachedHash = digest[:]
+	// Convert to big-endian
+	hdr.cachedHash = Reverse(digest[:])
 	return hdr.cachedHash
 }
 
@@ -234,14 +229,7 @@ func (hdr *BlockHeader) GetEncodableHash() []byte {
 	return digest[:]
 }
 
-// GetDisplayPrevHash returns the block hash in
+// GetDisplayPrevHash returns the block hash in big-endian order.
 func (hdr *BlockHeader) GetDisplayPrevHash() []byte {
-	rhash := make([]byte, len(hdr.HashPrevBlock))
-	copy(rhash, hdr.HashPrevBlock)
-	// Reverse byte order
-	for i := 0; i < len(rhash)/2; i++ {
-		j := len(rhash) - 1 - i
-		rhash[i], rhash[j] = rhash[j], rhash[i]
-	}
-	return rhash
+	return Reverse(hdr.HashPrevBlock)
 }

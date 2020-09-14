@@ -271,28 +271,22 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 // Transaction encodes a full (zcashd) transaction.
 type Transaction struct {
 	*rawTransaction
-	rawBytes []byte
-	txID     []byte
+	rawBytes   []byte
+	cachedTxID []byte // cached for performance
 }
 
 // GetDisplayHash returns the transaction hash in big-endian display order.
 func (tx *Transaction) GetDisplayHash() []byte {
-	if tx.txID != nil {
-		return tx.txID
+	if tx.cachedTxID != nil {
+		return tx.cachedTxID
 	}
 
 	// SHA256d
 	digest := sha256.Sum256(tx.rawBytes)
 	digest = sha256.Sum256(digest[:])
-
-	// Reverse byte order
-	for i := 0; i < len(digest)/2; i++ {
-		j := len(digest) - 1 - i
-		digest[i], digest[j] = digest[j], digest[i]
-	}
-
-	tx.txID = digest[:]
-	return tx.txID
+	// Convert to big-endian
+	tx.cachedTxID = Reverse(digest[:])
+	return tx.cachedTxID
 }
 
 // GetEncodableHash returns the transaction hash in little-endian wire format order.

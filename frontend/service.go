@@ -98,7 +98,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		txid, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
-		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: common.Reverse(txid)})
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txid)})
 		if err != nil {
 			common.Log.Errorf("GetTransaction error: %s", err.Error())
 			return err
@@ -377,7 +377,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 	}
 	excludeHex := make([]string, len(exclude.Txid))
 	for i := 0; i < len(exclude.Txid); i++ {
-		excludeHex[i] = hex.EncodeToString(common.Reverse(exclude.Txid[i]))
+		excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
 		tx := (*mempoolMap)[txid]
