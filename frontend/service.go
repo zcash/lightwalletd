@@ -154,6 +154,67 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 	}
 }
 
+// GetTreeState returns the note commitment tree state corresponding to the given block.
+// See section 3.7 of the zcash protocol specification. It returns several other useful
+// values also (even though they can be obtained using GetBlock).
+// The block can be specified by either height or hash.
+func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
+	if id.Height == 0 && id.Hash == nil {
+		return nil, errors.New("request for unspecified identifier")
+	}
+	// The zcash getblock rpc accepts either a block height or block hash
+	params := make([]json.RawMessage, 1)
+	if id.Height > 0 {
+		heightJSON, err := json.Marshal(strconv.Itoa(int(id.Height)))
+		if err != nil {
+			return nil, err
+		}
+		params[0] = heightJSON
+	} else {
+		// id.Hash is big-endian, keep in big-endian for the rpc
+		hashJSON, err := json.Marshal(hex.EncodeToString(id.Hash))
+		if err != nil {
+			return nil, err
+		}
+		params[0] = hashJSON
+	}
+	result, rpcErr := common.RawRequest("getblock", params)
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+	var getblockReply struct {
+		Height    int
+		Hash      string
+		Time      uint32
+		Treestate string
+	}
+	err := json.Unmarshal(result, &getblockReply)
+	if err != nil {
+		return nil, err
+	}
+	if getblockReply.Treestate == "" {
+		// probably zcashd doesn't include zcash/zcash PR 4744
+		return nil, errors.New("zcashd did not return treestate")
+	}
+	// saplingHeight, blockHeight, chainName, consensusBranchID
+	_, _, chainName, _ := common.GetSaplingInfo()
+	hashBytes, err := hex.DecodeString(getblockReply.Hash)
+	if err != nil {
+		return nil, err
+	}
+	treeBytes, err := hex.DecodeString(getblockReply.Treestate)
+	if err != nil {
+		return nil, err
+	}
+	return &walletrpc.TreeState{
+		Network: chainName,
+		Height:  id.Height,
+		Hash:    hashBytes,
+		Time:    getblockReply.Time,
+		Tree:    treeBytes,
+	}, nil
+}
+
 // GetTransaction returns the raw transaction bytes that are returned
 // by the zcashd 'getrawtransaction' RPC.
 func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
