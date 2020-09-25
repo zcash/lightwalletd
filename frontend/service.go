@@ -116,18 +116,10 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	if id.Height == 0 && id.Hash == nil {
 		return nil, errors.New("request for unspecified identifier")
 	}
-
-	// Precedence: a hash is more specific than a height. If we have it, use it first.
-	if id.Hash != nil {
-		// TODO: Get block by hash
-		return nil, errors.New("GetBlock by Hash is not yet implemented")
-	}
-	cBlock, err := common.GetBlock(s.cache, int(id.Height))
-
+	cBlock, err := common.GetBlock(s.cache, *id)
 	if err != nil {
 		return nil, err
 	}
-
 	return cBlock, err
 }
 
@@ -137,8 +129,7 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
-
-	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, *span.Start, *span.End)
 
 	for {
 		select {

@@ -909,7 +909,7 @@ into a specified block on the next ApplyStaged().</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.BlockID">BlockID</h3>
-        <p>A BlockID message contains identifiers to select a block: a height or a</p><p>hash. Specification by hash is not implemented, but may be in the future.</p>
+        <p>A BlockID message contains identifiers to select a block: a height or a</p><p>hash in le order.</p>
 
         
           <table class="field-table">
@@ -940,7 +940,7 @@ into a specified block on the next ApplyStaged().</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.BlockRange">BlockRange</h3>
-        <p>BlockRange specifies a series of blocks from start to end inclusive.</p><p>Both BlockIDs must be heights; specification by hash is not yet supported.</p>
+        <p>BlockRange specifies a series of blocks from start to end inclusive.</p>
 
         
           <table class="field-table">
@@ -1243,14 +1243,14 @@ into a specified block on the next ApplyStaged().</p></td>
                   <td>height</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>blockheight </p></td>
                 </tr>
               
                 <tr>
                   <td>hash</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>block id </p></td>
+                  <td><p>block id (le order) </p></td>
                 </tr>
               
                 <tr>

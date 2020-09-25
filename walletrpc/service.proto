@@ -9,14 +9,13 @@ option swift_prefix = "";
 import "compact_formats.proto";
 
 // A BlockID message contains identifiers to select a block: a height or a
-// hash. Specification by hash is not implemented, but may be in the future.
+// hash in le order.
 message BlockID {
      uint64 height = 1;
      bytes hash = 2;
 }
 
 // BlockRange specifies a series of blocks from start to end inclusive.
-// Both BlockIDs must be heights; specification by hash is not yet supported.
 message BlockRange {
     BlockID start = 1;
     BlockID end = 2;
@@ -102,10 +101,10 @@ message Exclude {
 
 message TreeState {
     string network = 1; // mainnet or testnet
-    uint64 height = 2;
-    bytes hash = 3; // block id
-    uint32 time = 4; // Unix epoch time when the block was mined
-    bytes tree = 5; // commitment tree state
+    uint64 height = 2;  // blockheight
+    bytes hash = 3;     // block id (le order)
+    uint32 time = 4;    // Unix epoch time when the block was mined
+    bytes tree = 5;     // commitment tree state
 }
 
 service CompactTxStreamer {

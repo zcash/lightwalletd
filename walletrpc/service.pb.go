@@ -34,7 +34,7 @@ const (
 const _ = proto.ProtoPackageIsVersion4
 
 // A BlockID message contains identifiers to select a block: a height or a
-// hash. Specification by hash is not implemented, but may be in the future.
+// hash in le order.
 type BlockID struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -91,7 +91,6 @@ func (x *BlockID) GetHash() []byte {
 }
 
 // BlockRange specifies a series of blocks from start to end inclusive.
-// Both BlockIDs must be heights; specification by hash is not yet supported.
 type BlockRange struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -862,10 +861,10 @@ type TreeState struct {
 	unknownFields protoimpl.UnknownFields
 
 	Network string `protobuf:"bytes,1,opt,name=network,proto3" json:"network,omitempty"` // mainnet or testnet
-	Height  uint64 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
-	Hash    []byte `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`  // block id
-	Time    uint32 `protobuf:"varint,4,opt,name=time,proto3" json:"time,omitempty"` // Unix epoch time when the block was mined
-	Tree    []byte `protobuf:"bytes,5,opt,name=tree,proto3" json:"tree,omitempty"`  // commitment tree state
+	Height  uint64 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`  // blockheight
+	Hash    []byte `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`       // block id (le order)
+	Time    uint32 `protobuf:"varint,4,opt,name=time,proto3" json:"time,omitempty"`      // Unix epoch time when the block was mined
+	Tree    []byte `protobuf:"bytes,5,opt,name=tree,proto3" json:"tree,omitempty"`       // commitment tree state
 }
 
 func (x *TreeState) Reset() {
