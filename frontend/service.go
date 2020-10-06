@@ -158,7 +158,7 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 // by the zcashd 'getrawtransaction' RPC.
 func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	if txf.Hash != nil {
-		leHashStringJSON, err := json.Marshal(hex.EncodeToString(txf.Hash))
+		leHashStringJSON, err := json.Marshal(hex.EncodeToString(parser.Reverse(txf.Hash)))
 		if err != nil {
 			common.Log.Errorf("GetTransaction: cannot encode txid: %s", err.Error())
 			return nil, err
@@ -172,7 +172,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		// For some reason, the error responses are not JSON
 		if rpcErr != nil {
 			common.Log.Errorf("GetTransaction error: %s", rpcErr.Error())
-			return nil, errors.New((strings.Split(rpcErr.Error(), ":"))[0])
+			return nil, rpcErr
 		}
 		// Many other fields are returned, but we need only these two.
 		var txinfo struct {
