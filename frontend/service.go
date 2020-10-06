@@ -212,6 +212,10 @@ func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 	}
 	return &walletrpc.LightdInfo{
 		Version:                 common.Version,
+		GitCommit:               common.GitCommit,
+		Branch:                  common.Branch,
+		BuildDate:               common.BuildDate,
+		BuildUser:               common.BuildUser,
 		Vendor:                  vendor,
 		TaddrSupport:            true,
 		ChainName:               chainName,
