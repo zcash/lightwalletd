@@ -64,6 +64,15 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		return errors.New("Invalid address")
 	}
 
+	if addressBlockFilter.Range == nil {
+		return errors.New("Must specify block range")
+	}
+	if addressBlockFilter.Range.Start == nil {
+		return errors.New("Must specify a start block height")
+	}
+	if addressBlockFilter.Range.End == nil {
+		return errors.New("Must specify an end block height")
+	}
 	params := make([]json.RawMessage, 1)
 	request := &struct {
 		Addresses []string `json:"addresses"`
@@ -137,6 +146,9 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
+	if span.Start == nil || span.End == nil {
+		return errors.New("Must specify start and end heights")
+	}
 
 	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 

@@ -313,6 +313,44 @@ func TestGetTaddressTxids(t *testing.T) {
 	step = 0
 }
 
+func TestGetTaddressTxidsNilArgs(t *testing.T) {
+	lwd, _ := testsetup()
+
+	{
+		noRange := &walletrpc.TransparentAddressBlockFilter{
+			Range: nil,
+		}
+		err := lwd.GetTaddressTxids(noRange, &testgettx{})
+		if err == nil {
+			t.Fatal("GetBlockRange nil range argument should fail")
+		}
+	}
+	{
+		noStart := &walletrpc.TransparentAddressBlockFilter{
+			Range: &walletrpc.BlockRange{
+				Start: nil,
+				End:   &walletrpc.BlockID{Height: 20},
+			},
+		}
+		err := lwd.GetTaddressTxids(noStart, &testgettx{})
+		if err == nil {
+			t.Fatal("GetBlockRange nil range argument should fail")
+		}
+	}
+	{
+		noEnd := &walletrpc.TransparentAddressBlockFilter{
+			Range: &walletrpc.BlockRange{
+				Start: &walletrpc.BlockID{Height: 30},
+				End:   nil,
+			},
+		}
+		err := lwd.GetTaddressTxids(noEnd, &testgettx{})
+		if err == nil {
+			t.Fatal("GetBlockRange nil range argument should fail")
+		}
+	}
+}
+
 func TestGetBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
@@ -354,7 +392,7 @@ func TestGetBlock(t *testing.T) {
 }
 
 type testgetbrange struct {
-	walletrpc.CompactTxStreamer_GetTaddressTxidsServer
+	walletrpc.CompactTxStreamer_GetBlockRangeServer
 }
 
 func (tg *testgetbrange) Context() context.Context {
@@ -386,6 +424,31 @@ func TestGetBlockRange(t *testing.T) {
 		t.Fatal("GetBlockRange should have failed")
 	}
 	step = 0
+}
+
+func TestGetBlockRangeNilArgs(t *testing.T) {
+	lwd, _ := testsetup()
+
+	{
+		noEnd := &walletrpc.BlockRange{
+			Start: &walletrpc.BlockID{Height: 380640},
+			End:   nil,
+		}
+		err := lwd.GetBlockRange(noEnd, &testgetbrange{})
+		if err == nil {
+			t.Fatal("GetBlockRange nil argument should fail")
+		}
+	}
+	{
+		noStart := &walletrpc.BlockRange{
+			Start: nil,
+			End:   &walletrpc.BlockID{Height: 380640},
+		}
+		err := lwd.GetBlockRange(noStart, &testgetbrange{})
+		if err == nil {
+			t.Fatal("GetBlockRange nil argument should fail")
+		}
+	}
 }
 
 func getblockchaininfoStub(method string, params []json.RawMessage) (json.RawMessage, error) {
