@@ -43,6 +43,15 @@ func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerSe
 	return &DarksideStreamer{cache}, nil
 }
 
+// Test to make sure Address is a single t address
+func checkTaddress(taddr string) error {
+	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(taddr))
+	if err != nil || !match {
+		return errors.New("Invalid address")
+	}
+	return nil
+}
+
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	latestBlock := s.cache.GetLatestHeight()
@@ -58,11 +67,8 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 // GetTaddressTxids is a streaming RPC that returns transaction IDs that have
 // the given transparent address (taddr) as either an input or output.
 func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTxidsServer) error {
-	// Test to make sure Address is a single t address
-	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(addressBlockFilter.Address))
-	if err != nil || !match {
-		common.Log.Error("Invalid address:", addressBlockFilter.Address)
-		return errors.New("Invalid address")
+	if err := checkTaddress(addressBlockFilter.Address); err != nil {
+		return err
 	}
 
 	if addressBlockFilter.Range == nil {
@@ -95,7 +101,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	}
 
 	var txids []string
-	err = json.Unmarshal(result, &txids)
+	err := json.Unmarshal(result, &txids)
 	if err != nil {
 		common.Log.Errorf("GetTaddressTxids error: %s", err.Error())
 		return err
@@ -408,7 +414,6 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 	if time.Now().Sub(lastMempool).Seconds() >= 2 {
 		lastMempool = time.Now()
 		// Refresh our copy of the mempool.
-		newmempoolMap := make(map[string]*walletrpc.CompactTx)
 		params := make([]json.RawMessage, 0)
 		result, rpcErr := common.RawRequest("getrawmempool", params)
 		if rpcErr != nil {
@@ -418,6 +423,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 		if err != nil {
 			return err
 		}
+		newmempoolMap := make(map[string]*walletrpc.CompactTx)
 		if mempoolMap == nil {
 			mempoolMap = &newmempoolMap
 		}
@@ -521,6 +527,80 @@ func MempoolFilter(items, exclude []string) []string {
 		}
 	}
 	return tosend
+}
+
+func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
+	if err := checkTaddress(arg.Address); err != nil {
+		return err
+	}
+	params := make([]json.RawMessage, 1)
+	params[0], _ = json.Marshal(arg.Address)
+	result, rpcErr := common.RawRequest("getaddressutxos", params)
+	if rpcErr != nil {
+		return rpcErr
+	}
+	var utxosReply []struct {
+		Txid        string
+		OutputIndex int64
+		Script      string
+		Satoshis    uint64
+		Height      int
+	}
+	err := json.Unmarshal(result, &utxosReply)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, utxo := range utxosReply {
+		if uint64(utxo.Height) < arg.StartHeight {
+			continue
+		}
+		n++
+		if arg.MaxEntries > 0 && uint32(n) > arg.MaxEntries {
+			break
+		}
+		txidBytes, err := hex.DecodeString(utxo.Txid)
+		if err != nil {
+			return err
+		}
+		scriptBytes, err := hex.DecodeString(utxo.Script)
+		if err != nil {
+			return err
+		}
+		err = f(&walletrpc.GetAddressUtxosReply{
+			Txid:     parser.Reverse(txidBytes),
+			Index:    int32(utxo.OutputIndex),
+			Script:   scriptBytes,
+			ValueZat: int64(utxo.Satoshis),
+			Height:   uint64(utxo.Height),
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *lwdStreamer) GetAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg) (*walletrpc.GetAddressUtxosReplyList, error) {
+	addressUtxos := make([]*walletrpc.GetAddressUtxosReply, 0)
+	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
+		addressUtxos = append(addressUtxos, utxo)
+		return nil
+	})
+	if err != nil {
+		return &walletrpc.GetAddressUtxosReplyList{}, err
+	}
+	return &walletrpc.GetAddressUtxosReplyList{AddressUtxos: addressUtxos}, nil
+}
+
+func (s *lwdStreamer) GetAddressUtxosStream(arg *walletrpc.GetAddressUtxosArg, resp walletrpc.CompactTxStreamer_GetAddressUtxosStreamServer) error {
+	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
+		return resp.Send(utxo)
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // This rpc is used only for testing.
