@@ -113,6 +113,22 @@ message TreeState {
     string tree = 5;    // sapling commitment tree state
 }
 
+message GetAddressUtxosArg {
+    string address = 1;
+    uint64 startHeight = 2;
+    uint32 maxEntries = 3; // zero means unlimited
+}
+message GetAddressUtxosReply {
+    bytes txid = 1;
+    int32 index = 2;
+    bytes script = 3;
+    int64 valueZat = 4;
+    uint64 height = 5;
+}
+message GetAddressUtxosReplyList {
+    repeated GetAddressUtxosReply addressUtxos = 1;
+}
+
 service CompactTxStreamer {
     // Return the height of the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -147,6 +163,9 @@ service CompactTxStreamer {
     // values also (even though they can be obtained using GetBlock).
     // The block can be specified by either height or hash.
     rpc GetTreeState(BlockID) returns (TreeState) {}
+
+    rpc GetAddressUtxos(GetAddressUtxosArg) returns (GetAddressUtxosReplyList) {}
+    rpc GetAddressUtxosStream(GetAddressUtxosArg) returns (stream GetAddressUtxosReply) {}
 
     // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}

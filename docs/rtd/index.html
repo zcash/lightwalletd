@@ -281,6 +281,18 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosArg"><span class="badge">M</span>GetAddressUtxosArg</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReply"><span class="badge">M</span>GetAddressUtxosReply</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList"><span class="badge">M</span>GetAddressUtxosReplyList</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.LightdInfo"><span class="badge">M</span>LightdInfo</a>
                 </li>
               
@@ -1032,6 +1044,120 @@ into a specified block on the next ApplyStaged().</p></td>
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.GetAddressUtxosArg">GetAddressUtxosArg</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>address</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>startHeight</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>maxEntries</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>zero means unlimited </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.GetAddressUtxosReply">GetAddressUtxosReply</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>txid</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#int32">int32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>script</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>valueZat</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>height</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList">GetAddressUtxosReplyList</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>addressUtxos</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReply">GetAddressUtxosReply</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.LightdInfo">LightdInfo</h3>
         <p>LightdInfo returns various information about this lightwalletd instance</p><p>and the state of the blockchain.</p>
 
@@ -1433,6 +1559,20 @@ in the exclude list that don&#39;t exist in the mempool are ignored.</p></td>
 See section 3.7 of the zcash protocol specification. It returns several other useful
 values also (even though they can be obtained using GetBlock).
 The block can be specified by either height or hash.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetAddressUtxos</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosArg">GetAddressUtxosArg</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList">GetAddressUtxosReplyList</a></td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetAddressUtxosStream</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosArg">GetAddressUtxosArg</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReply">GetAddressUtxosReply</a> stream</td>
+                <td><p></p></td>
               </tr>
             
               <tr>
