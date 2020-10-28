@@ -24,12 +24,13 @@ import (
 )
 
 type lwdStreamer struct {
-	cache *common.BlockCache
+	cache     *common.BlockCache
+	chainName string
 }
 
 // NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache}, nil
+func NewLwdStreamer(cache *common.BlockCache, chainName string) (walletrpc.CompactTxStreamerServer, error) {
+	return &lwdStreamer{cache, chainName}, nil
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
@@ -90,7 +91,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
 		common.Log.Errorf("GetTaddressTxids error: %s", rpcErr.Error())
-		return err
+		return rpcErr
 	}
 
 	var txids []string
@@ -164,6 +165,75 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			}
 		}
 	}
+}
+
+// GetTreeState returns the note commitment tree state corresponding to the given block.
+// See section 3.7 of the zcash protocol specification. It returns several other useful
+// values also (even though they can be obtained using GetBlock).
+// The block can be specified by either height or hash.
+func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
+	if id.Height == 0 && id.Hash == nil {
+		return nil, errors.New("request for unspecified identifier")
+	}
+	// The zcash z_gettreestate rpc accepts either a block height or block hash
+	params := make([]json.RawMessage, 1)
+	var hashJSON []byte
+	if id.Height > 0 {
+		heightJSON, err := json.Marshal(strconv.Itoa(int(id.Height)))
+		if err != nil {
+			return nil, err
+		}
+		params[0] = heightJSON
+	} else {
+		// id.Hash is big-endian, keep in big-endian for the rpc
+		hashJSON, err := json.Marshal(hex.EncodeToString(id.Hash))
+		if err != nil {
+			return nil, err
+		}
+		params[0] = hashJSON
+	}
+	var gettreestateReply struct {
+		Height  int
+		Hash    string
+		Time    uint32
+		Sapling struct {
+			Commitments struct {
+				FinalState string
+			}
+			SkipHash string
+		}
+	}
+	for {
+		result, rpcErr := common.RawRequest("z_gettreestate", params)
+		if rpcErr != nil {
+			return nil, rpcErr
+		}
+		err := json.Unmarshal(result, &gettreestateReply)
+		if err != nil {
+			return nil, err
+		}
+		if gettreestateReply.Sapling.Commitments.FinalState != "" {
+			break
+		}
+		if gettreestateReply.Sapling.SkipHash == "" {
+			break
+		}
+		hashJSON, err = json.Marshal(gettreestateReply.Sapling.SkipHash)
+		if err != nil {
+			return nil, err
+		}
+		params[0] = hashJSON
+	}
+	if gettreestateReply.Sapling.Commitments.FinalState == "" {
+		return nil, errors.New("zcashd did not return treestate")
+	}
+	return &walletrpc.TreeState{
+		Network: s.chainName,
+		Height:  uint64(gettreestateReply.Height),
+		Hash:    gettreestateReply.Hash,
+		Time:    gettreestateReply.Time,
+		Tree:    gettreestateReply.Sapling.Commitments.FinalState,
+	}, nil
 }
 
 // GetTransaction returns the raw transaction bytes that are returned
