@@ -301,6 +301,10 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.TreeState"><span class="badge">M</span>TreeState</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.TxFilter"><span class="badge">M</span>TxFilter</a>
                 </li>
               
@@ -1046,34 +1050,6 @@ into a specified block on the next ApplyStaged().</p></td>
                 </tr>
               
                 <tr>
-                  <td>gitCommit</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>branch</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>buildDate</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>buildUser</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
                   <td>vendor</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
@@ -1113,6 +1089,34 @@ into a specified block on the next ApplyStaged().</p></td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
                   <td><p>latest block on the best chain </p></td>
+                </tr>
+              
+                <tr>
+                  <td>gitCommit</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>branch</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>buildDate</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>buildUser</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -1246,6 +1250,58 @@ into a specified block on the next ApplyStaged().</p></td>
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.TreeState">TreeState</h3>
+        <p>The TreeState is derived from the zcash z_gettreestate rpc.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>network</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>&#34;main&#34; or &#34;test&#34; </p></td>
+                </tr>
+              
+                <tr>
+                  <td>height</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>hash</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>block id </p></td>
+                </tr>
+              
+                <tr>
+                  <td>time</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Unix epoch time when the block was mined </p></td>
+                </tr>
+              
+                <tr>
+                  <td>tree</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>sapling commitment tree state </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.TxFilter">TxFilter</h3>
         <p>A TxFilter contains the information needed to identify a particular</p><p>transaction: either a block and an index, or a direct transaction hash.</p><p>Currently, only specification by hash is supported.</p>
 
@@ -1367,6 +1423,16 @@ Exclude list can be shortened to any number of bytes to make the request
 more bandwidth-efficient; if two or more transactions in the mempool
 match a shortened txid, they are all sent (none is excluded). Transactions
 in the exclude list that don&#39;t exist in the mempool are ignored.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetTreeState</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.TreeState">TreeState</a></td>
+                <td><p>GetTreeState returns the note commitment tree state corresponding to the given block.
+See section 3.7 of the zcash protocol specification. It returns several other useful
+values also (even though they can be obtained using GetBlock).
+The block can be specified by either height or hash.</p></td>
               </tr>
             
               <tr>

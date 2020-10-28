@@ -230,7 +230,7 @@ func startServer(opts *common.Options) error {
 
 	// Compact transaction service initialization
 	{
-		service, err := frontend.NewLwdStreamer(cache)
+		service, err := frontend.NewLwdStreamer(cache, chainName)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
