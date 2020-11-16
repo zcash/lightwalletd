@@ -78,4 +78,4 @@ docker run  --rm \
 
 ## Using docker-compose for a full stack
 
-Don't have an existing zcash node? Check out the [docker-compose](./docker-compose-setup.md) for examples of multi cantainer usage.
+Don't have an existing zcash node? Check out the [docker-compose](./docker-compose-setup.md) for examples of multi-container usage.
