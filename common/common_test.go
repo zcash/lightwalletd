@@ -5,7 +5,6 @@ package common
 
 import (
 	"bufio"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -33,8 +32,6 @@ var (
 	getblockchaininfoReply []byte
 	logger                 = logrus.New()
 
-	getsaplinginfo []byte
-
 	blocks [][]byte // four test blocks
 )
 
@@ -49,13 +46,6 @@ func TestMain(m *testing.M) {
 	Log = logger.WithFields(logrus.Fields{
 		"app": "test",
 	})
-
-	getsaplinginfo, err := ioutil.ReadFile("../testdata/getsaplinginfo")
-	if err != nil {
-		os.Stderr.WriteString(fmt.Sprintf("Cannot open testdata/getsaplinginfo: %v", err))
-		os.Exit(1)
-	}
-	getblockchaininfoReply, _ = hex.DecodeString(string(getsaplinginfo))
 
 	// Several tests need test blocks; read all 4 into memory just once
 	// (for efficiency).
@@ -88,26 +78,43 @@ func sleepStub(d time.Duration) {
 	sleepDuration += d
 }
 
-// ------------------------------------------ GetSaplingInfo()
+// ------------------------------------------ GetLightdInfo()
 
-func getblockchaininfoStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+func getLightdInfoStub(method string, params []json.RawMessage) (json.RawMessage, error) {
 	step++
-	// Test retry logic (for the moment, it's very simple, just one retry).
-	switch step {
-	case 1:
-		return getblockchaininfoReply, errors.New("first failure")
+	switch method {
+	case "getinfo":
+		r, _ := json.Marshal(&ZcashdRpcReplyGetinfo{
+			Height:            9977,
+			ChainName:         "bugsbunny",
+			ConsensusBranchID: "someid",
+		})
+		return r, nil
+
+	case "getblockchaininfo":
+		// Test retry logic (for the moment, it's very simple, just one retry).
+		switch step {
+		case 1:
+			return json.RawMessage{}, errors.New("first failure")
+		case 2:
+			if sleepCount != 1 || sleepDuration != 15*time.Second {
+				testT.Error("unexpected sleeps", sleepCount, sleepDuration)
+			}
+		}
+		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+			Headers: 11111,
+		})
+		return r, nil
 	}
-	if sleepCount != 1 || sleepDuration != 15*time.Second {
-		testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-	}
-	return getblockchaininfoReply, nil
+	return nil, nil
 }
 
-func TestGetSaplingInfo(t *testing.T) {
+func TestGetLightdInfo(t *testing.T) {
 	testT = t
-	RawRequest = getblockchaininfoStub
+	RawRequest = getLightdInfoStub
 	Sleep = sleepStub
-	saplingHeight, blockHeight, chainName, branchID := GetSaplingInfo()
+	// This calls the getblockchaininfo rpc just to establish connectivity with zcashd
+	FirstRPC()
 
 	// Ensure the retry happened as expected
 	logFile, err := ioutil.ReadFile("test-log")
@@ -123,17 +130,21 @@ func TestGetSaplingInfo(t *testing.T) {
 	}
 
 	// Check the success case (second attempt)
-	if saplingHeight != 419200 {
-		t.Error("unexpected saplingHeight", saplingHeight)
+	getLightdInfo, err := GetLightdInfo()
+	if err != nil {
+		t.Fatal("GetLightdInfo failed")
 	}
-	if blockHeight != 677713 {
-		t.Error("unexpected blockHeight", blockHeight)
+	if getLightdInfo.SaplingActivationHeight != 0 {
+		t.Error("unexpected saplingActivationHeight", getLightdInfo.SaplingActivationHeight)
 	}
-	if chainName != "main" {
-		t.Error("unexpected chainName", chainName)
+	if getLightdInfo.BlockHeight != 9977 {
+		t.Error("unexpected blockHeight", getLightdInfo.BlockHeight)
 	}
-	if branchID != "2bb40e60" {
-		t.Error("unexpected branchID", branchID)
+	if getLightdInfo.ChainName != "bugsbunny" {
+		t.Error("unexpected chainName", getLightdInfo.ChainName)
+	}
+	if getLightdInfo.ConsensusBranchId != "someid" {
+		t.Error("unexpected ConsensusBranchId", getLightdInfo.ConsensusBranchId)
 	}
 
 	if sleepCount != 1 || sleepDuration != 15*time.Second {

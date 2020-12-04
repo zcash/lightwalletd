@@ -366,7 +366,7 @@ func DarksideClearIncomingTransactions() {
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
 	switch method {
 	case "getblockchaininfo":
-		blockchaininfo := Blockchaininfo{
+		blockchaininfo := &ZcashdRpcReplyGetblockchaininfo{
 			Chain: state.chainName,
 			Upgrades: map[string]Upgradeinfo{
 				"76b809bb": {ActivationHeight: state.startHeight},
@@ -375,6 +375,10 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			Consensus: ConsensusInfo{state.branchID, state.branchID},
 		}
 		return json.Marshal(blockchaininfo)
+
+	case "getinfo":
+		info := &ZcashdRpcReplyGetinfo{}
+		return json.Marshal(info)
 
 	case "getblock":
 		var heightStr string

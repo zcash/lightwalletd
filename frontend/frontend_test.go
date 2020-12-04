@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -214,11 +213,7 @@ func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, er
 	step++
 	switch method {
 	case "getaddresstxids":
-		var filter struct {
-			Addresses []string
-			Start     float64
-			End       float64
-		}
+		var filter common.ZcashdRpcRequestGetaddresstxids
 		err := json.Unmarshal(params[0], &filter)
 		if err != nil {
 			testT.Fatal("could not unmarshal block filter")
@@ -239,10 +234,7 @@ func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, er
 	case "getrawtransaction":
 		switch step {
 		case 2:
-			tx := &struct {
-				Hex    string `json:"hex"`
-				Height int    `json:"height"`
-			}{
+			tx := &common.ZcashdRpcRequestGetrawtransaction{
 				Hex:    hex.EncodeToString(rawTxData[0]),
 				Height: 1234567,
 			}
@@ -449,27 +441,6 @@ func TestGetBlockRangeNilArgs(t *testing.T) {
 			t.Fatal("GetBlockRange nil argument should fail")
 		}
 	}
-}
-
-func getblockchaininfoStub(method string, params []json.RawMessage) (json.RawMessage, error) {
-	getsaplinginfo, _ := ioutil.ReadFile("../testdata/getsaplinginfo")
-	getblockchaininfoReply, _ := hex.DecodeString(string(getsaplinginfo))
-	return getblockchaininfoReply, nil
-}
-
-func TestGetLightdInfo(t *testing.T) {
-	testT = t
-	common.RawRequest = getblockchaininfoStub
-	lwd, _ := testsetup()
-
-	ldinfo, err := lwd.GetLightdInfo(context.Background(), &walletrpc.Empty{})
-	if err != nil {
-		t.Fatal("GetLightdInfo failed", err)
-	}
-	if ldinfo.Vendor != "ECC LightWalletD" {
-		t.Fatal("GetLightdInfo: unexpected vendor", ldinfo)
-	}
-	step = 0
 }
 
 func sendrawtransactionStub(method string, params []json.RawMessage) (json.RawMessage, error) {
