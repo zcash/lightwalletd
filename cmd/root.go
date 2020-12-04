@@ -178,9 +178,7 @@ func startServer(opts *common.Options) error {
 	// of block streamer.
 
 	var saplingHeight int
-	var blockHeight int
 	var chainName string
-	var branchID string
 	var rpcClient *rpcclient.Client
 	var err error
 	if opts.Darkside {
@@ -198,13 +196,22 @@ func startServer(opts *common.Options) error {
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
 		common.RawRequest = rpcClient.RawRequest
-		// Get the sapling activation height from the RPC
-		// (this first RPC also verifies that we can communicate with zcashd)
-		saplingHeight, blockHeight, chainName, branchID = common.GetSaplingInfo()
-		common.Log.Info("Got sapling height ", saplingHeight,
-			" block height ", blockHeight,
-			" chain ", chainName,
-			" branchID ", branchID)
+
+		// Ensure that we can communicate with zcashd
+		common.FirstRPC()
+
+		getLightdInfo, err := common.GetLightdInfo()
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("getting initial information from zcashd")
+		}
+		common.Log.Info("Got sapling height ", getLightdInfo.SaplingActivationHeight,
+			" block height ", getLightdInfo.BlockHeight,
+			" chain ", getLightdInfo.ChainName,
+			" branchID ", getLightdInfo.ConsensusBranchId)
+		saplingHeight = int(getLightdInfo.SaplingActivationHeight)
+		chainName = getLightdInfo.ChainName
 	}
 
 	dbPath := filepath.Join(opts.DataDir, "db")

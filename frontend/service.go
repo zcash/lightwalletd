@@ -81,11 +81,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		return errors.New("Must specify an end block height")
 	}
 	params := make([]json.RawMessage, 1)
-	request := &struct {
-		Addresses []string `json:"addresses"`
-		Start     uint64   `json:"start"`
-		End       uint64   `json:"end"`
-	}{
+	request := &common.ZcashdRpcRequestGetaddresstxids{
 		Addresses: []string{addressBlockFilter.Address},
 		Start:     addressBlockFilter.Range.Start.Height,
 		End:       addressBlockFilter.Range.End.Height,
@@ -198,17 +194,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		}
 		params[0] = hashJSON
 	}
-	var gettreestateReply struct {
-		Height  int
-		Hash    string
-		Time    uint32
-		Sapling struct {
-			Commitments struct {
-				FinalState string
-			}
-			SkipHash string
-		}
-	}
+	var gettreestateReply common.ZcashdRpcReplyGettreestate
 	for {
 		result, rpcErr := common.RawRequest("z_gettreestate", params)
 		if rpcErr != nil {
@@ -263,10 +249,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 			return nil, rpcErr
 		}
 		// Many other fields are returned, but we need only these two.
-		var txinfo struct {
-			Hex    string
-			Height int
-		}
+		var txinfo common.ZcashdRpcReplyGetrawtransaction
 		err = json.Unmarshal(result, &txinfo)
 		if err != nil {
 			return nil, err
@@ -292,25 +275,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 // GetLightdInfo gets the LightWalletD (this server) info, and includes information
 // it gets from its backend zcashd.
 func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
-	saplingHeight, blockHeight, chainName, consensusBranchID := common.GetSaplingInfo()
-
-	vendor := "ECC LightWalletD"
-	if common.DarksideEnabled {
-		vendor = "ECC DarksideWalletD"
-	}
-	return &walletrpc.LightdInfo{
-		Version:                 common.Version,
-		GitCommit:               common.GitCommit,
-		Branch:                  common.Branch,
-		BuildDate:               common.BuildDate,
-		BuildUser:               common.BuildUser,
-		Vendor:                  vendor,
-		TaddrSupport:            true,
-		ChainName:               chainName,
-		SaplingActivationHeight: uint64(saplingHeight),
-		ConsensusBranchId:       consensusBranchID,
-		BlockHeight:             uint64(blockHeight),
-	}, nil
+	return common.GetLightdInfo()
 }
 
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
@@ -356,9 +321,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
 	params := make([]json.RawMessage, 1)
-	addrList := &struct {
-		Addresses []string `json:"addresses"`
-	}{
+	addrList := &common.ZcashdRpcREquestGetaddressbalance{
 		Addresses: addressList,
 	}
 	params[0], _ = json.Marshal(addrList)
@@ -367,9 +330,7 @@ func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, erro
 	if rpcErr != nil {
 		return &walletrpc.Balance{}, rpcErr
 	}
-	var balanceReply struct {
-		Balance int64
-	}
+	var balanceReply common.ZcashdRpcReplyGetaddressbalance
 	err := json.Unmarshal(result, &balanceReply)
 	if err != nil {
 		return &walletrpc.Balance{}, err
@@ -539,13 +500,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 	if rpcErr != nil {
 		return rpcErr
 	}
-	var utxosReply []struct {
-		Txid        string
-		OutputIndex int64
-		Script      string
-		Satoshis    uint64
-		Height      int
-	}
+	var utxosReply common.ZcashdRpcReplyGetaddressutxos
 	err := json.Unmarshal(result, &utxosReply)
 	if err != nil {
 		return err

@@ -59,27 +59,86 @@ var Sleep func(d time.Duration)
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
 
+// The following are JSON zcashd rpc requests and replies.
 type (
+	// zcashd rpc "getblockchaininfo"
 	Upgradeinfo struct {
-		// there are other fields that aren't needed here, omit them
+		// unneeded fields can be omitted
 		ActivationHeight int
+		Status           string // "active"
 	}
-	ConsensusInfo struct {
+	ConsensusInfo struct { // consensus branch IDs
 		Nextblock string
 		Chaintip  string
 	}
-	Blockchaininfo struct {
-		Chain     string
-		Upgrades  map[string]Upgradeinfo
-		Headers   int
-		Consensus ConsensusInfo
+	ZcashdRpcReplyGetblockchaininfo struct {
+		Chain           string
+		Upgrades        map[string]Upgradeinfo
+		Headers         int
+		Consensus       ConsensusInfo
+		EstimatedHeight int
+	}
+
+	// zcashd rpc "getinfo"
+	ZcashdRpcReplyGetinfo struct {
+		Height            int
+		ChainName         string
+		ConsensusBranchID string
+		Build             string
+		Subversion        string
+	}
+
+	// zcashd rpc "getaddresstxids"
+	ZcashdRpcRequestGetaddresstxids struct {
+		Addresses []string
+		Start     uint64
+		End       uint64
+	}
+
+	// zcashd rpc "z_gettreestate"
+	ZcashdRpcReplyGettreestate struct {
+		Height  int
+		Hash    string
+		Time    uint32
+		Sapling struct {
+			Commitments struct {
+				FinalState string
+			}
+			SkipHash string
+		}
+	}
+
+	// zcashd rpc "getrawtransaction"
+	ZcashdRpcRequestGetrawtransaction struct {
+		Hex    string
+		Height int
+	}
+	ZcashdRpcReplyGetrawtransaction struct {
+		Hex    string
+		Height int
+	}
+
+	// zcashd rpc "getaddressbalance"
+	ZcashdRpcREquestGetaddressbalance struct {
+		Addresses []string
+	}
+	ZcashdRpcReplyGetaddressbalance struct {
+		Balance int64
+	}
+
+	// zcashd rpc "getaddressutxos"
+	ZcashdRpcReplyGetaddressutxos []struct {
+		Txid        string
+		OutputIndex int64
+		Script      string
+		Satoshis    uint64
+		Height      int
 	}
 )
 
-// GetSaplingInfo returns the result of the getblockchaininfo RPC to zcashd
-func GetSaplingInfo() (int, int, string, string) {
-	// This request must succeed or we can't go on; give zcashd time to start up
-	var blockchaininfo Blockchaininfo
+// FirstRPC tests that we can successfully reach zcashd through the RPC
+// interface. The specific RPC used here is not important.
+func FirstRPC() {
 	retryCount := 0
 	for {
 		result, rpcErr := RawRequest("getblockchaininfo", []json.RawMessage{})
@@ -87,7 +146,8 @@ func GetSaplingInfo() (int, int, string, string) {
 			if retryCount > 0 {
 				Log.Warn("getblockchaininfo RPC successful")
 			}
-			err := json.Unmarshal(result, &blockchaininfo)
+			var getblockchaininfo ZcashdRpcReplyGetblockchaininfo
+			err := json.Unmarshal(result, &getblockchaininfo)
 			if err != nil {
 				Log.Fatalf("error parsing JSON getblockchaininfo response: %v", err)
 			}
@@ -105,15 +165,54 @@ func GetSaplingInfo() (int, int, string, string) {
 		}).Warn("error with getblockchaininfo rpc, retrying...")
 		Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
 	}
+}
 
+func GetLightdInfo() (*walletrpc.LightdInfo, error) {
+	result, rpcErr := RawRequest("getinfo", []json.RawMessage{})
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+	var getinfoReply ZcashdRpcReplyGetinfo
+	err := json.Unmarshal(result, &getinfoReply)
+	if err != nil {
+		return nil, rpcErr
+	}
+
+	result, rpcErr = RawRequest("getblockchaininfo", []json.RawMessage{})
+	if rpcErr != nil {
+		return nil, rpcErr
+	}
+	var getblockchaininfoReply ZcashdRpcReplyGetblockchaininfo
+	err = json.Unmarshal(result, &getblockchaininfoReply)
+	if err != nil {
+		return nil, rpcErr
+	}
 	// If the sapling consensus branch doesn't exist, it must be regtest
 	var saplingHeight int
-	if saplingJSON, ok := blockchaininfo.Upgrades["76b809bb"]; ok { // Sapling ID
+	if saplingJSON, ok := getblockchaininfoReply.Upgrades["76b809bb"]; ok { // Sapling ID
 		saplingHeight = saplingJSON.ActivationHeight
 	}
 
-	return saplingHeight, blockchaininfo.Headers, blockchaininfo.Chain,
-		blockchaininfo.Consensus.Nextblock
+	vendor := "ECC LightWalletD"
+	if DarksideEnabled {
+		vendor = "ECC DarksideWalletD"
+	}
+	return &walletrpc.LightdInfo{
+		Version:                 Version,
+		Vendor:                  vendor,
+		TaddrSupport:            true,
+		ChainName:               getinfoReply.ChainName,
+		SaplingActivationHeight: uint64(saplingHeight),
+		ConsensusBranchId:       getinfoReply.ConsensusBranchID,
+		BlockHeight:             uint64(getinfoReply.Height),
+		GitCommit:               GitCommit,
+		Branch:                  Branch,
+		BuildDate:               BuildDate,
+		BuildUser:               BuildUser,
+		EstimatedHeight:         uint64(getblockchaininfoReply.EstimatedHeight),
+		ZcashdBuild:             getinfoReply.Build,
+		ZcashdSubversion:        getinfoReply.Subversion,
+	}, nil
 }
 
 func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
