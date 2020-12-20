@@ -3,7 +3,7 @@ Docker images are available on Docker Hub at [electriccoinco/lightwalletd](https
 
 ## Using command line options
 
-Already have a zcash node running with an exposed RPC endpoint?
+Already have a Zcash node running with an exposed RPC endpoint?
 
 Try the docker container with command lines flags like:
 ```
@@ -78,4 +78,4 @@ docker run  --rm \
 
 ## Using docker-compose for a full stack
 
-Don't have an existing zcash node? Check out the [docker-compose](./docker-compose-setup.md) for examples of multi-container usage.
+Don't have an existing Zcash node? Check out the [docker-compose](./docker-compose-setup.md) for examples of multi-container usage.

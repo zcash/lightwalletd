@@ -4,7 +4,7 @@
 
 # Security Disclaimer
 
-Lightwalletd is under active development, some features are more stable than
+lightwalletd is under active development, some features are more stable than
 others. The code has not been subjected to a thorough review by an external
 auditor, and recent code changes have not yet received security review from
 Electric Coin Company's security team.
@@ -12,7 +12,7 @@ Electric Coin Company's security team.
 Developers should familiarize themselves with the [wallet app threat
 model](https://zcash.readthedocs.io/en/latest/rtd_pages/wallet_threat_model.html),
 since it contains important information about the security and privacy
-limitations of light wallets that use Lightwalletd.
+limitations of light wallets that use lightwalletd.
 
 ---
 
@@ -111,7 +111,7 @@ Example using server binary built from Makefile:
 
 ## Block cache
 
-Lightwalletd caches all blocks from Sapling activation up to the
+lightwalletd caches all blocks from Sapling activation up to the
 most recent block, which takes about an hour the first time you run
 lightwalletd. During this syncing, lightwalletd is fully available,
 but block fetches are slower until the download completes.
@@ -121,7 +121,7 @@ because the blocks are cached in local files (by default, within
 `/var/lib/lightwalletd/db`; you can specify a different location using
 the `--data-dir` command-line option).
 
-Lightwalletd checks the consistency of these files at startup and during
+lightwalletd checks the consistency of these files at startup and during
 operation as these files may be damaged by, for example, an unclean shutdown.
 If the server detects corruption, it will automatically re-downloading blocks
 from `zcashd` from that height, requiring up to an hour again (no manual
@@ -133,7 +133,7 @@ nature of the corruption.
 
 ## Darksidewalletd & Testing
 
-Lightwalletd now supports a mode that enables integration testing of itself and
+lightwalletd now supports a mode that enables integration testing of itself and
 wallets that connect to it. See the [darksidewalletd
 docs](docs/darksidewalletd.md) for more information.
 
