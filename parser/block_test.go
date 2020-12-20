@@ -97,12 +97,12 @@ func TestBlockParser(t *testing.T) {
 				t.Error("Unexpected number of transactions")
 			}
 			if block.HasSaplingTransactions() {
-				t.Error("Unexpected Saping tx")
+				t.Error("Unexpected Sapling tx")
 				break
 			}
 			for txindex, tx := range block.Transactions() {
 				if tx.HasSaplingElements() {
-					t.Error("Unexpected Saping tx")
+					t.Error("Unexpected Sapling tx")
 					break
 				}
 				expectedHash := txhashes[blockindex][txindex%len(txhashes[blockindex])]

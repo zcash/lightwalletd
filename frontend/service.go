@@ -170,14 +170,14 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 }
 
 // GetTreeState returns the note commitment tree state corresponding to the given block.
-// See section 3.7 of the zcash protocol specification. It returns several other useful
+// See section 3.7 of the Zcash protocol specification. It returns several other useful
 // values also (even though they can be obtained using GetBlock).
 // The block can be specified by either height or hash.
 func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
 	if id.Height == 0 && id.Hash == nil {
 		return nil, errors.New("request for unspecified identifier")
 	}
-	// The zcash z_gettreestate rpc accepts either a block height or block hash
+	// The Zcash z_gettreestate rpc accepts either a block height or block hash
 	params := make([]json.RawMessage, 1)
 	var hashJSON []byte
 	if id.Height > 0 {

@@ -2,7 +2,7 @@
  #  File: Dockerfile
  #  Author: mdr0id
  #  Date: 9/3/2019
- #  Description:  Used for devs that have not built zcash or lightwalletd on
+ #  Description:  Used for devs that have not built zcashd or lightwalletd on
  #                on existing system
  #  USAGE:
  #
@@ -15,10 +15,10 @@
  #  First you need to get zcashd sync to current height on testnet, from outside container:
  #  make docker_img_run_zcashd
  #
- #  Sometimes you need to manually start zcashd for the first time, from insdie the container:
+ #  Sometimes you need to manually start zcashd for the first time, from inside the container:
  #  zcashd -printtoconsole   
  #
- #  Once the block height is atleast 280,000 you can go ahead and start lightwalletd
+ #  Once the block height is at least 280,000 you can go ahead and start lightwalletd
  #  make docker_img_run_lightwalletd_insecure_server
  #  
  #  If you need a random bash session in the container, use:

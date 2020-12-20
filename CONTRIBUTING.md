@@ -11,7 +11,7 @@ This document describes the standard workflows and terminology for developers at
 Before continuing, please ensure you have an existing GitHub or GitLab account. If not, visit [GitHub](https://github.com) or [GitLab](https://gitlab.com) to create an account. 
 
 ## Fork Repository
-This step assumes you are starting with a new GitHub/GitLab environment. If you have already forked the Lightwalletd repository, please continue to [Create Branch] section. Otherwise, open up a terminal and issue the below commands:
+This step assumes you are starting with a new GitHub/GitLab environment. If you have already forked the lightwalletd repository, please continue to [Create Branch] section. Otherwise, open up a terminal and issue the below commands:
 
 Note: Please replace `your_username`, with your actual GitHub username
 
@@ -43,10 +43,10 @@ After issuing the above commands, your `.git/config` file should look similar to
 	fetch = +refs/heads/*:refs/remotes/upstream/*
 	pushurl = DISABLED
 ```
-This setup provides a single cloned environment to develop for Lightwalletd. There are alternative methods using multiple clones, but this document does not cover that process.
+This setup provides a single cloned environment to develop for lightwalletd. There are alternative methods using multiple clones, but this document does not cover that process.
 
 ## Create Branch
-While working on the Lightwalletd project, you are going to have bugs, features, and ideas to work on. Branching exists to aid these different tasks while you write code. Below are some conventions of branching at Zcash:
+While working on the lightwalletd project, you are going to have bugs, features, and ideas to work on. Branching exists to aid these different tasks while you write code. Below are some conventions of branching at Zcash:
 
 1. `master` branch is **ALWAYS** deployable
 2. Branch names **MUST** be descriptive:
@@ -57,14 +57,14 @@ To create a new branch (assuming you are in `lightwalletd` directory):
 ```bash
 git checkout -b [new_branch_name]
 ```
-Note: Even though you have created a new branch, until you `git push` this local branch, it will not show up in your Lightwalletd fork on GitHub (e.g. https://github.com/your_username/lightwalletd)
+Note: Even though you have created a new branch, until you `git push` this local branch, it will not show up in your lightwalletd fork on GitHub (e.g. https://github.com/your_username/lightwalletd)
 
 To checkout an existing branch (assuming you are in `lightwalletd` directory):
 
 ```bash
 git checkout [existing_branch_name]
 ```
-If you are fixing a bug or implementing a new feature, you likely will want to create a new branch. If you are reviewing code or working on existing branches, you likely will checkout an existing branch. To view the list of current Lightwalletd GitHub issues, click [here](https://github.com/zcash/lightwalletd/issues). 
+If you are fixing a bug or implementing a new feature, you likely will want to create a new branch. If you are reviewing code or working on existing branches, you likely will checkout an existing branch. To view the list of current lightwalletd GitHub issues, click [here](https://github.com/zcash/lightwalletd/issues). 
 
 ## Make & Commit Changes
 If you have created a new branch or checked out an existing one, it is time to make changes to your local source code. Below are some formalities for commits:
