@@ -54,6 +54,7 @@ type CompactTxStreamerClient interface {
 	// values also (even though they can be obtained using GetBlock).
 	// The block can be specified by either height or hash.
 	GetTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*TreeState, error)
+	GetLatestTreeState(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TreeState, error)
 	GetAddressUtxos(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (*GetAddressUtxosReplyList, error)
 	GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error)
 	// Return information about this lightwalletd instance and the blockchain
@@ -286,6 +287,15 @@ func (c *compactTxStreamerClient) GetTreeState(ctx context.Context, in *BlockID,
 	return out, nil
 }
 
+func (c *compactTxStreamerClient) GetLatestTreeState(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TreeState, error) {
+	out := new(TreeState)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLatestTreeState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (*GetAddressUtxosReplyList, error) {
 	out := new(GetAddressUtxosReplyList)
 	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos", in, out, opts...)
@@ -381,6 +391,7 @@ type CompactTxStreamerServer interface {
 	// values also (even though they can be obtained using GetBlock).
 	// The block can be specified by either height or hash.
 	GetTreeState(context.Context, *BlockID) (*TreeState, error)
+	GetLatestTreeState(context.Context, *Empty) (*TreeState, error)
 	GetAddressUtxos(context.Context, *GetAddressUtxosArg) (*GetAddressUtxosReplyList, error)
 	GetAddressUtxosStream(*GetAddressUtxosArg, CompactTxStreamer_GetAddressUtxosStreamServer) error
 	// Return information about this lightwalletd instance and the blockchain
@@ -426,6 +437,9 @@ func (UnimplementedCompactTxStreamerServer) GetMempoolStream(*Empty, CompactTxSt
 }
 func (UnimplementedCompactTxStreamerServer) GetTreeState(context.Context, *BlockID) (*TreeState, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTreeState not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetLatestTreeState(context.Context, *Empty) (*TreeState, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetLatestTreeState not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetAddressUtxos(context.Context, *GetAddressUtxosArg) (*GetAddressUtxosReplyList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAddressUtxos not implemented")
@@ -670,6 +684,24 @@ func _CompactTxStreamer_GetTreeState_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CompactTxStreamer_GetLatestTreeState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetLatestTreeState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLatestTreeState",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetLatestTreeState(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CompactTxStreamer_GetAddressUtxos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAddressUtxosArg)
 	if err := dec(in); err != nil {
@@ -775,6 +807,10 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTreeState",
 			Handler:    _CompactTxStreamer_GetTreeState_Handler,
+		},
+		{
+			MethodName: "GetLatestTreeState",
+			Handler:    _CompactTxStreamer_GetLatestTreeState_Handler,
 		},
 		{
 			MethodName: "GetAddressUtxos",
