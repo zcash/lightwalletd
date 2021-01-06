@@ -85,13 +85,16 @@ doc: docs/rtd/index.html
 docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto walletrpc/darkside.proto
 	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/walletrpc:/protos pseudomuto/protoc-gen-doc
 
-proto: walletrpc/service.pb.go walletrpc/darkside.pb.go
+proto: walletrpc/service.pb.go walletrpc/darkside.pb.go walletrpc/compact_formats.pb.go
 
 walletrpc/service.pb.go: walletrpc/service.proto
-	cd walletrpc && protoc service.proto --go_out=plugins=grpc:.
+	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
 
 walletrpc/darkside.pb.go: walletrpc/darkside.proto
-	cd walletrpc && protoc darkside.proto --go_out=plugins=grpc:.
+	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative darkside.proto
+
+walletrpc/compact_formats.pb.go: walletrpc/compact_formats.proto
+	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative compact_formats.proto
 
 # Generate documents using a very simple wrap-in-html approach (not ideal)
 simpledoc: lwd-api.html
@@ -147,8 +150,9 @@ update-grpc:
 	go get -u github.com/golang/protobuf/proto
 	go get -u github.com/golang/protobuf/protoc-gen-go
 	go get -u google.golang.org/grpc
-	cd walletrpc && protoc service.proto --go_out=plugins=grpc:.
-	cd walletrpc && protoc darkside.proto --go_out=plugins=grpc:.
+	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
+	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative darkside.proto
+	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative compact_formats.proto
 	go mod tidy && go mod vendor
 
 clean:
