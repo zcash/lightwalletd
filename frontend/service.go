@@ -26,21 +26,23 @@ import (
 type lwdStreamer struct {
 	cache     *common.BlockCache
 	chainName string
+	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
 // NewLwdStreamer constructs a gRPC context.
 func NewLwdStreamer(cache *common.BlockCache, chainName string) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache, chainName}, nil
+	return &lwdStreamer{cache: cache, chainName: chainName}, nil
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
 type DarksideStreamer struct {
 	cache *common.BlockCache
+	walletrpc.UnimplementedDarksideStreamerServer
 }
 
 // NewDarksideStreamer constructs a gRPC context for darksidewalletd.
 func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerServer, error) {
-	return &DarksideStreamer{cache}, nil
+	return &DarksideStreamer{cache: cache}, nil
 }
 
 // Test to make sure Address is a single t address
