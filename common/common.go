@@ -68,24 +68,21 @@ type (
 		Status           string // "active"
 	}
 	ConsensusInfo struct { // consensus branch IDs
-		Nextblock string
-		Chaintip  string
+		Nextblock string // example: "e9ff75a6" (canopy)
+		Chaintip  string // example: "e9ff75a6" (canopy)
 	}
 	ZcashdRpcReplyGetblockchaininfo struct {
 		Chain           string
 		Upgrades        map[string]Upgradeinfo
-		Headers         int
+		Blocks          int
 		Consensus       ConsensusInfo
 		EstimatedHeight int
 	}
 
 	// zcashd rpc "getinfo"
 	ZcashdRpcReplyGetinfo struct {
-		Height            int
-		ChainName         string
-		ConsensusBranchID string
-		Build             string
-		Subversion        string
+		Build      string
+		Subversion string
 	}
 
 	// zcashd rpc "getaddresstxids"
@@ -201,10 +198,10 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		Version:                 Version,
 		Vendor:                  vendor,
 		TaddrSupport:            true,
-		ChainName:               getinfoReply.ChainName,
+		ChainName:               getblockchaininfoReply.Chain,
 		SaplingActivationHeight: uint64(saplingHeight),
-		ConsensusBranchId:       getinfoReply.ConsensusBranchID,
-		BlockHeight:             uint64(getinfoReply.Height),
+		ConsensusBranchId:       getblockchaininfoReply.Consensus.Chaintip,
+		BlockHeight:             uint64(getblockchaininfoReply.Blocks),
 		GitCommit:               GitCommit,
 		Branch:                  Branch,
 		BuildDate:               BuildDate,
