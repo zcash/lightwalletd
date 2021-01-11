@@ -219,6 +219,14 @@ func startServer(opts *common.Options) error {
 		os.RemoveAll(filepath.Join(dbPath, chainName))
 	}
 
+	// Temporary, because PR 320 put the db files in the wrong place
+	// (one level too high, directly in "db/" instead of "db/chainname"),
+	// so delete them if they're present. This can be removed sometime.
+	os.Remove(filepath.Join(dbPath, "blocks"))
+	os.Remove(filepath.Join(dbPath, "blocks-corrupted"))
+	os.Remove(filepath.Join(dbPath, "lengths"))
+	os.Remove(filepath.Join(dbPath, "lengths-corrupted"))
+
 	if err := os.MkdirAll(opts.DataDir, 0755); err != nil {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create data directory: %s\n\n", opts.DataDir))
 		os.Exit(1)

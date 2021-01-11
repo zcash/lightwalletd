@@ -371,7 +371,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			Upgrades: map[string]Upgradeinfo{
 				"76b809bb": {ActivationHeight: state.startHeight},
 			},
-			Headers:   state.latestHeight,
+			Blocks:    state.latestHeight,
 			Consensus: ConsensusInfo{state.branchID, state.branchID},
 		}
 		return json.Marshal(blockchaininfo)

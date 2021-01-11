@@ -84,11 +84,7 @@ func getLightdInfoStub(method string, params []json.RawMessage) (json.RawMessage
 	step++
 	switch method {
 	case "getinfo":
-		r, _ := json.Marshal(&ZcashdRpcReplyGetinfo{
-			Height:            9977,
-			ChainName:         "bugsbunny",
-			ConsensusBranchID: "someid",
-		})
+		r, _ := json.Marshal(&ZcashdRpcReplyGetinfo{})
 		return r, nil
 
 	case "getblockchaininfo":
@@ -102,7 +98,9 @@ func getLightdInfoStub(method string, params []json.RawMessage) (json.RawMessage
 			}
 		}
 		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
-			Headers: 11111,
+			Blocks:    9977,
+			Chain:     "bugsbunny",
+			Consensus: ConsensusInfo{Chaintip: "someid"},
 		})
 		return r, nil
 	}
