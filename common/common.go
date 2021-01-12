@@ -87,9 +87,9 @@ type (
 
 	// zcashd rpc "getaddresstxids"
 	ZcashdRpcRequestGetaddresstxids struct {
-		Addresses []string
-		Start     uint64
-		End       uint64
+		Addresses []string `json:"addresses"`
+		Start     uint64   `json:"start"`
+		End       uint64   `json:"end"`
 	}
 
 	// zcashd rpc "z_gettreestate"
@@ -106,10 +106,6 @@ type (
 	}
 
 	// zcashd rpc "getrawtransaction"
-	ZcashdRpcRequestGetrawtransaction struct {
-		Hex    string
-		Height int
-	}
 	ZcashdRpcReplyGetrawtransaction struct {
 		Hex    string
 		Height int
