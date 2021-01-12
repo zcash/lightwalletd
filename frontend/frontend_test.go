@@ -234,7 +234,7 @@ func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, er
 	case "getrawtransaction":
 		switch step {
 		case 2:
-			tx := &common.ZcashdRpcRequestGetrawtransaction{
+			tx := &common.ZcashdRpcReplyGetrawtransaction{
 				Hex:    hex.EncodeToString(rawTxData[0]),
 				Height: 1234567,
 			}
