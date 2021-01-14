@@ -55,6 +55,7 @@ var rootCmd = &cobra.Command{
 			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
 			DataDir:             viper.GetString("data-dir"),
 			Redownload:          viper.GetBool("redownload"),
+			PingEnable:          viper.GetBool("ping-very-insecure"),
 			Darkside:            viper.GetBool("darkside-very-insecure"),
 			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
 		}
@@ -248,7 +249,7 @@ func startServer(opts *common.Options) error {
 
 	// Compact transaction service initialization
 	{
-		service, err := frontend.NewLwdStreamer(cache, chainName)
+		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -325,6 +326,7 @@ func init() {
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
+	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 
@@ -356,6 +358,8 @@ func init() {
 	viper.SetDefault("redownload", false)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))
 	viper.SetDefault("data-dir", "/var/lib/lightwalletd")
+	viper.BindPFlag("ping-very-insecure", rootCmd.Flags().Lookup("ping-very-insecure"))
+	viper.SetDefault("ping-very-insecure", false)
 	viper.BindPFlag("darkside-very-insecure", rootCmd.Flags().Lookup("darkside-very-insecure"))
 	viper.SetDefault("darkside-very-insecure", false)
 	viper.BindPFlag("darkside-timeout", rootCmd.Flags().Lookup("darkside-timeout"))
