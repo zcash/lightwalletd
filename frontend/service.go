@@ -304,6 +304,9 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
 		errParts := strings.SplitN(rpcErr.Error(), ":", 2)
+		if len(errParts) < 2 {
+			return nil, errors.New("SendTransaction couldn't parse error code")
+		}
 		errMsg = strings.TrimSpace(errParts[1])
 		errCode, err = strconv.ParseInt(errParts[0], 10, 32)
 		if err != nil {
