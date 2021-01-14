@@ -24,14 +24,15 @@ import (
 )
 
 type lwdStreamer struct {
-	cache     *common.BlockCache
-	chainName string
+	cache      *common.BlockCache
+	chainName  string
+	pingEnable bool
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
 // NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache, chainName string) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache: cache, chainName: chainName}, nil
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
+	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}, nil
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
@@ -575,6 +576,12 @@ func (s *lwdStreamer) GetAddressUtxosStream(arg *walletrpc.GetAddressUtxosArg, r
 var concurrent int64
 
 func (s *lwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*walletrpc.PingResponse, error) {
+	// This gRPC allows the client to create an arbitrary number of
+	// concurrent threads, which could run the server out of resources,
+	// so only allow if explicitly enabled.
+	if !s.pingEnable {
+		return nil, errors.New("Ping not enabled, start lightwalletd with --ping-very-insecure")
+	}
 	var response walletrpc.PingResponse
 	response.Entry = atomic.AddInt64(&concurrent, 1)
 	time.Sleep(time.Duration(in.IntervalUs) * time.Microsecond)

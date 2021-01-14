@@ -172,6 +172,6 @@ service CompactTxStreamer {
 
     // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
-    // Testing-only
+    // Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
     rpc Ping(Duration) returns (PingResponse) {}
 }

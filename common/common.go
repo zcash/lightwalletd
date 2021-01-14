@@ -43,6 +43,7 @@ type Options struct {
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`
 	DataDir             string `json:"data_dir"`
+	PingEnable          bool   `json:"ping_enable"`
 	Darkside            bool   `json:"darkside"`
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
 }
