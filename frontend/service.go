@@ -327,6 +327,11 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 }
 
 func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
+	for _, addr := range addressList {
+		if err := checkTaddress(addr); err != nil {
+			return &walletrpc.Balance{}, err
+		}
+	}
 	params := make([]json.RawMessage, 1)
 	addrList := &common.ZcashdRpcRequestGetaddressbalance{
 		Addresses: addressList,
