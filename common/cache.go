@@ -281,8 +281,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	}
 	bheight := int(block.Height)
 
-	// XXX check? TODO COINBASE-HEIGHT: restore this check after coinbase height is fixed
-	if false && bheight != height {
+	if bheight != height {
 		// This could only happen if zcashd returned the wrong
 		// block (not the height we requested).
 		Log.Fatal("cache.Add wrong height: ", bheight, " expecting: ", height)
