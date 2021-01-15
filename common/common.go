@@ -112,8 +112,8 @@ type (
 	}
 
 	// zcashd rpc "getaddressbalance"
-	ZcashdRpcREquestGetaddressbalance struct {
-		Addresses []string
+	ZcashdRpcRequestGetaddressbalance struct {
+		Addresses []string `json:"addresses"`
 	}
 	ZcashdRpcReplyGetaddressbalance struct {
 		Balance int64

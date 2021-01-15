@@ -323,7 +323,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
 	params := make([]json.RawMessage, 1)
-	addrList := &common.ZcashdRpcREquestGetaddressbalance{
+	addrList := &common.ZcashdRpcRequestGetaddressbalance{
 		Addresses: addressList,
 	}
 	params[0], _ = json.Marshal(addrList)
