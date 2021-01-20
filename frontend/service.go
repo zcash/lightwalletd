@@ -94,14 +94,12 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
-		common.Log.Errorf("GetTaddressTxids error: %s", rpcErr.Error())
 		return rpcErr
 	}
 
 	var txids []string
 	err := json.Unmarshal(result, &txids)
 	if err != nil {
-		common.Log.Errorf("GetTaddressTxids error: %s", err.Error())
 		return err
 	}
 
@@ -114,7 +112,6 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		// to bytes, it should be little-endian
 		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txid)})
 		if err != nil {
-			common.Log.Errorf("GetTransaction error: %s", err.Error())
 			return err
 		}
 		if err = resp.Send(tx); err != nil {
@@ -236,7 +233,6 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 	if txf.Hash != nil {
 		leHashStringJSON, err := json.Marshal(hex.EncodeToString(parser.Reverse(txf.Hash)))
 		if err != nil {
-			common.Log.Errorf("GetTransaction: cannot encode txid: %s", err.Error())
 			return nil, err
 		}
 		params := []json.RawMessage{
@@ -247,7 +243,6 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 
 		// For some reason, the error responses are not JSON
 		if rpcErr != nil {
-			common.Log.Errorf("GetTransaction error: %s", rpcErr.Error())
 			return nil, rpcErr
 		}
 		// Many other fields are returned, but we need only these two.
@@ -267,10 +262,8 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 	}
 
 	if txf.Block != nil && txf.Block.Hash != nil {
-		common.Log.Error("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
 		return nil, errors.New("Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid")
 	}
-	common.Log.Error("Please call GetTransaction with txid")
 	return nil, errors.New("Please call GetTransaction with txid")
 }
 
@@ -403,7 +396,6 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 			result, rpcErr := common.RawRequest("getrawtransaction", params)
 			if rpcErr != nil {
 				// Not an error; mempool transactions can disappear
-				common.Log.Errorf("GetTransaction error: %s", rpcErr.Error())
 				continue
 			}
 			// strip the quotes
