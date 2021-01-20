@@ -40,6 +40,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := &common.Options{
 			GRPCBindAddr:        viper.GetString("grpc-bind-addr"),
+			GRPCLogging:         viper.GetBool("grpc-logging-insecure"),
 			HTTPBindAddr:        viper.GetString("http-bind-addr"),
 			TLSCertPath:         viper.GetString("tls-cert"),
 			TLSKeyPath:          viper.GetString("tls-key"),
@@ -120,6 +121,8 @@ func startServer(opts *common.Options) error {
 		"buildDate": common.BuildDate,
 		"buildUser": common.BuildUser,
 	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
+
+	logging.LogToStderr = opts.GRPCLogging
 
 	// gRPC initialization
 	var server *grpc.Server
@@ -308,6 +311,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is current directory, lightwalletd.yaml)")
 	rootCmd.Flags().String("http-bind-addr", "127.0.0.1:9068", "the address to listen for http on")
 	rootCmd.Flags().String("grpc-bind-addr", "127.0.0.1:9067", "the address to listen for grpc on")
+	rootCmd.Flags().Bool("grpc-logging-insecure", false, "enable grpc logging to stderr")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -326,6 +330,8 @@ func init() {
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
+	viper.BindPFlag("grpc-logging-insecure", rootCmd.Flags().Lookup("grpc-logging-insecure"))
+	viper.SetDefault("grpc-logging-insecure", false)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))

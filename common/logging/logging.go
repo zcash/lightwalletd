@@ -10,6 +10,8 @@ import (
 	"google.golang.org/grpc/peer"
 )
 
+var LogToStderr bool
+
 func LoggingInterceptor() grpc.ServerOption {
 	return grpc.UnaryInterceptor(LogInterceptor)
 }
@@ -33,16 +35,18 @@ func LogInterceptor(
 
 	resp, err := handler(ctx, req)
 
-	entry := reqLog.WithFields(logrus.Fields{
-		"method":   info.FullMethod,
-		"duration": time.Since(start),
-		"error":    err,
-	})
+	if LogToStderr {
+		entry := reqLog.WithFields(logrus.Fields{
+			"method":   info.FullMethod,
+			"duration": time.Since(start),
+			"error":    err,
+		})
 
-	if err != nil {
-		entry.Error("call failed")
-	} else {
-		entry.Info("method called")
+		if err != nil {
+			entry.Error("call failed")
+		} else {
+			entry.Info("method called")
+		}
 	}
 
 	return resp, err
