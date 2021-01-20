@@ -88,8 +88,11 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		Start:     addressBlockFilter.Range.Start.Height,
 		End:       addressBlockFilter.Range.End.Height,
 	}
-	params[0], _ = json.Marshal(request)
-
+	param, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	params[0] = param
 	result, rpcErr := common.RawRequest("getaddresstxids", params)
 
 	// For some reason, the error responses are not JSON
@@ -98,7 +101,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	}
 
 	var txids []string
-	err := json.Unmarshal(result, &txids)
+	err = json.Unmarshal(result, &txids)
 	if err != nil {
 		return err
 	}
@@ -284,11 +287,13 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
-	txJSON, _ := json.Marshal(hex.EncodeToString(rawtx.Data))
+	txJSON, err := json.Marshal(hex.EncodeToString(rawtx.Data))
+	if err != nil {
+		return &walletrpc.SendResponse{}, err
+	}
 	params[0] = txJSON
 	result, rpcErr := common.RawRequest("sendrawtransaction", params)
 
-	var err error
 	var errCode int64
 	var errMsg string
 
@@ -319,14 +324,18 @@ func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, erro
 	addrList := &common.ZcashdRpcRequestGetaddressbalance{
 		Addresses: addressList,
 	}
-	params[0], _ = json.Marshal(addrList)
+	param, err := json.Marshal(addrList)
+	if err != nil {
+		return &walletrpc.Balance{}, err
+	}
+	params[0] = param
 
 	result, rpcErr := common.RawRequest("getaddressbalance", params)
 	if rpcErr != nil {
 		return &walletrpc.Balance{}, rpcErr
 	}
 	var balanceReply common.ZcashdRpcReplyGetaddressbalance
-	err := json.Unmarshal(result, &balanceReply)
+	err = json.Unmarshal(result, &balanceReply)
 	if err != nil {
 		return &walletrpc.Balance{}, err
 	}
@@ -389,7 +398,10 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 				newmempoolMap[txidstr] = ctx
 				continue
 			}
-			txidJSON, _ := json.Marshal(txidstr)
+			txidJSON, err := json.Marshal(txidstr)
+			if err != nil {
+				return err
+			}
 			// The "0" is because we only need the raw hex, which is returned as
 			// just a hex string, and not even a json string (with quotes).
 			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
@@ -400,7 +412,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 			}
 			// strip the quotes
 			var txStr string
-			err := json.Unmarshal(result, &txStr)
+			err = json.Unmarshal(result, &txStr)
 			if err != nil {
 				return err
 			}
@@ -489,13 +501,17 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 		return err
 	}
 	params := make([]json.RawMessage, 1)
-	params[0], _ = json.Marshal(arg.Address)
+	param, err := json.Marshal(arg.Address)
+	if err != nil {
+		return err
+	}
+	params[0] = param
 	result, rpcErr := common.RawRequest("getaddressutxos", params)
 	if rpcErr != nil {
 		return rpcErr
 	}
 	var utxosReply common.ZcashdRpcReplyGetaddressutxos
-	err := json.Unmarshal(result, &utxosReply)
+	err = json.Unmarshal(result, &utxosReply)
 	if err != nil {
 		return err
 	}
