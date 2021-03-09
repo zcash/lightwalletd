@@ -136,7 +136,7 @@ dep:
 
 # Build binary
 build:
-	GO111MODULE=on go build $(LDFLAGS) 
+	GO111MODULE=on go build $(LDFLAGS) -mod=vendor
 
 build_rel:
 	GO111MODULE=on GOOS=linux go build $(LDFLAGS) 
