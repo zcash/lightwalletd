@@ -88,7 +88,7 @@ func main() {
 				" maximum 65535"))
 		}
 
-		hashOfTxnsAndHeight := sha256.Sum256([]byte(allTransactionsHex + "#" + string(curHeight)))
+		hashOfTxnsAndHeight := sha256.Sum256([]byte(allTransactionsHex + "#" + string(rune(curHeight))))
 
 		// These fields do not need to be valid for the lightwalletd/wallet stack to work.
 		// The lightwalletd/wallet stack rely on the miners to validate these.
