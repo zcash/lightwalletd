@@ -11,6 +11,7 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
+// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // CompactTxStreamerClient is the client API for CompactTxStreamer service.
@@ -50,7 +51,7 @@ type CompactTxStreamerClient interface {
 	GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error)
 	// Return information about this lightwalletd instance and the blockchain
 	GetLightdInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*LightdInfo, error)
-	// Testing-only
+	// Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
 	Ping(ctx context.Context, in *Duration, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
@@ -81,7 +82,7 @@ func (c *compactTxStreamerClient) GetBlock(ctx context.Context, in *BlockID, opt
 }
 
 func (c *compactTxStreamerClient) GetBlockRange(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlockRange", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetBlockRange", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +132,7 @@ func (c *compactTxStreamerClient) SendTransaction(ctx context.Context, in *RawTr
 }
 
 func (c *compactTxStreamerClient) GetTaddressTxids(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTxidsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressTxids", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressTxids", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +173,7 @@ func (c *compactTxStreamerClient) GetTaddressBalance(ctx context.Context, in *Ad
 }
 
 func (c *compactTxStreamerClient) GetTaddressBalanceStream(ctx context.Context, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressBalanceStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[2], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalanceStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[2], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalanceStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +207,7 @@ func (x *compactTxStreamerGetTaddressBalanceStreamClient) CloseAndRecv() (*Balan
 }
 
 func (c *compactTxStreamerClient) GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[3], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +257,7 @@ func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAd
 }
 
 func (c *compactTxStreamerClient) GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_CompactTxStreamer_serviceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +343,7 @@ type CompactTxStreamerServer interface {
 	GetAddressUtxosStream(*GetAddressUtxosArg, CompactTxStreamer_GetAddressUtxosStreamServer) error
 	// Return information about this lightwalletd instance and the blockchain
 	GetLightdInfo(context.Context, *Empty) (*LightdInfo, error)
-	// Testing-only
+	// Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
 	Ping(context.Context, *Duration) (*PingResponse, error)
 	mustEmbedUnimplementedCompactTxStreamerServer()
 }
@@ -403,7 +404,7 @@ type UnsafeCompactTxStreamerServer interface {
 }
 
 func RegisterCompactTxStreamerServer(s grpc.ServiceRegistrar, srv CompactTxStreamerServer) {
-	s.RegisterService(&_CompactTxStreamer_serviceDesc, srv)
+	s.RegisterService(&CompactTxStreamer_ServiceDesc, srv)
 }
 
 func _CompactTxStreamer_GetLatestBlock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -678,7 +679,10 @@ func _CompactTxStreamer_Ping_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
-var _CompactTxStreamer_serviceDesc = grpc.ServiceDesc{
+// CompactTxStreamer_ServiceDesc is the grpc.ServiceDesc for CompactTxStreamer service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "cash.z.wallet.sdk.rpc.CompactTxStreamer",
 	HandlerType: (*CompactTxStreamerServer)(nil),
 	Methods: []grpc.MethodDesc{
