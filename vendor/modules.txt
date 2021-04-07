@@ -109,7 +109,7 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # google.golang.org/genproto v0.0.0-20210406143921-e86de6bf7a46
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.36.1
+# google.golang.org/grpc v1.37.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
