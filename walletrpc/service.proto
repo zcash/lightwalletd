@@ -116,12 +116,15 @@ message TreeState {
     string tree = 5;    // sapling commitment tree state
 }
 
+// Results are sorted by height, which makes it easy to issue another
+// request that picks up from where the previous left off.
 message GetAddressUtxosArg {
-    string address = 1;
+    repeated string addresses = 1;
     uint64 startHeight = 2;
     uint32 maxEntries = 3; // zero means unlimited
 }
 message GetAddressUtxosReply {
+    string address = 6;
     bytes txid = 1;
     int32 index = 2;
     bytes script = 3;

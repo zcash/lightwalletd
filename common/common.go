@@ -122,7 +122,11 @@ type (
 	}
 
 	// zcashd rpc "getaddressutxos"
+	ZcashdRpcRequestGetaddressutxos struct {
+		Addresses []string `json:"addresses"`
+	}
 	ZcashdRpcReplyGetaddressutxos []struct {
+		Address     string
 		Txid        string
 		OutputIndex int64
 		Script      string
