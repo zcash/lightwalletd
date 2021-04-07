@@ -11,6 +11,7 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
+// Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
 // DarksideStreamerClient is the client API for DarksideStreamer service.
@@ -95,7 +96,7 @@ func (c *darksideStreamerClient) Reset(ctx context.Context, in *DarksideMetaStat
 }
 
 func (c *darksideStreamerClient) StageBlocksStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageBlocksStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[0], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (c *darksideStreamerClient) StageBlocksCreate(ctx context.Context, in *Dark
 }
 
 func (c *darksideStreamerClient) StageTransactionsStream(ctx context.Context, opts ...grpc.CallOption) (DarksideStreamer_StageTransactionsStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactionsStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[1], "/cash.z.wallet.sdk.rpc.DarksideStreamer/StageTransactionsStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +200,7 @@ func (c *darksideStreamerClient) ApplyStaged(ctx context.Context, in *DarksideHe
 }
 
 func (c *darksideStreamerClient) GetIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DarksideStreamer_GetIncomingTransactionsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_DarksideStreamer_serviceDesc.Streams[2], "/cash.z.wallet.sdk.rpc.DarksideStreamer/GetIncomingTransactions", opts...)
+	stream, err := c.cc.NewStream(ctx, &DarksideStreamer_ServiceDesc.Streams[2], "/cash.z.wallet.sdk.rpc.DarksideStreamer/GetIncomingTransactions", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +346,7 @@ type UnsafeDarksideStreamerServer interface {
 }
 
 func RegisterDarksideStreamerServer(s grpc.ServiceRegistrar, srv DarksideStreamerServer) {
-	s.RegisterService(&_DarksideStreamer_serviceDesc, srv)
+	s.RegisterService(&DarksideStreamer_ServiceDesc, srv)
 }
 
 func _DarksideStreamer_Reset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -529,7 +530,10 @@ func _DarksideStreamer_ClearIncomingTransactions_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
-var _DarksideStreamer_serviceDesc = grpc.ServiceDesc{
+// DarksideStreamer_ServiceDesc is the grpc.ServiceDesc for DarksideStreamer service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var DarksideStreamer_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "cash.z.wallet.sdk.rpc.DarksideStreamer",
 	HandlerType: (*DarksideStreamerServer)(nil),
 	Methods: []grpc.MethodDesc{

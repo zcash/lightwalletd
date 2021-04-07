@@ -4,7 +4,7 @@
 
 syntax = "proto3";
 package cash.z.wallet.sdk.rpc;
-option go_package = ".;walletrpc";
+option go_package = "lightwalletd/walletrpc";
 option swift_prefix = "";
 // Remember that proto3 fields are all optional. A field that is not present will be set to its zero value.
 // bytes fields of hashes are in canonical little-endian format.
