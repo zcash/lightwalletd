@@ -46,6 +46,9 @@ type darksideState struct {
 	// These transactions come from StageTransactions(); they will be merged into
 	// activeBlocks by ApplyStaged() (and this list then cleared).
 	stagedTransactions []stagedTx
+
+	// Unordered list of replies
+	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
 }
 
 var state darksideState
@@ -459,6 +462,23 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		return json.Marshal(reply)
 
+	case "getaddressutxos":
+		var req ZcashdRpcRequestGetaddressutxos
+		err := json.Unmarshal(params[0], &req)
+		if err != nil {
+			return nil, errors.New("failed to parse getaddressutxos JSON")
+		}
+		utxosReply := make([]ZcashdRpcReplyGetaddressutxos, 0)
+		for _, utxo := range state.getAddressUtxos {
+			for _, a := range req.Addresses {
+				if a == utxo.Address {
+					utxosReply = append(utxosReply, utxo)
+					break
+				}
+			}
+		}
+		return json.Marshal(utxosReply)
+
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC")
 	}
@@ -584,4 +604,14 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	}
 	return scan.Err()
 
+}
+
+func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
+	state.getAddressUtxos = append(state.getAddressUtxos, arg)
+	return nil
+}
+
+func DarksideClearAddressUtxos() error {
+	state.getAddressUtxos = nil
+	return nil
 }
