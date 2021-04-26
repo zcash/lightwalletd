@@ -76,6 +76,11 @@ type DarksideStreamerClient interface {
 	GetIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (DarksideStreamer_GetIncomingTransactionsClient, error)
 	// Clear the incoming transaction pool.
 	ClearIncomingTransactions(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Add a GetAddressUtxosReply entry to be returned by GetAddressUtxos().
+	// There is no staging or applying for these, very simple.
+	AddAddressUtxo(ctx context.Context, in *GetAddressUtxosReply, opts ...grpc.CallOption) (*Empty, error)
+	// Clear the list of GetAddressUtxos entries (can't fail)
+	ClearAddressUtxo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type darksideStreamerClient struct {
@@ -240,6 +245,24 @@ func (c *darksideStreamerClient) ClearIncomingTransactions(ctx context.Context, 
 	return out, nil
 }
 
+func (c *darksideStreamerClient) AddAddressUtxo(ctx context.Context, in *GetAddressUtxosReply, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddAddressUtxo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *darksideStreamerClient) ClearAddressUtxo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAddressUtxo", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DarksideStreamerServer is the server API for DarksideStreamer service.
 // All implementations must embed UnimplementedDarksideStreamerServer
 // for forward compatibility
@@ -302,6 +325,11 @@ type DarksideStreamerServer interface {
 	GetIncomingTransactions(*Empty, DarksideStreamer_GetIncomingTransactionsServer) error
 	// Clear the incoming transaction pool.
 	ClearIncomingTransactions(context.Context, *Empty) (*Empty, error)
+	// Add a GetAddressUtxosReply entry to be returned by GetAddressUtxos().
+	// There is no staging or applying for these, very simple.
+	AddAddressUtxo(context.Context, *GetAddressUtxosReply) (*Empty, error)
+	// Clear the list of GetAddressUtxos entries (can't fail)
+	ClearAddressUtxo(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDarksideStreamerServer()
 }
 
@@ -335,6 +363,12 @@ func (UnimplementedDarksideStreamerServer) GetIncomingTransactions(*Empty, Darks
 }
 func (UnimplementedDarksideStreamerServer) ClearIncomingTransactions(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClearIncomingTransactions not implemented")
+}
+func (UnimplementedDarksideStreamerServer) AddAddressUtxo(context.Context, *GetAddressUtxosReply) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddAddressUtxo not implemented")
+}
+func (UnimplementedDarksideStreamerServer) ClearAddressUtxo(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearAddressUtxo not implemented")
 }
 func (UnimplementedDarksideStreamerServer) mustEmbedUnimplementedDarksideStreamerServer() {}
 
@@ -530,6 +564,42 @@ func _DarksideStreamer_ClearIncomingTransactions_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DarksideStreamer_AddAddressUtxo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAddressUtxosReply)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).AddAddressUtxo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddAddressUtxo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).AddAddressUtxo(ctx, req.(*GetAddressUtxosReply))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DarksideStreamer_ClearAddressUtxo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).ClearAddressUtxo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAddressUtxo",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).ClearAddressUtxo(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DarksideStreamer_ServiceDesc is the grpc.ServiceDesc for DarksideStreamer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -560,6 +630,14 @@ var DarksideStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ClearIncomingTransactions",
 			Handler:    _DarksideStreamer_ClearIncomingTransactions_Handler,
+		},
+		{
+			MethodName: "AddAddressUtxo",
+			Handler:    _DarksideStreamer_AddAddressUtxo_Handler,
+		},
+		{
+			MethodName: "ClearAddressUtxo",
+			Handler:    _DarksideStreamer_ClearAddressUtxo_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

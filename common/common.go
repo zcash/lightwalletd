@@ -125,7 +125,7 @@ type (
 	ZcashdRpcRequestGetaddressutxos struct {
 		Addresses []string `json:"addresses"`
 	}
-	ZcashdRpcReplyGetaddressutxos []struct {
+	ZcashdRpcReplyGetaddressutxos struct {
 		Address     string
 		Txid        string
 		OutputIndex int64

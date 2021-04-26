@@ -114,4 +114,11 @@ service DarksideStreamer {
 
     // Clear the incoming transaction pool.
     rpc ClearIncomingTransactions(Empty) returns (Empty) {}
+
+    // Add a GetAddressUtxosReply entry to be returned by GetAddressUtxos().
+    // There is no staging or applying for these, very simple.
+    rpc AddAddressUtxo(GetAddressUtxosReply) returns (Empty) {}
+
+    // Clear the list of GetAddressUtxos entries (can't fail)
+    rpc ClearAddressUtxo(Empty) returns (Empty) {}
 }
