@@ -325,12 +325,87 @@ func TestGetBlockRange(t *testing.T) {
 		t.Fatal("reading height 22 should have failed")
 	}
 
-	// check goroutine GetBlockRange() reaching the end of the range (and exiting)
-	go GetBlockRange(testcache, blockChan, errChan, 1, 0)
-	err := <-errChan
+	step = 0
+	os.RemoveAll(unitTestPath)
+}
+
+// There are four test blocks, 0..3
+func getblockStubReverse(method string, params []json.RawMessage) (json.RawMessage, error) {
+	var height string
+	err := json.Unmarshal(params[0], &height)
 	if err != nil {
-		t.Fatal("unexpected err return")
+		testT.Fatal("could not unmarshal height")
 	}
+
+	step++
+	switch step {
+	case 1:
+		if height != "380642" {
+			testT.Error("unexpected height")
+		}
+		// Sunny-day
+		return blocks[2], nil
+	case 2:
+		if height != "380641" {
+			testT.Error("unexpected height")
+		}
+		// Sunny-day
+		return blocks[1], nil
+	case 3:
+		if height != "380640" {
+			testT.Error("unexpected height")
+		}
+		// Sunny-day
+		return blocks[0], nil
+	}
+	testT.Error("getblockStub called too many times")
+	return nil, nil
+}
+
+func TestGetBlockRangeReverse(t *testing.T) {
+	testT = t
+	RawRequest = getblockStubReverse
+	os.RemoveAll(unitTestPath)
+	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	blockChan := make(chan *walletrpc.CompactBlock)
+	errChan := make(chan error)
+
+	// Request the blocks in reverse order by specifying start greater than end
+	go GetBlockRange(testcache, blockChan, errChan, 380642, 380640)
+
+	// read in block 380642
+	select {
+	case err := <-errChan:
+		// this will also catch context.DeadlineExceeded from the timeout
+		t.Fatal("unexpected error:", err)
+	case cBlock := <-blockChan:
+		if cBlock.Height != 380642 {
+			t.Fatal("unexpected Height:", cBlock.Height)
+		}
+	}
+
+	// read in block 380641
+	select {
+	case err := <-errChan:
+		// this will also catch context.DeadlineExceeded from the timeout
+		t.Fatal("unexpected error:", err)
+	case cBlock := <-blockChan:
+		if cBlock.Height != 380641 {
+			t.Fatal("unexpected Height:", cBlock.Height)
+		}
+	}
+
+	// read in block 380640
+	select {
+	case err := <-errChan:
+		// this will also catch context.DeadlineExceeded from the timeout
+		t.Fatal("unexpected error:", err)
+	case cBlock := <-blockChan:
+		if cBlock.Height != 380640 {
+			t.Fatal("unexpected Height:", cBlock.Height)
+		}
+	}
+	step = 0
 	os.RemoveAll(unitTestPath)
 }
 
