@@ -305,6 +305,14 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.PriceRequest"><span class="badge">M</span>PriceRequest</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.PriceResponse"><span class="badge">M</span>PriceResponse</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.RawTransaction"><span class="badge">M</span>RawTransaction</a>
                 </li>
               
@@ -1382,6 +1390,76 @@ There is no staging or applying for these, very simple.</p></td>
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.PriceRequest">PriceRequest</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>List of timestamps(in sec) at which the price is being requested </p></td>
+                </tr>
+              
+                <tr>
+                  <td>currency</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>3 letter currency-code </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.PriceResponse">PriceResponse</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>timestamp</td>
+                  <td><a href="#int64">int64</a></td>
+                  <td></td>
+                  <td><p>Timestamp at which this price quote was fetched. Note, this may not be the same
+as the request timestamp, but the server will respond with the closest timestamp that it has/can fetch </p></td>
+                </tr>
+              
+                <tr>
+                  <td>currency</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>3-letter currency code, matching the request </p></td>
+                </tr>
+              
+                <tr>
+                  <td>price</td>
+                  <td><a href="#double">double</a></td>
+                  <td></td>
+                  <td><p>price of ZEC </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</h3>
         <p>RawTransaction contains the complete transaction data. It also optionally includes </p><p>the block height in which the transaction was included, or, when returned</p><p>by GetMempoolStream(), the latest block height.</p>
 
@@ -1663,6 +1741,20 @@ in the exclude list that don&#39;t exist in the mempool are ignored.</p></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
                 <td><p>Return a stream of current Mempool transactions. This will keep the output stream open while
 there are mempool transactions. It will close the returned stream when a new block is mined.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetZECPrice</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.PriceRequest">PriceRequest</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.PriceResponse">PriceResponse</a></td>
+                <td><p>Get the historical and current prices</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetCurrentZECPrice</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.PriceResponse">PriceResponse</a></td>
+                <td><p></p></td>
               </tr>
             
               <tr>

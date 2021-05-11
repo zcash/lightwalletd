@@ -137,6 +137,26 @@ message GetAddressUtxosReplyList {
     repeated GetAddressUtxosReply addressUtxos = 1;
 }
 
+message PriceRequest {
+    // List of timestamps(in sec) at which the price is being requested
+    uint64 timestamp = 1;
+
+    // 3 letter currency-code
+    string currency = 2;
+}
+
+message PriceResponse {
+    // Timestamp at which this price quote was fetched. Note, this may not be the same
+    // as the request timestamp, but the server will respond with the closest timestamp that it has/can fetch    
+    int64 timestamp = 1;  
+    
+    // 3-letter currency code, matching the request
+    string currency = 2;  
+
+    // price of ZEC
+    double price = 3;
+}
+
 service CompactTxStreamer {
     // Return the height of the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -169,6 +189,10 @@ service CompactTxStreamer {
     // Return a stream of current Mempool transactions. This will keep the output stream open while
     // there are mempool transactions. It will close the returned stream when a new block is mined.
     rpc GetMempoolStream(Empty) returns (stream RawTransaction) {}
+
+    // Get the historical and current prices 
+    rpc GetZECPrice(PriceRequest) returns (PriceResponse) {}
+    rpc GetCurrentZECPrice(Empty) returns (PriceResponse) {}
 
     // GetTreeState returns the note commitment tree state corresponding to the given block.
     // See section 3.7 of the Zcash protocol specification. It returns several other useful

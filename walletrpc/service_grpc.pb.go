@@ -49,6 +49,9 @@ type CompactTxStreamerClient interface {
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
 	GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error)
+	// Get the historical and current prices
+	GetZECPrice(ctx context.Context, in *PriceRequest, opts ...grpc.CallOption) (*PriceResponse, error)
+	GetCurrentZECPrice(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PriceResponse, error)
 	// GetTreeState returns the note commitment tree state corresponding to the given block.
 	// See section 3.7 of the Zcash protocol specification. It returns several other useful
 	// values also (even though they can be obtained using GetBlock).
@@ -278,6 +281,24 @@ func (x *compactTxStreamerGetMempoolStreamClient) Recv() (*RawTransaction, error
 	return m, nil
 }
 
+func (c *compactTxStreamerClient) GetZECPrice(ctx context.Context, in *PriceRequest, opts ...grpc.CallOption) (*PriceResponse, error) {
+	out := new(PriceResponse)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *compactTxStreamerClient) GetCurrentZECPrice(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PriceResponse, error) {
+	out := new(PriceResponse)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *compactTxStreamerClient) GetTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*TreeState, error) {
 	out := new(TreeState)
 	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTreeState", in, out, opts...)
@@ -386,6 +407,9 @@ type CompactTxStreamerServer interface {
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
 	GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error
+	// Get the historical and current prices
+	GetZECPrice(context.Context, *PriceRequest) (*PriceResponse, error)
+	GetCurrentZECPrice(context.Context, *Empty) (*PriceResponse, error)
 	// GetTreeState returns the note commitment tree state corresponding to the given block.
 	// See section 3.7 of the Zcash protocol specification. It returns several other useful
 	// values also (even though they can be obtained using GetBlock).
@@ -434,6 +458,12 @@ func (UnimplementedCompactTxStreamerServer) GetMempoolTx(*Exclude, CompactTxStre
 }
 func (UnimplementedCompactTxStreamerServer) GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetMempoolStream not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetZECPrice(context.Context, *PriceRequest) (*PriceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetZECPrice not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetCurrentZECPrice(context.Context, *Empty) (*PriceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCurrentZECPrice not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetTreeState(context.Context, *BlockID) (*TreeState, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTreeState not implemented")
@@ -666,6 +696,42 @@ func (x *compactTxStreamerGetMempoolStreamServer) Send(m *RawTransaction) error 
 	return x.ServerStream.SendMsg(m)
 }
 
+func _CompactTxStreamer_GetZECPrice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PriceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetZECPrice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetZECPrice",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetZECPrice(ctx, req.(*PriceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CompactTxStreamer_GetCurrentZECPrice_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetCurrentZECPrice(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetCurrentZECPrice",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetCurrentZECPrice(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CompactTxStreamer_GetTreeState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlockID)
 	if err := dec(in); err != nil {
@@ -803,6 +869,14 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetTaddressBalance",
 			Handler:    _CompactTxStreamer_GetTaddressBalance_Handler,
+		},
+		{
+			MethodName: "GetZECPrice",
+			Handler:    _CompactTxStreamer_GetZECPrice_Handler,
+		},
+		{
+			MethodName: "GetCurrentZECPrice",
+			Handler:    _CompactTxStreamer_GetCurrentZECPrice_Handler,
 		},
 		{
 			MethodName: "GetTreeState",
