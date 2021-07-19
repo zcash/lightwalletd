@@ -267,10 +267,6 @@ func startServer(opts *common.Options) error {
 		walletrpc.RegisterDarksideStreamerServer(server, service)
 	}
 
-	// Initialize mempool monitor
-	exitMempool := make(chan bool)
-	common.StartMempoolMonitor(cache, exitMempool)
-
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
 	if err != nil {
@@ -286,7 +282,6 @@ func startServer(opts *common.Options) error {
 	go func() {
 		s := <-signals
 		cache.Sync()
-		exitMempool <- true
 		common.Log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")

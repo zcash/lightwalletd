@@ -32,7 +32,8 @@ message TxFilter {
 }
 
 // RawTransaction contains the complete transaction data. It also optionally includes 
-// the block height in which the transaction was included.
+// the block height in which the transaction was included, or, when returned
+// by GetMempoolStream(), the latest block height.
 message RawTransaction {
     bytes data = 1;     // exact data returned by Zcash 'getrawtransaction'
     uint64 height = 2;  // height that the transaction was mined (or -1)
