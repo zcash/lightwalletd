@@ -42,6 +42,9 @@ type CompactTxStreamerClient interface {
 	// match a shortened txid, they are all sent (none is excluded). Transactions
 	// in the exclude list that don't exist in the mempool are ignored.
 	GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error)
+	// Return a stream of current Mempool transactions. This will keep the output stream open while
+	// there are mempool transactions. It will close the returned stream when a new block is mined.
+	GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error)
 	// GetTreeState returns the note commitment tree state corresponding to the given block.
 	// See section 3.7 of the Zcash protocol specification. It returns several other useful
 	// values also (even though they can be obtained using GetBlock).
@@ -238,6 +241,38 @@ func (x *compactTxStreamerGetMempoolTxClient) Recv() (*CompactTx, error) {
 	return m, nil
 }
 
+func (c *compactTxStreamerClient) GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolStream", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &compactTxStreamerGetMempoolStreamClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CompactTxStreamer_GetMempoolStreamClient interface {
+	Recv() (*RawTransaction, error)
+	grpc.ClientStream
+}
+
+type compactTxStreamerGetMempoolStreamClient struct {
+	grpc.ClientStream
+}
+
+func (x *compactTxStreamerGetMempoolStreamClient) Recv() (*RawTransaction, error) {
+	m := new(RawTransaction)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *compactTxStreamerClient) GetTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*TreeState, error) {
 	out := new(TreeState)
 	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTreeState", in, out, opts...)
@@ -257,7 +292,7 @@ func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAd
 }
 
 func (c *compactTxStreamerClient) GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -334,6 +369,9 @@ type CompactTxStreamerServer interface {
 	// match a shortened txid, they are all sent (none is excluded). Transactions
 	// in the exclude list that don't exist in the mempool are ignored.
 	GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error
+	// Return a stream of current Mempool transactions. This will keep the output stream open while
+	// there are mempool transactions. It will close the returned stream when a new block is mined.
+	GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error
 	// GetTreeState returns the note commitment tree state corresponding to the given block.
 	// See section 3.7 of the Zcash protocol specification. It returns several other useful
 	// values also (even though they can be obtained using GetBlock).
@@ -378,6 +416,9 @@ func (UnimplementedCompactTxStreamerServer) GetTaddressBalanceStream(CompactTxSt
 }
 func (UnimplementedCompactTxStreamerServer) GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetMempoolTx not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetMempoolStream not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetTreeState(context.Context, *BlockID) (*TreeState, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTreeState not implemented")
@@ -586,6 +627,27 @@ func (x *compactTxStreamerGetMempoolTxServer) Send(m *CompactTx) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _CompactTxStreamer_GetMempoolStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CompactTxStreamerServer).GetMempoolStream(m, &compactTxStreamerGetMempoolStreamServer{stream})
+}
+
+type CompactTxStreamer_GetMempoolStreamServer interface {
+	Send(*RawTransaction) error
+	grpc.ServerStream
+}
+
+type compactTxStreamerGetMempoolStreamServer struct {
+	grpc.ServerStream
+}
+
+func (x *compactTxStreamerGetMempoolStreamServer) Send(m *RawTransaction) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 func _CompactTxStreamer_GetTreeState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlockID)
 	if err := dec(in); err != nil {
@@ -742,6 +804,11 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "GetMempoolTx",
 			Handler:       _CompactTxStreamer_GetMempoolTx_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetMempoolStream",
+			Handler:       _CompactTxStreamer_GetMempoolStream_Handler,
 			ServerStreams: true,
 		},
 		{
