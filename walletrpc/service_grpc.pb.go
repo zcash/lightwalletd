@@ -32,16 +32,6 @@ type CompactTxStreamerClient interface {
 	GetTaddressTxids(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTxidsClient, error)
 	GetTaddressBalance(ctx context.Context, in *AddressList, opts ...grpc.CallOption) (*Balance, error)
 	GetTaddressBalanceStream(ctx context.Context, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressBalanceStreamClient, error)
-	// Return the compact transactions currently in the mempool; the results
-	// can be a few seconds out of date. If the Exclude list is empty, return
-	// all transactions; otherwise return all *except* those in the Exclude list
-	// (if any); this allows the client to avoid receiving transactions that it
-	// already has (from an earlier call to this rpc). The transaction IDs in the
-	// Exclude list can be shortened to any number of bytes to make the request
-	// more bandwidth-efficient; if two or more transactions in the mempool
-	// match a shortened txid, they are all sent (none is excluded). Transactions
-	// in the exclude list that don't exist in the mempool are ignored.
-	GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error)
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
 	GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error)
@@ -209,40 +199,8 @@ func (x *compactTxStreamerGetTaddressBalanceStreamClient) CloseAndRecv() (*Balan
 	return m, nil
 }
 
-func (c *compactTxStreamerClient) GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &compactTxStreamerGetMempoolTxClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type CompactTxStreamer_GetMempoolTxClient interface {
-	Recv() (*CompactTx, error)
-	grpc.ClientStream
-}
-
-type compactTxStreamerGetMempoolTxClient struct {
-	grpc.ClientStream
-}
-
-func (x *compactTxStreamerGetMempoolTxClient) Recv() (*CompactTx, error) {
-	m := new(CompactTx)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 func (c *compactTxStreamerClient) GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +250,7 @@ func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAd
 }
 
 func (c *compactTxStreamerClient) GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -359,16 +317,6 @@ type CompactTxStreamerServer interface {
 	GetTaddressTxids(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTxidsServer) error
 	GetTaddressBalance(context.Context, *AddressList) (*Balance, error)
 	GetTaddressBalanceStream(CompactTxStreamer_GetTaddressBalanceStreamServer) error
-	// Return the compact transactions currently in the mempool; the results
-	// can be a few seconds out of date. If the Exclude list is empty, return
-	// all transactions; otherwise return all *except* those in the Exclude list
-	// (if any); this allows the client to avoid receiving transactions that it
-	// already has (from an earlier call to this rpc). The transaction IDs in the
-	// Exclude list can be shortened to any number of bytes to make the request
-	// more bandwidth-efficient; if two or more transactions in the mempool
-	// match a shortened txid, they are all sent (none is excluded). Transactions
-	// in the exclude list that don't exist in the mempool are ignored.
-	GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
 	GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error
@@ -413,9 +361,6 @@ func (UnimplementedCompactTxStreamerServer) GetTaddressBalance(context.Context, 
 }
 func (UnimplementedCompactTxStreamerServer) GetTaddressBalanceStream(CompactTxStreamer_GetTaddressBalanceStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetTaddressBalanceStream not implemented")
-}
-func (UnimplementedCompactTxStreamerServer) GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error {
-	return status.Errorf(codes.Unimplemented, "method GetMempoolTx not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetMempoolStream not implemented")
@@ -606,27 +551,6 @@ func (x *compactTxStreamerGetTaddressBalanceStreamServer) Recv() (*Address, erro
 	return m, nil
 }
 
-func _CompactTxStreamer_GetMempoolTx_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Exclude)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(CompactTxStreamerServer).GetMempoolTx(m, &compactTxStreamerGetMempoolTxServer{stream})
-}
-
-type CompactTxStreamer_GetMempoolTxServer interface {
-	Send(*CompactTx) error
-	grpc.ServerStream
-}
-
-type compactTxStreamerGetMempoolTxServer struct {
-	grpc.ServerStream
-}
-
-func (x *compactTxStreamerGetMempoolTxServer) Send(m *CompactTx) error {
-	return x.ServerStream.SendMsg(m)
-}
-
 func _CompactTxStreamer_GetMempoolStream_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(Empty)
 	if err := stream.RecvMsg(m); err != nil {
@@ -800,11 +724,6 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "GetTaddressBalanceStream",
 			Handler:       _CompactTxStreamer_GetTaddressBalanceStream_Handler,
 			ClientStreams: true,
-		},
-		{
-			StreamName:    "GetMempoolTx",
-			Handler:       _CompactTxStreamer_GetMempoolTx_Handler,
-			ServerStreams: true,
 		},
 		{
 			StreamName:    "GetMempoolStream",
