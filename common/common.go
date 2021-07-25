@@ -53,10 +53,16 @@ type Options struct {
 // in unit tests it points to a function to mock RPCs to zcashd.
 var RawRequest func(method string, params []json.RawMessage) (json.RawMessage, error)
 
-// Sleep allows a request to time.Sleep() to be mocked for testing;
-// in production, it points to the standard library time.Sleep();
-// in unit tests it points to a mock function.
-var Sleep func(d time.Duration)
+// Time allows time-related functions to be mocked for testing,
+// so that tests can be deterministic and so they don't require
+// real time to elapse. In production, these point to the standard
+// library `time` functions; in unit tests they point to mock
+// functions (set by the specific test as required).
+// More functions can be added later.
+var Time struct {
+	Sleep func(d time.Duration)
+	Now   func() time.Time
+}
 
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
@@ -163,7 +169,7 @@ func FirstRPC() {
 			"error": rpcErr.Error(),
 			"retry": retryCount,
 		}).Warn("error with getblockchaininfo rpc, retrying...")
-		Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
+		Time.Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
 	}
 }
 
@@ -312,7 +318,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 			}
 			// Delay then retry the same height.
 			c.Sync()
-			Sleep(10 * time.Second)
+			Time.Sleep(10 * time.Second)
 			wait = true
 			continue
 		}
@@ -323,7 +329,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 				Log.Info("Waiting for zcashd height to reach Sapling activation height ",
 					"(", c.GetFirstHeight(), ")...")
 				reorgCount = 0
-				Sleep(20 * time.Second)
+				Time.Sleep(20 * time.Second)
 				continue
 			}
 			if wait {
@@ -333,7 +339,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 					Log.Info("Ingestor waiting for block: ", height)
 					lastHeightLogged = height - 1
 				}
-				Sleep(2 * time.Second)
+				Time.Sleep(2 * time.Second)
 				wait = false
 				continue
 			}

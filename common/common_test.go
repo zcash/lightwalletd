@@ -77,6 +77,10 @@ func sleepStub(d time.Duration) {
 	sleepCount++
 	sleepDuration += d
 }
+func nowStub() time.Time {
+	start := time.Time{}
+	return start.Add(sleepDuration)
+}
 
 // ------------------------------------------ GetLightdInfo()
 
@@ -110,7 +114,7 @@ func getLightdInfoStub(method string, params []json.RawMessage) (json.RawMessage
 func TestGetLightdInfo(t *testing.T) {
 	testT = t
 	RawRequest = getLightdInfoStub
-	Sleep = sleepStub
+	Time.Sleep = sleepStub
 	// This calls the getblockchaininfo rpc just to establish connectivity with zcashd
 	FirstRPC()
 
@@ -270,7 +274,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 func TestBlockIngestor(t *testing.T) {
 	testT = t
 	RawRequest = getblockStub
-	Sleep = sleepStub
+	Time.Sleep = sleepStub
 	os.RemoveAll(unitTestPath)
 	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, false)
 	BlockIngestor(testcache, 11)
