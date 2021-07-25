@@ -64,7 +64,7 @@ func GetMempool(sendToClient func(*walletrpc.RawTransaction) error) error {
 				g_lock.Unlock()
 				return err
 			}
-			g_lastTime = time.Now()
+			g_lastTime = Time.Now()
 		}
 		// Send transactions we haven't sent yet, best to not do so while
 		// holding the mutex, since this call may get flow-controlled.
@@ -76,7 +76,7 @@ func GetMempool(sendToClient func(*walletrpc.RawTransaction) error) error {
 				return err
 			}
 		}
-		time.Sleep(200 * time.Millisecond)
+		Time.Sleep(200 * time.Millisecond)
 		g_lock.Lock()
 		if g_lastBlockChainInfo.BestBlockHash != stayHash {
 			break

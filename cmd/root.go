@@ -381,8 +381,9 @@ func init() {
 
 	logrus.RegisterExitHandler(onexit)
 
-	// Indirect function for test mocking (so unit tests can talk to stub functions)
-	common.Sleep = time.Sleep
+	// Indirect functions for test mocking (so unit tests can talk to stub functions)
+	common.Time.Sleep = time.Sleep
+	common.Time.Now = time.Now
 }
 
 // initConfig reads in config file and ENV variables if set.
