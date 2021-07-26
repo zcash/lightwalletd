@@ -44,7 +44,8 @@ func GetMempool(sendToClient func(*walletrpc.RawTransaction) error) error {
 	// Wait for more transactions to be added to the list
 	for {
 		// Don't fetch the mempool more often than every 2 seconds.
-		if time.Since(g_lastTime) > 2*time.Second {
+		now := Time.Now()
+		if now.After(g_lastTime.Add(2 * time.Second)) {
 			blockChainInfo, err := getLatestBlockChainInfo()
 			if err != nil {
 				g_lock.Unlock()
@@ -64,7 +65,7 @@ func GetMempool(sendToClient func(*walletrpc.RawTransaction) error) error {
 				g_lock.Unlock()
 				return err
 			}
-			g_lastTime = Time.Now()
+			g_lastTime = now
 		}
 		// Send transactions we haven't sent yet, best to not do so while
 		// holding the mutex, since this call may get flow-controlled.

@@ -114,7 +114,8 @@ type (
 		}
 	}
 
-	// zcashd rpc "getrawtransaction"
+	// zcashd rpc "getrawtransaction txid 1" (1 means verbose), there are
+	// many more fields but these are the only ones we current need.
 	ZcashdRpcReplyGetrawtransaction struct {
 		Hex    string
 		Height int
