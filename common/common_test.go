@@ -5,6 +5,7 @@ package common
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -417,4 +418,159 @@ func TestGenerateCerts(t *testing.T) {
 	if GenerateCerts() == nil {
 		t.Fatal("GenerateCerts returned nil")
 	}
+}
+
+// ------------------------------------------ GetMempoolStream
+
+// Note that in mocking zcashd's RPC replies here, we don't really need
+// actual txids or transactions, or even strings with the correct format
+// for those, except that a transaction must be a hex string.
+func mempoolStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	step++
+	switch step {
+	case 1:
+		// This will be a getblockchaininfo request
+		if method != "getblockchaininfo" {
+			testT.Fatal("expecting blockchaininfo")
+		}
+		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+			BestBlockHash: "010203",
+			Blocks:        200,
+		})
+		return r, nil
+	case 2:
+		// No new block has arrived.
+		if method != "getblockchaininfo" {
+			testT.Fatal("expecting blockchaininfo")
+		}
+		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+			BestBlockHash: "010203",
+			Blocks:        200,
+		})
+		return r, nil
+	case 3:
+		// Expect a getrawmempool next.
+		if method != "getrawmempool" {
+			testT.Fatal("expecting getrawmempool")
+		}
+		// In reality, this would be a hex txid
+		r, _ := json.Marshal([]string{
+			"mempooltxid-1",
+		})
+		return r, nil
+	case 4:
+		// Next, it should ask for this transaction (non-verbose).
+		if method != "getrawtransaction" {
+			testT.Fatal("expecting getrawtransaction")
+		}
+		var txid string
+		json.Unmarshal(params[0], &txid)
+		if txid != "mempooltxid-1" {
+			testT.Fatal("unexpected txid")
+		}
+		r, _ := json.Marshal("aabb")
+		return r, nil
+	case 5:
+		// Simulate that still no new block has arrived ...
+		if method != "getblockchaininfo" {
+			testT.Fatal("expecting blockchaininfo")
+		}
+		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+			BestBlockHash: "010203",
+			Blocks:        200,
+		})
+		return r, nil
+	case 6:
+		// ... but there a second tx has arrived in the mempool
+		if method != "getrawmempool" {
+			testT.Fatal("expecting getrawmempool")
+		}
+		// In reality, this would be a hex txid
+		r, _ := json.Marshal([]string{
+			"mempooltxid-2",
+			"mempooltxid-1"})
+		return r, nil
+	case 7:
+		// The new mempool tx (and only that one) gets fetched
+		if method != "getrawtransaction" {
+			testT.Fatal("expecting getrawtransaction")
+		}
+		var txid string
+		json.Unmarshal(params[0], &txid)
+		if txid != "mempooltxid-2" {
+			testT.Fatal("unexpected txid")
+		}
+		r, _ := json.Marshal("ccdd")
+		return r, nil
+	case 8:
+		// A new block arrives, this will cause these two tx to be returned
+		if method != "getblockchaininfo" {
+			testT.Fatal("expecting blockchaininfo")
+		}
+		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+			BestBlockHash: "d1d2d3",
+			Blocks:        201,
+		})
+		return r, nil
+	}
+	testT.Fatal("ran out of cases")
+	return nil, nil
+}
+
+func TestMempoolStream(t *testing.T) {
+	testT = t
+	RawRequest = mempoolStub
+	Time.Sleep = sleepStub
+	Time.Now = nowStub
+	// In real life, wall time is not close to zero, simulate that.
+	sleepDuration = 1000 * time.Second
+
+	var replies []*walletrpc.RawTransaction
+	// The first request after startup immediately returns an empty list.
+	err := GetMempool(func(tx *walletrpc.RawTransaction) error {
+		t.Fatal("send to client function called on initial GetMempool call")
+		return nil
+	})
+	if err != nil {
+		t.Fatal("GetMempool failed")
+	}
+
+	// This should return two transactions.
+	err = GetMempool(func(tx *walletrpc.RawTransaction) error {
+		replies = append(replies, tx)
+		return nil
+	})
+	if err != nil {
+		t.Fatal("GetMempool failed")
+	}
+	if len(replies) != 2 {
+		t.Fatal("unexpected number of tx")
+	}
+	// The interface guarantees that the transactions will be returned
+	// in the order they entered the mempool.
+	if !bytes.Equal([]byte(replies[0].GetData()), []byte{0xaa, 0xbb}) {
+		t.Fatal("unexpected tx contents")
+	}
+	if replies[0].GetHeight() != 200 {
+		t.Fatal("unexpected tx height")
+	}
+	if !bytes.Equal([]byte(replies[1].GetData()), []byte{0xcc, 0xdd}) {
+		t.Fatal("unexpected tx contents")
+	}
+	if replies[1].GetHeight() != 200 {
+		t.Fatal("unexpected tx height")
+	}
+
+	// Time started at 1000 seconds (since 1970), and just over 4 seconds
+	// should have elapsed. The units here are nanoseconds.
+	if sleepDuration != 1004400000000 {
+		t.Fatal("unexpected end time")
+	}
+	if step != 8 {
+		t.Fatal("unexpected number of zcashd RPCs")
+	}
+
+	step = 0
+	sleepCount = 0
+	sleepDuration = 0
 }
