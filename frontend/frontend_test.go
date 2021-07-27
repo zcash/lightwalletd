@@ -191,6 +191,9 @@ func TestGetLatestBlock(t *testing.T) {
 	if blockID.Height != 380640 {
 		t.Fatal("unexpected blockID.height")
 	}
+	if string(blockID.Hash) != string(block.Hash) {
+		t.Fatal("unexpected blockID.hash")
+	}
 	step = 0
 }
 

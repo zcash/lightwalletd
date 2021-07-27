@@ -8,3 +8,4 @@ lwd-api.html
 *.orig
 __debug_bin
 .vscode
+frontend/unittestcache/
