@@ -51,12 +51,12 @@ func (c *BlockCache) GetLatestHash() []byte {
 	return c.latestHash
 }
 
-// HashMismatch indicates if the given prev-hash doesn't match the most recent block's hash
+// HashMatch indicates if the given prev-hash matches the most recent block's hash
 // so reorgs can be detected.
-func (c *BlockCache) HashMismatch(prevhash []byte) bool {
+func (c *BlockCache) HashMatch(prevhash []byte) bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.latestHash != nil && !bytes.Equal(c.latestHash, prevhash)
+	return c.latestHash == nil || bytes.Equal(c.latestHash, prevhash)
 }
 
 // Make the block at the given height the lowest height that we don't have.
