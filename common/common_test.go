@@ -34,6 +34,8 @@ var (
 	logger                 = logrus.New()
 
 	blocks [][]byte // four test blocks
+
+	testcache *BlockCache
 )
 
 // TestMain does common setup that's shared across multiple tests
@@ -60,6 +62,7 @@ func TestMain(m *testing.M) {
 		blockJSON, _ := json.Marshal(scan.Text())
 		blocks = append(blocks, blockJSON)
 	}
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, true)
 
 	// Setup is done; run all tests.
 	exitcode := m.Run()
@@ -160,8 +163,217 @@ func TestGetLightdInfo(t *testing.T) {
 
 // ------------------------------------------ BlockIngestor()
 
+func checkSleepMethod(count int, duration time.Duration, expected string, method string) {
+	if sleepCount != count {
+		testT.Fatal("unexpected sleep count")
+	}
+	if sleepDuration != duration*time.Second {
+		testT.Fatal("unexpected sleep duration")
+	}
+	if method != expected {
+		testT.Error("unexpected method")
+	}
+}
+
 // There are four test blocks, 0..3
+func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	step++
+	// request the first two blocks very quickly (syncing),
+	// then next block isn't yet available
+	switch step {
+	case 1:
+		checkSleepMethod(0, 0, "getbestblockhash", method)
+		// This hash doesn't matter, won't match anything
+		r, _ := json.Marshal("010101")
+		return r, nil
+	case 2:
+		checkSleepMethod(0, 0, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380640" {
+			testT.Fatal("incorrect height requested")
+		}
+		// height 380640
+		return blocks[0], nil
+	case 3:
+		checkSleepMethod(0, 0, "getbestblockhash", method)
+		// This hash doesn't matter, won't match anything
+		r, _ := json.Marshal("010101")
+		return r, nil
+	case 4:
+		checkSleepMethod(0, 0, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380641" {
+			testT.Fatal("incorrect height requested")
+		}
+		// height 380641
+		return blocks[1], nil
+	case 5:
+		// Return the expected block hash, so we're synced, should
+		// then sleep for 2 seconds, then another getbestblockhash
+		checkSleepMethod(0, 0, "getbestblockhash", method)
+		r, _ := json.Marshal(displayHash(testcache.GetLatestHash()))
+		return r, nil
+	case 6:
+		// Simulate still no new block, still synced, should
+		// sleep for 2 seconds, then another getbestblockhash
+		checkSleepMethod(1, 2, "getbestblockhash", method)
+		r, _ := json.Marshal(displayHash(testcache.GetLatestHash()))
+		return r, nil
+	case 7:
+		// Simulate new block (any non-matching hash will do)
+		checkSleepMethod(2, 4, "getbestblockhash", method)
+		r, _ := json.Marshal("aabb")
+		return r, nil
+	case 8:
+		checkSleepMethod(2, 4, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380642" {
+			testT.Fatal("incorrect height requested")
+		}
+		// height 380642
+		return blocks[2], nil
+	case 9:
+		// Simulate still no new block, still synced, should
+		// sleep for 2 seconds, then another getbestblockhash
+		checkSleepMethod(2, 4, "getbestblockhash", method)
+		r, _ := json.Marshal(displayHash(testcache.GetLatestHash()))
+		return r, nil
+	case 10:
+		// There are 3 blocks in the cache (380640-642), so let's
+		// simulate a 1-block reorg, new version (replacement) of 380642
+		checkSleepMethod(3, 6, "getbestblockhash", method)
+		// hash doesn't matter, just something that doesn't match
+		r, _ := json.Marshal("4545")
+		return r, nil
+	case 11:
+		// It thinks there may simply be a new block, but we'll say
+		// there is no block at this height (380642 was replaced).
+		checkSleepMethod(3, 6, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380643" {
+			testT.Fatal("incorrect height requested")
+		}
+		return nil, errors.New("-8: Block height out of range")
+	case 12:
+		// It will re-ask the best hash (let's make no change)
+		checkSleepMethod(3, 6, "getbestblockhash", method)
+		// hash doesn't matter, just something that doesn't match
+		r, _ := json.Marshal("4545")
+		return r, nil
+	case 13:
+		// It should have backed up one block
+		checkSleepMethod(3, 6, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380642" {
+			testT.Fatal("incorrect height requested")
+		}
+		// height 380642
+		return blocks[2], nil
+	case 14:
+		// We're back to the same state as case 9, and this time
+		// we'll make it back up 2 blocks (rather than one)
+		checkSleepMethod(3, 6, "getbestblockhash", method) // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXX
+		// hash doesn't matter, just something that doesn't match
+		r, _ := json.Marshal("5656")
+		return r, nil
+	case 15:
+		// It thinks there may simply be a new block, but we'll say
+		// there is no block at this height (380642 was replaced).
+		checkSleepMethod(3, 6, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380643" {
+			testT.Fatal("incorrect height requested")
+		}
+		return nil, errors.New("-8: Block height out of range")
+	case 16:
+		checkSleepMethod(3, 6, "getbestblockhash", method)
+		// hash doesn't matter, just something that doesn't match
+		r, _ := json.Marshal("5656")
+		return r, nil
+	case 17:
+		// Like case 13, it should have backed up one block, but
+		// this time we'll make it back up one more
+		checkSleepMethod(3, 6, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380642" {
+			testT.Fatal("incorrect height requested")
+		}
+		return nil, errors.New("-8: Block height out of range")
+	case 18:
+		checkSleepMethod(3, 6, "getbestblockhash", method)
+		// hash doesn't matter, just something that doesn't match
+		r, _ := json.Marshal("5656")
+		return r, nil
+	case 19:
+		// It should have backed up one more
+		checkSleepMethod(3, 6, "getblock", method)
+		var height string
+		err := json.Unmarshal(params[0], &height)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
+		if height != "380641" {
+			testT.Fatal("incorrect height requested")
+		}
+		return blocks[1], nil
+	}
+	testT.Error("blockIngestorStub called too many times")
+	return nil, nil
+}
+
+func TestBlockIngestor(t *testing.T) {
+	testT = t
+	RawRequest = blockIngestorStub
+	Time.Sleep = sleepStub
+	Time.Now = nowStub
+	os.RemoveAll(unitTestPath)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, false)
+	BlockIngestor(testcache, 11)
+	if step != 19 {
+		t.Error("unexpected final step", step)
+	}
+	step = 0
+	sleepCount = 0
+	sleepDuration = 0
+	os.RemoveAll(unitTestPath)
+}
+
+// ------------------------------------------ GetBlockRange()
+
+// There are four test blocks, 0..3
+// (probably don't need all these cases)
 func getblockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method != "getblock" {
+		testT.Error("unexpected method")
+	}
 	var height string
 	err := json.Unmarshal(params[0], &height)
 	if err != nil {
@@ -272,27 +484,11 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 	return nil, nil
 }
 
-func TestBlockIngestor(t *testing.T) {
-	testT = t
-	RawRequest = getblockStub
-	Time.Sleep = sleepStub
-	os.RemoveAll(unitTestPath)
-	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, false)
-	BlockIngestor(testcache, 11)
-	if step != 11 {
-		t.Error("unexpected final step", step)
-	}
-	step = 0
-	sleepCount = 0
-	sleepDuration = 0
-	os.RemoveAll(unitTestPath)
-}
-
 func TestGetBlockRange(t *testing.T) {
 	testT = t
 	RawRequest = getblockStub
 	os.RemoveAll(unitTestPath)
-	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, true)
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go GetBlockRange(testcache, blockChan, errChan, 380640, 380642)
@@ -371,7 +567,7 @@ func TestGetBlockRangeReverse(t *testing.T) {
 	testT = t
 	RawRequest = getblockStubReverse
 	os.RemoveAll(unitTestPath)
-	testcache := NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, true)
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 

@@ -94,6 +94,16 @@ block height to another. This happens in two parts, first we create and apply
 the "before reorg" state. Then we create the "after reorg" stage and apply
 it, which makes the reorg happen.
 
+Here's a quick-start guide to simulating a reorg:
+```
+grpcurl -plaintext -d '{"saplingActivation": 663150,"branchID": "bad", "chainName":"x"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Reset
+grpcurl -plaintext -d '{"url": "https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/basic-reorg/663150.txt"}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocks
+grpcurl -plaintext -d '{"height":663151,"count":10}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate
+grpcurl -plaintext -d '{"height":663160}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged
+grpcurl -plaintext -d '{"height":663155,"count":10,"nonce":44}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/StageBlocksCreate
+grpcurl -plaintext -d '{"height":663164}' localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/ApplyStaged
+```
+
 #### Creating the Before-Reorg State
 
 If you haven't already started darksidewalletd, please start it:
