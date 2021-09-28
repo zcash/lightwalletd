@@ -18,8 +18,8 @@ Copy `.env.example` to `.env` and change any required paramaters.
 |   `ZCASHD_RPCUSER`   |    zcashd rpc user   |
 |   `ZCASHD_RPCPORT`   |    zcashd rpc port   |
 |`ZCASHD_ALLOWIP`| zcashd rpc allowed IPs (don't |change unless you know what you're doing)|
-|`ZCASHD_DATADIR`| local location of zcasd data directory. `uid` 2001 needs write access|
-|`ZCASHD_PARMDIR`| local location of zcasd data directory. `uid` 2001 needs read access|
+|`ZCASHD_DATADIR`| local location of zcashd data directory. `uid` 2001 needs write access|
+|`ZCASHD_PARMDIR`| local location of zcashd data directory. `uid` 2001 needs read access|
 |`ZCASHD_NETWORK`| zcashd network to use, `testnet` or `mainnet`|
 |`ZCASHD_GEN`| should zcashd mine? `0` or `1`
 |`LWD_PORT`| port for lightwalletd to bind to|
