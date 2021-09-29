@@ -36,20 +36,23 @@ Copy `.env.example` to `.env` and change any required paramaters.
 ## Edit the two zcash.conf files
 There are two zcash.conf files; one read by zcashd, one read by lightwalletd.
 
-### `$ZCASHD_DATADIR/zcash.conf` -- read by zcashd
+### `$ZCASHD_DATADIR/zcash.conf`—read by zcashd
 The zcashd's `zcash.conf` needs to look like: 
 ```
 rpcuser=zcashrpc
-rpcpassword=Z7V7IoXt6I0OVuKr7TpHjxAnE6NvB/ZBRdM6x9w/OAU=
+rpcpassword=TODO INSERT A RANDOM PASSWORD HERE
 experimentalfeatures=1
 lightwalletd=1
 ```
+
+Replace `TODO INSERT A RANDOM PASSWORD HERE` with a random password, e.g. the output of `head -c 16 /dev/urandom | base64`.
+
 `rpcuser` and `rpcpassword` must be set, as lightwalletd doesn't work with RPC cookies (see the [rpcpassword](https://zcash.readthedocs.io/en/latest/rtd_pages/zcash_conf_guide.html) documentation) for authentication.
 
 `rpcuser` and `rpcpassword` in `.env` are only used by zcashd_exporter, but they also must be the same values as in `$ZCASHD_DATADIR/zcash.conf`
 
-### `lightwalletd/docker/zcash.conf` -- read by lightwalletd
-The other `zcashd.conf` -- the one read by lightwalletd -- needs to have `rpcbind` (the address of the zcashd it will connect to) set to `zcashd` -- docker-compose networking will make it resolve to the right IP address. Also, it needs to have the same `rpcuser` and `rpcpassword` values that are listed in `$ZCASHD_DATADIR/zcash.conf` to be able to authenticate.
+### `lightwalletd/docker/zcash.conf`—read by lightwalletd
+The other `zcashd.conf`—the one read by lightwalletd—needs to have `rpcbind` (the address of the zcashd it will connect to) set to `zcashd`, and then docker-compose networking will make it resolve to the right IP address. Also, it needs to have the same `rpcuser` and `rpcpassword` values that are listed in `$ZCASHD_DATADIR/zcash.conf` to be able to authenticate.
 
 
 ## Build initial local docker image
@@ -132,4 +135,4 @@ Edit `docker-compose.yml` to look like
       - "0.0.0.0:$LWD_HTTP_PORT:$LWD_HTTP_PORT"      
 ```
 
-When you edit these lines in `docker-compose.yml`, stopping/starting the individual `lightwalletd` container doesn't actually make the changes happen -- you have to stop/start the whole `docker-compose` ensemble of containers because the ports/network config stuff lives at that level and doesn't seem to be affected by individual container stop/starts. Also if you want to expose `lightwalletd` to the whole internet, you don't need to specify an IP address, `0.0.0.0` works as it should.
+When you edit these lines in `docker-compose.yml`, stopping/starting the individual `lightwalletd` container doesn't actually make the changes happen—you have to stop/start the whole `docker-compose` ensemble of containers because the ports/network config stuff lives at that level and doesn't seem to be affected by individual container stop/starts. Also if you want to expose `lightwalletd` to the whole internet, you don't need to specify an IP address, `0.0.0.0` works as it should.
