@@ -120,7 +120,7 @@ Loki as a rich query syntax to help with log in many ways, for example combine 2
 See more here: https://github.com/grafana/loki/blob/master/docs/logql.md
 
 
-# Exposing to the network
+# Exposing `lightwalletd` to the network
 
 Edit `docker-compose.yml` to look like
 
