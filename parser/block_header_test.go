@@ -134,7 +134,7 @@ func TestBlockHeader(t *testing.T) {
 		}
 
 		// This is not necessarily true for anything but our current test cases.
-		for _, b := range hash[:4] {
+		for _, b := range hash[:1] {
 			if b != 0 {
 				t.Errorf("Hash lacked leading zeros: %x", hash)
 			}
