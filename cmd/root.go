@@ -394,7 +394,7 @@ func initConfig() {
 	} else {
 		// Look in the current directory for a configuration file
 		viper.AddConfigPath(".")
-		// Viper auto appends extention to this config name
+		// Viper auto appends extension to this config name
 		// For example, lightwalletd.yml
 		viper.SetConfigName("lightwalletd")
 	}
