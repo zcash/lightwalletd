@@ -10,7 +10,7 @@ docker plugin install grafana/loki-docker-driver:latest --alias loki --grant-all
 
 ## Setup .env file
 
-Copy `.env.example` to `.env` and change any required paramaters.
+Copy `.env.example` to `.env` and change any required parameters.
 
 | Variable        | Usage           | 
 | ------------- |:-------------:|
@@ -100,7 +100,7 @@ This should then be taken to the `Zcashd node exporter` dashboard.
 
 If all goes as planned, the dashboard should start populating data from the container services.
 
-If there are an issues, you can view all the `docker-compose` services under the `Explore` section.
+If there are any issues, you can view all the `docker-compose` services under the `Explore` section.
 
 # Viewing container logs
 
