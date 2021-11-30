@@ -62,7 +62,7 @@ func (b *Block) GetDisplayPrevHash() []byte {
 // HasSaplingTransactions indicates if the block contains any Sapling tx.
 func (b *Block) HasSaplingTransactions() bool {
 	for _, tx := range b.vtx {
-		if tx.HasSaplingElements() {
+		if tx.HasShieldedElements() {
 			return true
 		}
 	}
@@ -118,7 +118,7 @@ func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	// Only Sapling transactions have a meaningful compact encoding
 	saplingTxns := make([]*walletrpc.CompactTx, 0, len(b.vtx))
 	for idx, tx := range b.vtx {
-		if tx.HasSaplingElements() {
+		if tx.HasShieldedElements() {
 			saplingTxns = append(saplingTxns, tx.ToCompact(idx))
 		}
 	}

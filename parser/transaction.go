@@ -369,10 +369,11 @@ func (tx *Transaction) Bytes() []byte {
 	return tx.rawBytes
 }
 
-// HasSaplingElements indicates whether a transaction has
+// HasShieldedElements indicates whether a transaction has
 // at least one shielded input or output.
-func (tx *Transaction) HasSaplingElements() bool {
-	return tx.version >= 4 && (len(tx.shieldedSpends)+len(tx.shieldedOutputs)) > 0
+func (tx *Transaction) HasShieldedElements() bool {
+	nshielded := len(tx.shieldedSpends) + len(tx.shieldedOutputs) + len(tx.orchardActions)
+	return tx.version >= 4 && nshielded > 0
 }
 
 // ToCompact converts the given (full) transaction to compact format.
