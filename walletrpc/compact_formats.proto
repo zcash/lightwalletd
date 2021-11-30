@@ -37,20 +37,30 @@ message CompactTx {
     //    valueBalance + (sum(vPubNew) - sum(vPubOld) - sum(tOut))
     uint32 fee = 3;
 
-    repeated CompactSpend spends = 4;   // inputs
-    repeated CompactOutput outputs = 5; // outputs
+    repeated CompactSaplingSpend spends = 4;   // inputs
+    repeated CompactSaplingOutput outputs = 5; // outputs
+    repeated CompactOrchardAction actions = 6;
 }
 
-// CompactSpend is a Sapling Spend Description as described in 7.3 of the Zcash
+// CompactSaplingSpend is a Sapling Spend Description as described in 7.3 of the Zcash
 // protocol specification.
-message CompactSpend {
+message CompactSaplingSpend {
     bytes nf = 1;   // nullifier (see the Zcash protocol specification)
 }
 
 // output is a Sapling Output Description as described in section 7.4 of the
 // Zcash protocol spec. Total size is 948.
-message CompactOutput {
+message CompactSaplingOutput {
     bytes cmu = 1;          // note commitment u-coordinate
     bytes epk = 2;          // ephemeral public key
-    bytes ciphertext = 3;   // ciphertext and zkproof
+    bytes ciphertext = 3;   // first 52 bytes of ciphertext
+}
+
+// https://github.com/zcash/zips/blob/main/zip-0225.rst#orchard-action-description-orchardaction
+// (but not all fields are needed)
+message CompactOrchardAction {
+    bytes nullifier = 1;        // [32] The nullifier of the input note
+    bytes cmx = 2;              // [32] The x-coordinate of the note commitment for the output note
+    bytes ephemeralKey = 3;     // [32] An encoding of an ephemeral Pallas public key
+    bytes encCiphertext = 4;    // [580] The encrypted contents of the note plaintext
 }
