@@ -30,6 +30,7 @@ type rawTransaction struct {
 	//joinSplitPubKey     []byte
 	//joinSplitSig        []byte
 	//bindingSigSapling   []byte
+	orchardActions []action
 }
 
 // Txin format as described in https://en.bitcoin.it/wiki/Transaction
@@ -165,8 +166,8 @@ func (p *spend) ParseFromSlice(data []byte, version uint32) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (p *spend) ToCompact() *walletrpc.CompactSpend {
-	return &walletrpc.CompactSpend{
+func (p *spend) ToCompact() *walletrpc.CompactSaplingSpend {
+	return &walletrpc.CompactSaplingSpend{
 		Nf: p.nullifier,
 	}
 }
@@ -212,8 +213,8 @@ func (p *output) ParseFromSlice(data []byte, version uint32) ([]byte, error) {
 	return []byte(s), nil
 }
 
-func (p *output) ToCompact() *walletrpc.CompactOutput {
-	return &walletrpc.CompactOutput{
+func (p *output) ToCompact() *walletrpc.CompactSaplingOutput {
+	return &walletrpc.CompactSaplingOutput{
 		Cmu:        p.cmu,
 		Epk:        p.ephemeralKey,
 		Ciphertext: p.encCiphertext[:52],
@@ -290,6 +291,51 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
+type action struct {
+	//cv            []byte // 32
+	nullifier []byte // 32
+	//rk            []byte // 32
+	cmx           []byte // 32
+	ephemeralKey  []byte // 32
+	encCiphertext []byte // 580
+	//outCiphertext []byte // 80
+}
+
+func (a *action) ParseFromSlice(data []byte) ([]byte, error) {
+	s := bytestring.String(data)
+	if !s.Skip(32) {
+		return nil, errors.New("could not read action cv")
+	}
+	if !s.ReadBytes(&a.nullifier, 32) {
+		return nil, errors.New("could not read action nullifier")
+	}
+	if !s.Skip(32) {
+		return nil, errors.New("could not read action rk")
+	}
+	if !s.ReadBytes(&a.cmx, 32) {
+		return nil, errors.New("could not read action cmx")
+	}
+	if !s.ReadBytes(&a.ephemeralKey, 32) {
+		return nil, errors.New("could not read action ephemeralKey")
+	}
+	if !s.ReadBytes(&a.encCiphertext, 580) {
+		return nil, errors.New("could not read action encCiphertext")
+	}
+	if !s.Skip(80) {
+		return nil, errors.New("could not read action outCiphertext")
+	}
+	return []byte(s), nil
+}
+
+func (p *action) ToCompact() *walletrpc.CompactOrchardAction {
+	return &walletrpc.CompactOrchardAction{
+		Nullifier:     p.nullifier,
+		Cmx:           p.cmx,
+		EphemeralKey:  p.ephemeralKey,
+		EncCiphertext: p.encCiphertext[:52],
+	}
+}
+
 // Transaction encodes a full (zcashd) transaction.
 type Transaction struct {
 	*rawTransaction
@@ -335,14 +381,18 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 		Index: uint64(index), // index is contextual
 		Hash:  tx.GetEncodableHash(),
 		//Fee:     0, // TODO: calculate fees
-		Spends:  make([]*walletrpc.CompactSpend, len(tx.shieldedSpends)),
-		Outputs: make([]*walletrpc.CompactOutput, len(tx.shieldedOutputs)),
+		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
+		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),
+		Actions: make([]*walletrpc.CompactOrchardAction, len(tx.orchardActions)),
 	}
 	for i, spend := range tx.shieldedSpends {
 		ctx.Spends[i] = spend.ToCompact()
 	}
 	for i, output := range tx.shieldedOutputs {
 		ctx.Outputs[i] = output.ToCompact()
+	}
+	for i, a := range tx.orchardActions {
+		ctx.Actions[i] = a.ToCompact()
 	}
 	return ctx
 }
@@ -500,8 +550,13 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 	if actionsCount >= (1 << 16) {
 		return nil, errors.New(fmt.Sprintf("actionsCount (%d) must be less than 2^16", actionsCount))
 	}
-	if !s.Skip(820 * actionsCount) {
-		return nil, errors.New("could not skip vActionsOrchard")
+	tx.orchardActions = make([]action, actionsCount)
+	for i := 0; i < actionsCount; i++ {
+		a := &tx.orchardActions[i]
+		s, err = a.ParseFromSlice([]byte(s))
+		if err != nil {
+			return nil, errors.Wrap(err, "while parsing orchard action")
+		}
 	}
 	if actionsCount > 0 {
 		if !s.Skip(1) {

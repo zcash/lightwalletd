@@ -137,11 +137,6 @@ func (s *String) ReadCompactSize(size *int) bool {
 	return true
 }
 
-func (s *String) SkipCompactSize() bool {
-	var unused int
-	return s.ReadCompactSize(&unused)
-}
-
 // ReadCompactLengthPrefixed reads data prefixed by a CompactSize-encoded
 // length field into out. It reports whether the read was successful.
 func (s *String) ReadCompactLengthPrefixed(out *String) bool {
@@ -159,8 +154,8 @@ func (s *String) ReadCompactLengthPrefixed(out *String) bool {
 	return true
 }
 
-// SkipCompactLengthPrefixed reads a CompactSize-encoded
-// length field, then skips that many bytes.
+// SkipCompactLengthPrefixed skips a CompactSize-encoded
+// length field.
 func (s *String) SkipCompactLengthPrefixed() bool {
 	var length int
 	if !s.ReadCompactSize(&length) {
