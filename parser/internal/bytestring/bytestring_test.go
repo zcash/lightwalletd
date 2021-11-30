@@ -261,6 +261,38 @@ func TestString_ReadCompactLengthPrefixed(t *testing.T) {
 	}
 }
 
+func TestString_SkipCompactLengthPrefixed(t *testing.T) {
+	// a stream of 3 bytes followed by 2 bytes into the value variable, v
+	s := String{3, 55, 66, 77, 2, 88, 99}
+
+	// read the 3 and thus the following 3 bytes
+	if !s.SkipCompactLengthPrefixed() {
+		t.Fatalf("SkipCompactLengthPrefix failed")
+	}
+	if len(s) != 3 {
+		t.Fatalf("SkipCompactLengthPrefix incorrect remaining length")
+	}
+
+	// read the 2 and then two bytes
+	if !s.SkipCompactLengthPrefixed() {
+		t.Fatalf("SkipCompactLengthPrefix failed")
+	}
+	if len(s) != 0 {
+		t.Fatalf("SkipCompactLengthPrefix incorrect remaining length")
+	}
+
+	// at the end of the String, another read should return false
+	if s.SkipCompactLengthPrefixed() {
+		t.Fatalf("SkipCompactLengthPrefix unexpected success")
+	}
+
+	// this string is too short (less than 2 bytes of data)
+	s = String{3, 55, 66}
+	if s.SkipCompactLengthPrefixed() {
+		t.Fatalf("SkipdCompactLengthPrefix unexpected success")
+	}
+}
+
 var readInt32Tests = []struct {
 	s        String
 	expected int32
