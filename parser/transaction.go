@@ -19,14 +19,14 @@ type rawTransaction struct {
 	version             uint32
 	nVersionGroupID     uint32
 	consensusBranchID   uint32
-	transparentInputs   []*txIn
-	transparentOutputs  []*txOut
+	transparentInputs   []txIn
+	transparentOutputs  []txOut
 	nLockTime           uint32
 	nExpiryHeight       uint32
 	valueBalanceSapling int64
-	shieldedSpends      []*spend
-	shieldedOutputs     []*output
-	joinSplits          []*joinSplit
+	shieldedSpends      []spend
+	shieldedOutputs     []output
+	joinSplits          []joinSplit
 	joinSplitPubKey     []byte
 	joinSplitSig        []byte
 	bindingSigSapling   []byte
@@ -103,28 +103,26 @@ func (tx *Transaction) ParseTransparent(data []byte) ([]byte, error) {
 	// TODO: Duplicate/otherwise-too-many transactions are a possible DoS
 	// TODO: vector. At the moment we're assuming trusted input.
 	// See https://nvd.nist.gov/vuln/detail/CVE-2018-17144 for an example.
-	tx.transparentInputs = make([]*txIn, txInCount)
+	tx.transparentInputs = make([]txIn, txInCount)
 	for i := 0; i < txInCount; i++ {
-		ti := &txIn{}
+		ti := &tx.transparentInputs[i]
 		s, err = ti.ParseFromSlice([]byte(s))
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing transparent input")
 		}
-		tx.transparentInputs[i] = ti
 	}
 
 	var txOutCount int
 	if !s.ReadCompactSize(&txOutCount) {
 		return nil, errors.New("could not read tx_out_count")
 	}
-	tx.transparentOutputs = make([]*txOut, txOutCount)
+	tx.transparentOutputs = make([]txOut, txOutCount)
 	for i := 0; i < txOutCount; i++ {
-		to := &txOut{}
+		to := &tx.transparentOutputs[i]
 		s, err = to.ParseFromSlice([]byte(s))
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing transparent output")
 		}
-		tx.transparentOutputs[i] = to
 	}
 	return []byte(s), nil
 }
@@ -379,41 +377,38 @@ func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
 	if !s.ReadCompactSize(&spendCount) {
 		return nil, errors.New("could not read nShieldedSpend")
 	}
-	tx.shieldedSpends = make([]*spend, spendCount)
+	tx.shieldedSpends = make([]spend, spendCount)
 	for i := 0; i < spendCount; i++ {
-		newSpend := &spend{}
+		newSpend := &tx.shieldedSpends[i]
 		s, err = newSpend.ParseFromSlice([]byte(s), 4)
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing shielded Spend")
 		}
-		tx.shieldedSpends[i] = newSpend
 	}
 	if !s.ReadCompactSize(&outputCount) {
 		return nil, errors.New("could not read nShieldedOutput")
 	}
-	tx.shieldedOutputs = make([]*output, outputCount)
+	tx.shieldedOutputs = make([]output, outputCount)
 	for i := 0; i < outputCount; i++ {
-		newOutput := &output{}
+		newOutput := &tx.shieldedOutputs[i]
 		s, err = newOutput.ParseFromSlice([]byte(s), 4)
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing shielded Output")
 		}
-		tx.shieldedOutputs[i] = newOutput
 	}
 	var joinSplitCount int
 	if !s.ReadCompactSize(&joinSplitCount) {
 		return nil, errors.New("could not read nJoinSplit")
 	}
 
-	tx.joinSplits = make([]*joinSplit, joinSplitCount)
+	tx.joinSplits = make([]joinSplit, joinSplitCount)
 	if joinSplitCount > 0 {
 		for i := 0; i < joinSplitCount; i++ {
-			js := &joinSplit{}
+			js := &tx.joinSplits[i]
 			s, err = js.ParseFromSlice([]byte(s))
 			if err != nil {
 				return nil, errors.Wrap(err, "while parsing JoinSplit")
 			}
-			tx.joinSplits[i] = js
 		}
 
 		if !s.ReadBytes(&tx.joinSplitPubKey, 32) {
@@ -461,14 +456,13 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 	if spendCount >= (1 << 16) {
 		return nil, errors.New(fmt.Sprintf("spentCount (%d) must be less than 2^16", spendCount))
 	}
-	tx.shieldedSpends = make([]*spend, spendCount)
+	tx.shieldedSpends = make([]spend, spendCount)
 	for i := 0; i < spendCount; i++ {
-		newSpend := &spend{}
+		newSpend := &tx.shieldedSpends[i]
 		s, err = newSpend.ParseFromSlice([]byte(s), tx.version)
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing shielded Spend")
 		}
-		tx.shieldedSpends[i] = newSpend
 	}
 	if !s.ReadCompactSize(&outputCount) {
 		return nil, errors.New("could not read nShieldedOutput")
@@ -476,14 +470,13 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 	if outputCount >= (1 << 16) {
 		return nil, errors.New(fmt.Sprintf("outputCount (%d) must be less than 2^16", outputCount))
 	}
-	tx.shieldedOutputs = make([]*output, outputCount)
+	tx.shieldedOutputs = make([]output, outputCount)
 	for i := 0; i < outputCount; i++ {
-		newOutput := &output{}
+		newOutput := &tx.shieldedOutputs[i]
 		s, err = newOutput.ParseFromSlice([]byte(s), tx.version)
 		if err != nil {
 			return nil, errors.Wrap(err, "while parsing shielded Output")
 		}
-		tx.shieldedOutputs[i] = newOutput
 	}
 	if spendCount+outputCount > 0 && !s.ReadInt64(&tx.valueBalanceSapling) {
 		return nil, errors.New("could not read valueBalance")
