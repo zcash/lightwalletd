@@ -50,11 +50,17 @@ The `zcashd` can be configured to run `mainnet` or `testnet` (or `regtest`). If 
 It's necessary to run `zcashd --reindex` one time for these options to take effect. This typically takes several hours, and requires more space in the `.zcash` data directory.
 
 Lightwalletd uses the following `zcashd` RPCs:
+- `getinfo`
 - `getblockchaininfo`
+- `getbestblockhash`
+- `z_gettreestate`
 - `getblock`
 - `getrawtransaction`
-- `getaddresstxids`
 - `sendrawtransaction`
+- `getrawmempool`
+- `getaddresstxids`
+- `getaddressbalance`
+- `getaddressutxos`
 
 ## Lightwalletd
 
