@@ -12,6 +12,7 @@ import (
 	"errors"
 	"io"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -391,6 +392,134 @@ func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.C
 	return err
 }
 
+// Key is 32-byte txid (as a 64-character string), data is pointer to compact tx.
+var mempoolMap *map[string]*walletrpc.CompactTx
+var mempoolList []string
+
+// Last time we pulled a copy of the mempool from zcashd.
+var lastMempool time.Time
+
+func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
+	if time.Now().Sub(lastMempool).Seconds() >= 2 {
+		lastMempool = time.Now()
+		// Refresh our copy of the mempool.
+		params := make([]json.RawMessage, 0)
+		result, rpcErr := common.RawRequest("getrawmempool", params)
+		if rpcErr != nil {
+			return rpcErr
+		}
+		err := json.Unmarshal(result, &mempoolList)
+		if err != nil {
+			return err
+		}
+		newmempoolMap := make(map[string]*walletrpc.CompactTx)
+		if mempoolMap == nil {
+			mempoolMap = &newmempoolMap
+		}
+		for _, txidstr := range mempoolList {
+			if ctx, ok := (*mempoolMap)[txidstr]; ok {
+				// This ctx has already been fetched, copy pointer to it.
+				newmempoolMap[txidstr] = ctx
+				continue
+			}
+			txidJSON, err := json.Marshal(txidstr)
+			if err != nil {
+				return err
+			}
+			// The "0" is because we only need the raw hex, which is returned as
+			// just a hex string, and not even a json string (with quotes).
+			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+			result, rpcErr := common.RawRequest("getrawtransaction", params)
+			if rpcErr != nil {
+				// Not an error; mempool transactions can disappear
+				continue
+			}
+			// strip the quotes
+			var txStr string
+			err = json.Unmarshal(result, &txStr)
+			if err != nil {
+				return err
+			}
+
+			// conver to binary
+			txBytes, err := hex.DecodeString(txStr)
+			if err != nil {
+				return err
+			}
+			tx := parser.NewTransaction()
+			txdata, err := tx.ParseFromSlice(txBytes)
+			if len(txdata) > 0 {
+				return errors.New("extra data deserializing transaction")
+			}
+			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
+			if tx.HasShieldedElements() {
+				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+			}
+		}
+		mempoolMap = &newmempoolMap
+	}
+	excludeHex := make([]string, len(exclude.Txid))
+	for i := 0; i < len(exclude.Txid); i++ {
+		excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
+	}
+	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
+		tx := (*mempoolMap)[txid]
+		if len(tx.Hash) > 0 {
+			err := resp.Send(tx)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Return the subset of items that aren't excluded, but
+// if more than one item matches an exclude entry, return
+// all those items.
+func MempoolFilter(items, exclude []string) []string {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i] < items[j]
+	})
+	sort.Slice(exclude, func(i, j int) bool {
+		return exclude[i] < exclude[j]
+	})
+	// Determine how many items match each exclude item.
+	nmatches := make([]int, len(exclude))
+	// is the exclude string less than the item string?
+	lessthan := func(e, i string) bool {
+		l := len(e)
+		if l > len(i) {
+			l = len(i)
+		}
+		return e < i[0:l]
+	}
+	ei := 0
+	for _, item := range items {
+		for ei < len(exclude) && lessthan(exclude[ei], item) {
+			ei++
+		}
+		match := ei < len(exclude) && strings.HasPrefix(item, exclude[ei])
+		if match {
+			nmatches[ei]++
+		}
+	}
+
+	// Add each item that isn't uniquely excluded to the results.
+	tosend := make([]string, 0)
+	ei = 0
+	for _, item := range items {
+		for ei < len(exclude) && lessthan(exclude[ei], item) {
+			ei++
+		}
+		match := ei < len(exclude) && strings.HasPrefix(item, exclude[ei])
+		if !match || nmatches[ei] > 1 {
+			tosend = append(tosend, item)
+		}
+	}
+	return tosend
+}
+
 func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
 	for _, a := range arg.Addresses {
 		if err := checkTaddress(a); err != nil {
@@ -501,6 +630,8 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 	if err != nil {
 		return nil, err
 	}
+	mempoolMap = nil
+	mempoolList = nil
 	return &walletrpc.Empty{}, nil
 }
 
