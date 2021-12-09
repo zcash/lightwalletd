@@ -540,3 +540,58 @@ func TestNewZRPCFromConf(t *testing.T) {
 		t.Fatal("NewZRPCFromClient unexpected success")
 	}
 }
+
+func TestMempoolFilter(t *testing.T) {
+	txidlist := []string{
+		"2e819d0bab5c819dc7d5f92d1bfb4127ce321daf847f6602",
+		"29e594c312eee49bc2c9ad37367ba58f857c4a7387ec9715",
+		"d4d090e60bf9141c6573f0598b84cc1f9817543e55a4d84d",
+		"d4714779c6dd32a72077bd79d4a70cb2153b552d7addec15",
+		"9839c1d4deca000656caff57c1f720f4fbd114b52239edde",
+		"ce5a28854a509ab309faa433542e73414fef6e903a3d52f5",
+	}
+	exclude := []string{
+		"98aa", // common prefix (98) but no match
+		"19",   // no match
+		"29",   // one match (should not appear)
+		"d4",   // 2 matches (both should appear in result)
+		"ce5a28854a509ab309faa433542e73414fef6e903a3d52f5",   // exact match
+		"ce5a28854a509ab309faa433542e73414fef6e903a3d52f500", // extra stuff ignored
+	}
+	expected := []string{
+		"2e819d0bab5c819dc7d5f92d1bfb4127ce321daf847f6602",
+		"9839c1d4deca000656caff57c1f720f4fbd114b52239edde",
+		"d4714779c6dd32a72077bd79d4a70cb2153b552d7addec15",
+		"d4d090e60bf9141c6573f0598b84cc1f9817543e55a4d84d",
+	}
+	actual := MempoolFilter(txidlist, exclude)
+	if len(actual) != len(expected) {
+		t.Fatal("mempool: wrong number of filter results")
+	}
+	for i := 0; i < len(actual); i++ {
+		if actual[i] != expected[i] {
+			t.Fatal(fmt.Sprintf("mempool: expected: %s actual: %s",
+				expected[i], actual[i]))
+		}
+	}
+	// If the exclude list is empty, return the entire mempool.
+	actual = MempoolFilter(txidlist, []string{})
+	expected = []string{
+		"29e594c312eee49bc2c9ad37367ba58f857c4a7387ec9715",
+		"2e819d0bab5c819dc7d5f92d1bfb4127ce321daf847f6602",
+		"9839c1d4deca000656caff57c1f720f4fbd114b52239edde",
+		"ce5a28854a509ab309faa433542e73414fef6e903a3d52f5",
+		"d4714779c6dd32a72077bd79d4a70cb2153b552d7addec15",
+		"d4d090e60bf9141c6573f0598b84cc1f9817543e55a4d84d",
+	}
+	if len(actual) != len(expected) {
+		t.Fatal("mempool: wrong number of filter results")
+	}
+	for i := 0; i < len(actual); i++ {
+		if actual[i] != expected[i] {
+			t.Fatal(fmt.Sprintf("mempool: expected: %s actual: %s",
+				expected[i], actual[i]))
+		}
+	}
+
+}
