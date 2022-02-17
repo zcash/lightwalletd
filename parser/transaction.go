@@ -329,10 +329,10 @@ func (a *action) ParseFromSlice(data []byte) ([]byte, error) {
 
 func (p *action) ToCompact() *walletrpc.CompactOrchardAction {
 	return &walletrpc.CompactOrchardAction{
-		Nullifier:     p.nullifier,
-		Cmx:           p.cmx,
-		EphemeralKey:  p.ephemeralKey,
-		EncCiphertext: p.encCiphertext[:52],
+		Nullifier:    p.nullifier,
+		Cmx:          p.cmx,
+		EphemeralKey: p.ephemeralKey,
+		Ciphertext:   p.encCiphertext[:52],
 	}
 }
 
