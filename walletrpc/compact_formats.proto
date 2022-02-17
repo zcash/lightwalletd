@@ -62,5 +62,5 @@ message CompactOrchardAction {
     bytes nullifier = 1;        // [32] The nullifier of the input note
     bytes cmx = 2;              // [32] The x-coordinate of the note commitment for the output note
     bytes ephemeralKey = 3;     // [32] An encoding of an ephemeral Pallas public key
-    bytes encCiphertext = 4;    // [580] The encrypted contents of the note plaintext
+    bytes ciphertext = 4;       // [52] The note plaintext component of the encCiphertext field
 }
