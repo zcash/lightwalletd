@@ -58,7 +58,7 @@ func TestCache(t *testing.T) {
 
 	// Pretend Sapling starts at 289460.
 	os.RemoveAll(unitTestPath)
-	cache = NewBlockCache(unitTestPath, unitTestChain, 289460, true)
+	cache = NewBlockCache(unitTestPath, unitTestChain, 289460, 0)
 
 	// Initially cache is empty.
 	if cache.GetLatestHeight() != -1 {
@@ -75,7 +75,7 @@ func TestCache(t *testing.T) {
 	fillCache(t)
 
 	// Simulate a restart to ensure the db files are read correctly.
-	cache = NewBlockCache(unitTestPath, unitTestChain, 289460, false)
+	cache = NewBlockCache(unitTestPath, unitTestChain, 289460, -1)
 
 	// Should still be 6 blocks.
 	if cache.nextBlock != 289466 {

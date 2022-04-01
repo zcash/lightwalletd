@@ -191,7 +191,8 @@ func (c *BlockCache) Reset(startHeight int) {
 
 // NewBlockCache returns an instance of a block cache object.
 // (No locking here, we assume this is single-threaded.)
-func NewBlockCache(dbPath string, chainName string, startHeight int, redownload bool) *BlockCache {
+// syncFromHeight < 0 means latest (tip) height.
+func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHeight int) *BlockCache {
 	c := &BlockCache{}
 	c.firstBlock = startHeight
 	c.nextBlock = startHeight
@@ -208,17 +209,19 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, redownload 
 	if err != nil {
 		Log.Fatal("open ", c.lengthsName, " failed: ", err)
 	}
-	if redownload {
-		if err := c.lengthsFile.Truncate(0); err != nil {
-			Log.Fatal("truncate lengths file failed: ", err)
-		}
-		if err := c.blocksFile.Truncate(0); err != nil {
-			Log.Fatal("truncate blocks file failed: ", err)
-		}
-	}
 	lengths, err := ioutil.ReadFile(c.lengthsName)
 	if err != nil {
 		Log.Fatal("read ", c.lengthsName, " failed: ", err)
+	}
+	// 4 bytes per lengths[] value (block length)
+	if syncFromHeight >= 0 {
+		if syncFromHeight < startHeight {
+			syncFromHeight = startHeight
+		}
+		if (syncFromHeight-startHeight)*4 < len(lengths) {
+			// discard the entries at and beyond (newer than) the specified height
+			lengths = lengths[:(syncFromHeight-startHeight)*4]
+		}
 	}
 
 	// The last entry in starts[] is where to write the next block.

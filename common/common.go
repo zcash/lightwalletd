@@ -42,6 +42,7 @@ type Options struct {
 	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`
+	SyncFromHeight      int    `json:"sync_from_height"`
 	DataDir             string `json:"data_dir"`
 	PingEnable          bool   `json:"ping_enable"`
 	Darkside            bool   `json:"darkside"`
