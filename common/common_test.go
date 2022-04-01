@@ -62,7 +62,7 @@ func TestMain(m *testing.M) {
 		blockJSON, _ := json.Marshal(scan.Text())
 		blocks = append(blocks, blockJSON)
 	}
-	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 
 	// Setup is done; run all tests.
 	exitcode := m.Run()
@@ -355,7 +355,7 @@ func TestBlockIngestor(t *testing.T) {
 	Time.Sleep = sleepStub
 	Time.Now = nowStub
 	os.RemoveAll(unitTestPath)
-	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, false)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, -1)
 	BlockIngestor(testcache, 11)
 	if step != 19 {
 		t.Error("unexpected final step", step)
@@ -488,7 +488,7 @@ func TestGetBlockRange(t *testing.T) {
 	testT = t
 	RawRequest = getblockStub
 	os.RemoveAll(unitTestPath)
-	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go GetBlockRange(testcache, blockChan, errChan, 380640, 380642)
@@ -567,7 +567,7 @@ func TestGetBlockRangeReverse(t *testing.T) {
 	testT = t
 	RawRequest = getblockStubReverse
 	os.RemoveAll(unitTestPath)
-	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, true)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 
