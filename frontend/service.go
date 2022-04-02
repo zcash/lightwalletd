@@ -223,11 +223,12 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		return nil, errors.New("zcashd did not return treestate")
 	}
 	return &walletrpc.TreeState{
-		Network: s.chainName,
-		Height:  uint64(gettreestateReply.Height),
-		Hash:    gettreestateReply.Hash,
-		Time:    gettreestateReply.Time,
-		Tree:    gettreestateReply.Sapling.Commitments.FinalState,
+		Network:     s.chainName,
+		Height:      uint64(gettreestateReply.Height),
+		Hash:        gettreestateReply.Hash,
+		Time:        gettreestateReply.Time,
+		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
+		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
 	}, nil
 }
 
