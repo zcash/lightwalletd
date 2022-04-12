@@ -483,9 +483,6 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 	if tx.nVersionGroupID != 0x26A7270A {
 		return nil, errors.New(fmt.Sprintf("version group ID %d must be 0x26A7270A", tx.nVersionGroupID))
 	}
-	if tx.consensusBranchID != 0x37519621 {
-		return nil, errors.New("unknown consensusBranchID")
-	}
 	if !s.Skip(4) {
 		return nil, errors.New("could not skip nLockTime")
 	}
