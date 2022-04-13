@@ -109,10 +109,8 @@ func median(inp []float64) (median float64) {
 	l := len(inp)
 	if l == 0 {
 		return -1
-	} else if l == 2 {
-		return (inp[0] + inp[1]) / 2
 	} else if l%2 == 0 {
-		return (inp[l/2-1] + inp[l/2+1]) / 2
+		return (inp[l/2-1] + inp[l/2]) / 2
 	} else {
 		return inp[l/2]
 	}
