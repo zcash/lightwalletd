@@ -183,11 +183,15 @@
                 </li>
               
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.CompactOutput"><span class="badge">M</span>CompactOutput</a>
+                  <a href="#cash.z.wallet.sdk.rpc.CompactOrchardAction"><span class="badge">M</span>CompactOrchardAction</a>
                 </li>
               
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.CompactSpend"><span class="badge">M</span>CompactSpend</a>
+                  <a href="#cash.z.wallet.sdk.rpc.CompactSaplingOutput"><span class="badge">M</span>CompactSaplingOutput</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.CompactSaplingSpend"><span class="badge">M</span>CompactSaplingSpend</a>
                 </li>
               
                 <li>
@@ -408,7 +412,52 @@
 
         
       
-        <h3 id="cash.z.wallet.sdk.rpc.CompactOutput">CompactOutput</h3>
+        <h3 id="cash.z.wallet.sdk.rpc.CompactOrchardAction">CompactOrchardAction</h3>
+        <p>https://github.com/zcash/zips/blob/main/zip-0225.rst#orchard-action-description-orchardaction</p><p>(but not all fields are needed)</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>nullifier</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>[32] The nullifier of the input note </p></td>
+                </tr>
+              
+                <tr>
+                  <td>cmx</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>[32] The x-coordinate of the note commitment for the output note </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ephemeralKey</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>[32] An encoding of an ephemeral Pallas public key </p></td>
+                </tr>
+              
+                <tr>
+                  <td>ciphertext</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>[52] The note plaintext component of the encCiphertext field </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.CompactSaplingOutput">CompactSaplingOutput</h3>
         <p>output is a Sapling Output Description as described in section 7.4 of the</p><p>Zcash protocol spec. Total size is 948.</p>
 
         
@@ -436,7 +485,7 @@
                   <td>ciphertext</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>ciphertext and zkproof </p></td>
+                  <td><p>first 52 bytes of ciphertext </p></td>
                 </tr>
               
             </tbody>
@@ -446,8 +495,8 @@
 
         
       
-        <h3 id="cash.z.wallet.sdk.rpc.CompactSpend">CompactSpend</h3>
-        <p>CompactSpend is a Sapling Spend Description as described in 7.3 of the Zcash</p><p>protocol specification.</p>
+        <h3 id="cash.z.wallet.sdk.rpc.CompactSaplingSpend">CompactSaplingSpend</h3>
+        <p>CompactSaplingSpend is a Sapling Spend Description as described in 7.3 of the Zcash</p><p>protocol specification.</p>
 
         
           <table class="field-table">
@@ -507,16 +556,23 @@ in a pure-Sapling context, the fee will be calculable as:
               
                 <tr>
                   <td>spends</td>
-                  <td><a href="#cash.z.wallet.sdk.rpc.CompactSpend">CompactSpend</a></td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.CompactSaplingSpend">CompactSaplingSpend</a></td>
                   <td>repeated</td>
                   <td><p>inputs </p></td>
                 </tr>
               
                 <tr>
                   <td>outputs</td>
-                  <td><a href="#cash.z.wallet.sdk.rpc.CompactOutput">CompactOutput</a></td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.CompactSaplingOutput">CompactSaplingOutput</a></td>
                   <td>repeated</td>
                   <td><p>outputs </p></td>
+                </tr>
+              
+                <tr>
+                  <td>actions</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.CompactOrchardAction">CompactOrchardAction</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
                 </tr>
               
             </tbody>
@@ -836,6 +892,21 @@ into a specified block on the next ApplyStaged().</p></td>
                 <td><p>Clear the incoming transaction pool.</p></td>
               </tr>
             
+              <tr>
+                <td>AddAddressUtxo</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReply">GetAddressUtxosReply</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>Add a GetAddressUtxosReply entry to be returned by GetAddressUtxos().
+There is no staging or applying for these, very simple.</p></td>
+              </tr>
+            
+              <tr>
+                <td>ClearAddressUtxo</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>Clear the list of GetAddressUtxos entries (can&#39;t fail)</p></td>
+              </tr>
+            
           </tbody>
         </table>
 
@@ -1045,7 +1116,7 @@ into a specified block on the next ApplyStaged().</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.GetAddressUtxosArg">GetAddressUtxosArg</h3>
-        <p></p>
+        <p>Results are sorted by height, which makes it easy to issue another</p><p>request that picks up from where the previous left off.</p>
 
         
           <table class="field-table">
@@ -1055,9 +1126,9 @@ into a specified block on the next ApplyStaged().</p></td>
             <tbody>
               
                 <tr>
-                  <td>address</td>
+                  <td>addresses</td>
                   <td><a href="#string">string</a></td>
-                  <td></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -1091,6 +1162,13 @@ into a specified block on the next ApplyStaged().</p></td>
               <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
             </thead>
             <tbody>
+              
+                <tr>
+                  <td>address</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
               
                 <tr>
                   <td>txid</td>
@@ -1305,7 +1383,7 @@ into a specified block on the next ApplyStaged().</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</h3>
-        <p>RawTransaction contains the complete transaction data. It also optionally includes </p><p>the block height in which the transaction was included.</p>
+        <p>RawTransaction contains the complete transaction data. It also optionally includes </p><p>the block height in which the transaction was included, or, when returned</p><p>by GetMempoolStream(), the latest block height.</p>
 
         
           <table class="field-table">
@@ -1573,6 +1651,14 @@ in the exclude list that don&#39;t exist in the mempool are ignored.</p></td>
               </tr>
             
               <tr>
+                <td>GetMempoolStream</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
+                <td><p>Return a stream of current Mempool transactions. This will keep the output stream open while
+there are mempool transactions. It will close the returned stream when a new block is mined.</p></td>
+              </tr>
+            
+              <tr>
                 <td>GetTreeState</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TreeState">TreeState</a></td>
@@ -1607,7 +1693,7 @@ The block can be specified by either height or hash.</p></td>
                 <td>Ping</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Duration">Duration</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.PingResponse">PingResponse</a></td>
-                <td><p>Testing-only</p></td>
+                <td><p>Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)</p></td>
               </tr>
             
           </tbody>
