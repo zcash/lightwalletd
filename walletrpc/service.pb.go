@@ -1196,7 +1196,7 @@ type PriceRequest struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// List of timestamps(in sec) at which the price is being requested
+	// timestamp (Unix time, seconds since 1970) at which the price is being requested
 	Timestamp uint64 `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	// 3 letter currency-code
 	Currency string `protobuf:"bytes,2,opt,name=currency,proto3" json:"currency,omitempty"`

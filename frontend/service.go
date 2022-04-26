@@ -187,7 +187,7 @@ func (s *lwdStreamer) GetZECPrice(ctx context.Context, in *walletrpc.PriceReques
 	}
 
 	ts := time.Unix(int64(in.Timestamp), 0)
-	price, timeFetched, err := common.GetHistoricalPrice(&ts)
+	price, timeFetched, err := common.GetHistoricalPrice(ts)
 
 	if err != nil {
 		return nil, err
