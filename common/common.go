@@ -369,7 +369,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		var block *walletrpc.CompactBlock
 		block, err = getBlockFromRPC(height)
 		if err != nil {
-			Log.Fatal("getblock failed, will retry", err)
+			Log.Fatal("getblock ", height, " failed, will retry: ", err)
 		}
 		if block != nil && c.HashMatch(block.PrevHash) {
 			if err = c.Add(height, block); err != nil {
