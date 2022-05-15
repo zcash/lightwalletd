@@ -496,7 +496,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(utxosReply)
 
 	default:
-		return nil, errors.New("there was an attempt to call an unsupported RPC")
+		return nil, errors.New("there was an attempt to call an unsupported RPC: " + method)
 	}
 }
 
