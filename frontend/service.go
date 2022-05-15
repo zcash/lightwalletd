@@ -763,3 +763,32 @@ func (s *DarksideStreamer) ClearAddressUtxo(ctx context.Context, arg *walletrpc.
 	err := common.DarksideClearAddressUtxos()
 	return &walletrpc.Empty{}, err
 }
+
+// Adds a tree state to the cached tree states
+func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.TreeState) (*walletrpc.Empty, error) {
+	tree := common.DarksideTreeState{
+		Network:     arg.Network,
+		Height:      arg.Height,
+		Hash:        arg.Hash,
+		Time:        arg.Time,
+		SaplingTree: arg.SaplingTree,
+		OrchardTree: arg.OrchardTree,
+	}
+	err := common.DarksideAddTreeState(tree)
+
+	return &walletrpc.Empty{}, err
+}
+
+// removes a TreeState from the cache if present
+func (s *DarksideStreamer) RemoveTreeState(ctx context.Context, arg *walletrpc.BlockID) (*walletrpc.Empty, error) {
+	err := common.DarksideRemoveTreeState(arg.Height)
+
+	return &walletrpc.Empty{}, err
+}
+
+// Clears all the TreeStates present in the cache.
+func (s *DarksideStreamer) ClearAllTreeStates(ctx context.Context, arg *walletrpc.Empty) (*walletrpc.Empty, error) {
+	err := common.DarksideClearAllTreeStates()
+
+	return &walletrpc.Empty{}, err
+}

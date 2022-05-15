@@ -85,6 +85,12 @@ type DarksideStreamerClient interface {
 	AddAddressUtxo(ctx context.Context, in *GetAddressUtxosReply, opts ...grpc.CallOption) (*Empty, error)
 	// Clear the list of GetAddressUtxos entries (can't fail)
 	ClearAddressUtxo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Adds a GetTreeState to the tree state cache
+	AddTreeState(ctx context.Context, in *TreeState, opts ...grpc.CallOption) (*Empty, error)
+	// Removes a GetTreeState for the given height from cache if present (can't fail)
+	RemoveTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*Empty, error)
+	// Clear the list of GetTreeStates entries (can't fail)
+	ClearAllTreeStates(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type darksideStreamerClient struct {
@@ -267,6 +273,33 @@ func (c *darksideStreamerClient) ClearAddressUtxo(ctx context.Context, in *Empty
 	return out, nil
 }
 
+func (c *darksideStreamerClient) AddTreeState(ctx context.Context, in *TreeState, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddTreeState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *darksideStreamerClient) RemoveTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/RemoveTreeState", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *darksideStreamerClient) ClearAllTreeStates(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAllTreeStates", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DarksideStreamerServer is the server API for DarksideStreamer service.
 // All implementations must embed UnimplementedDarksideStreamerServer
 // for forward compatibility
@@ -334,6 +367,12 @@ type DarksideStreamerServer interface {
 	AddAddressUtxo(context.Context, *GetAddressUtxosReply) (*Empty, error)
 	// Clear the list of GetAddressUtxos entries (can't fail)
 	ClearAddressUtxo(context.Context, *Empty) (*Empty, error)
+	// Adds a GetTreeState to the tree state cache
+	AddTreeState(context.Context, *TreeState) (*Empty, error)
+	// Removes a GetTreeState for the given height from cache if present (can't fail)
+	RemoveTreeState(context.Context, *BlockID) (*Empty, error)
+	// Clear the list of GetTreeStates entries (can't fail)
+	ClearAllTreeStates(context.Context, *Empty) (*Empty, error)
 	mustEmbedUnimplementedDarksideStreamerServer()
 }
 
@@ -373,6 +412,15 @@ func (UnimplementedDarksideStreamerServer) AddAddressUtxo(context.Context, *GetA
 }
 func (UnimplementedDarksideStreamerServer) ClearAddressUtxo(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClearAddressUtxo not implemented")
+}
+func (UnimplementedDarksideStreamerServer) AddTreeState(context.Context, *TreeState) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddTreeState not implemented")
+}
+func (UnimplementedDarksideStreamerServer) RemoveTreeState(context.Context, *BlockID) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveTreeState not implemented")
+}
+func (UnimplementedDarksideStreamerServer) ClearAllTreeStates(context.Context, *Empty) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearAllTreeStates not implemented")
 }
 func (UnimplementedDarksideStreamerServer) mustEmbedUnimplementedDarksideStreamerServer() {}
 
@@ -604,6 +652,60 @@ func _DarksideStreamer_ClearAddressUtxo_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DarksideStreamer_AddTreeState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TreeState)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).AddTreeState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddTreeState",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).AddTreeState(ctx, req.(*TreeState))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DarksideStreamer_RemoveTreeState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BlockID)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).RemoveTreeState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/RemoveTreeState",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).RemoveTreeState(ctx, req.(*BlockID))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _DarksideStreamer_ClearAllTreeStates_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).ClearAllTreeStates(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAllTreeStates",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).ClearAllTreeStates(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DarksideStreamer_ServiceDesc is the grpc.ServiceDesc for DarksideStreamer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -642,6 +744,18 @@ var DarksideStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ClearAddressUtxo",
 			Handler:    _DarksideStreamer_ClearAddressUtxo_Handler,
+		},
+		{
+			MethodName: "AddTreeState",
+			Handler:    _DarksideStreamer_AddTreeState_Handler,
+		},
+		{
+			MethodName: "RemoveTreeState",
+			Handler:    _DarksideStreamer_RemoveTreeState_Handler,
+		},
+		{
+			MethodName: "ClearAllTreeStates",
+			Handler:    _DarksideStreamer_ClearAllTreeStates_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
