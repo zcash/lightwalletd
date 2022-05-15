@@ -121,4 +121,13 @@ service DarksideStreamer {
 
     // Clear the list of GetAddressUtxos entries (can't fail)
     rpc ClearAddressUtxo(Empty) returns (Empty) {}
+
+    // Adds a GetTreeState to the tree state cache
+    rpc AddTreeState(TreeState) returns (Empty) {}
+
+    // Removes a GetTreeState for the given height from cache if present (can't fail)
+    rpc RemoveTreeState(BlockID) returns (Empty) {}
+
+    // Clear the list of GetTreeStates entries (can't fail)
+    rpc ClearAllTreeStates(Empty) returns (Empty) {}
 }

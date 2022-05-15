@@ -49,6 +49,8 @@ type darksideState struct {
 
 	// Unordered list of replies
 	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
+
+	stagedTreeStates map[uint64]*DarksideTreeState
 }
 
 var state darksideState
@@ -56,6 +58,15 @@ var state darksideState
 type stagedTx struct {
 	height int
 	bytes  []byte
+}
+
+type DarksideTreeState struct {
+	Network     string
+	Height      uint64
+	Hash        string
+	Time        uint32
+	SaplingTree string
+	OrchardTree string
 }
 
 // DarksideEnabled is true if --darkside-very-insecure was given on
@@ -106,6 +117,7 @@ func DarksideReset(sa int, bi, cn string) error {
 		stagedBlocks:         make([][]byte, 0),
 		incomingTransactions: make([][]byte, 0),
 		stagedTransactions:   make([]stagedTx, 0),
+		stagedTreeStates:     make(map[uint64]*DarksideTreeState),
 	}
 	state.cache.Reset(sa)
 	return nil
@@ -546,6 +558,40 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		return json.Marshal(utxosReply)
 
+	case "z_gettreestate":
+		var heightStr string
+		err := json.Unmarshal(params[0], &heightStr)
+		if err != nil {
+			return nil, errors.New("failed to parse gettreestate request")
+		}
+
+		height, err := strconv.Atoi(heightStr)
+		if err != nil {
+			return nil, errors.New("error parsing height as integer")
+		}
+
+		treeState := state.stagedTreeStates[uint64(height)]
+
+		if treeState == nil {
+			return nil, errors.New(fmt.Sprint(
+				"there is no TreeState Staged for height \"",
+				height,
+				"\". Stage it using AddTreeState() first"))
+		}
+
+		zcashdTreeState := &ZcashdRpcReplyGettreestate{}
+
+		zcashdTreeState.Hash = treeState.Hash
+		zcashdTreeState.Height = int(treeState.Height)
+		zcashdTreeState.Time = treeState.Time
+		zcashdTreeState.Sapling.Commitments.FinalState = treeState.SaplingTree
+
+		if treeState.OrchardTree != "" {
+			zcashdTreeState.Orchard.Commitments.FinalState = treeState.OrchardTree
+		}
+
+		return json.Marshal(zcashdTreeState)
+
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC: " + method)
 	}
@@ -682,5 +728,27 @@ func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
 
 func DarksideClearAddressUtxos() error {
 	state.getAddressUtxos = nil
+	return nil
+}
+
+func DarksideClearAllTreeStates() error {
+	state.stagedTreeStates = make(map[uint64]*DarksideTreeState)
+	return nil
+}
+
+func DarksideAddTreeState(arg DarksideTreeState) error {
+	if !state.resetted || state.stagedTreeStates == nil {
+		return errors.New("please call Reset first")
+	}
+
+	state.stagedTreeStates[arg.Height] = &arg
+	return nil
+}
+
+func DarksideRemoveTreeState(arg uint64) error {
+	if !state.resetted || state.stagedTreeStates == nil {
+		return errors.New("please call Reset first")
+	}
+	delete(state.stagedTreeStates, arg)
 	return nil
 }
