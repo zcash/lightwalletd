@@ -147,6 +147,11 @@ type (
 		Satoshis    uint64
 		Height      int
 	}
+
+	// reply to getblock verbose=1 (json includes txid list)
+	ZcashRpcReplyGetblock1 struct {
+		Tx []string
+	}
 )
 
 // FirstRPC tests that we can successfully reach zcashd through the RPC
@@ -269,6 +274,31 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 
 	if block.GetHeight() != height {
 		return nil, errors.New("received unexpected height block")
+	}
+
+	// `block.ParseFromSlice` correctly parses blocks containing v5 transactions, but
+	// incorrectly computes the IDs of the v5 transactions. We temporarily paper over this
+	// bug by fetching the correct txids via a second getblock RPC call.
+	// https://github.com/zcash/lightwalletd/issues/392
+	{
+		params[1] = json.RawMessage("1") // JSON with list of txids
+		result, rpcErr := RawRequest("getblock", params)
+		if rpcErr != nil {
+			return nil, errors.Wrap(rpcErr, "error requesting verbose block")
+		}
+		var block1 ZcashRpcReplyGetblock1
+		err = json.Unmarshal(result, &block1)
+		if err != nil {
+			return nil, err
+		}
+		for i, t := range block.Transactions() {
+			txid, err := hex.DecodeString(block1.Tx[i])
+			if err != nil {
+				return nil, errors.Wrap(err, "error decoding getblock txid")
+			}
+			// convert from big-endian
+			t.SetTxID(parser.Reverse(txid))
+		}
 	}
 
 	return block.ToCompact(), nil

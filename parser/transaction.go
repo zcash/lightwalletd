@@ -6,7 +6,6 @@
 package parser
 
 import (
-	"crypto/sha256"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -339,29 +338,23 @@ func (p *action) ToCompact() *walletrpc.CompactOrchardAction {
 // Transaction encodes a full (zcashd) transaction.
 type Transaction struct {
 	*rawTransaction
-	rawBytes   []byte
-	cachedTxID []byte // cached for performance
+	rawBytes []byte
+	txID     []byte // from getblock verbose=1
+}
+
+func (tx *Transaction) SetTxID(txid []byte) {
+	tx.txID = txid
 }
 
 // GetDisplayHash returns the transaction hash in big-endian display order.
 func (tx *Transaction) GetDisplayHash() []byte {
-	if tx.cachedTxID != nil {
-		return tx.cachedTxID
-	}
-
-	// SHA256d
-	digest := sha256.Sum256(tx.rawBytes)
-	digest = sha256.Sum256(digest[:])
 	// Convert to big-endian
-	tx.cachedTxID = Reverse(digest[:])
-	return tx.cachedTxID
+	return Reverse(tx.txID[:])
 }
 
 // GetEncodableHash returns the transaction hash in little-endian wire format order.
 func (tx *Transaction) GetEncodableHash() []byte {
-	digest := sha256.Sum256(tx.rawBytes)
-	digest = sha256.Sum256(digest[:])
-	return digest[:]
+	return tx.txID
 }
 
 // Bytes returns a full transaction's raw bytes.

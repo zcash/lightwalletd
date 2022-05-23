@@ -4,7 +4,6 @@
 package parser
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -85,9 +84,9 @@ func TestV5TransactionParser(t *testing.T) {
 		if len(rest) != 0 {
 			t.Fatalf("Test did not consume entire buffer, %d remaining", len(rest))
 		}
-		if bytes.Equal(tx.cachedTxID, []byte(txtestdata.Txid)) {
-			t.Fatal("txid")
-		}
+		// Currently, we can't check the txid because we get that from
+		// zcashd (getblock rpc) rather than computing it ourselves.
+		// https://github.com/zcash/lightwalletd/issues/392
 		if tx.version != uint32(txtestdata.Version) {
 			t.Fatal("version miscompare")
 		}
