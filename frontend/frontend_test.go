@@ -115,7 +115,7 @@ func TestGetTransaction(t *testing.T) {
 	if err == nil {
 		testT.Fatal("GetTransaction unexpectedly succeeded")
 	}
-	if err.Error() != "Please call GetTransaction with txid" {
+	if err.Error() != "please call GetTransaction with txid" {
 		testT.Fatal("GetTransaction unexpected error message")
 	}
 	if rawtx != nil {
@@ -127,7 +127,7 @@ func TestGetTransaction(t *testing.T) {
 	if err == nil {
 		testT.Fatal("GetTransaction unexpectedly succeeded")
 	}
-	if err.Error() != "Can't GetTransaction with a blockhash+num. Please call GetTransaction with txid" {
+	if err.Error() != "can't GetTransaction with a blockhash+num, please call GetTransaction with txid" {
 		testT.Fatal("GetTransaction unexpected error message")
 	}
 	if rawtx != nil {
@@ -151,7 +151,10 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 	case 1:
 		return blocks[0], nil
 	case 2:
-		return nil, errors.New("getblock test error")
+		// verbose mode (getblock height 1), return transaction list
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 3:
+		return nil, errors.New("getblock test error, too many requests")
 	}
 	testT.Fatal("unexpected call to getblockStub")
 	return nil, nil
@@ -169,7 +172,7 @@ func TestGetLatestBlock(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetLatestBlock should have failed, empty cache")
 	}
-	if err.Error() != "Cache is empty. Server is probably not yet ready" {
+	if err.Error() != "cache is empty, server is probably not yet ready" {
 		t.Fatal("GetLatestBlock incorrect error", err)
 	}
 	if blockID != nil {
@@ -288,7 +291,7 @@ func TestGetTaddressTxids(t *testing.T) {
 		if err == nil {
 			t.Fatal("GetTaddressTxids should have failed on bad address, case", i)
 		}
-		if err.Error() != "Invalid address" {
+		if err.Error() != "invalid address" {
 			t.Fatal("GetTaddressTxids incorrect error on bad address, case", i)
 		}
 	}
@@ -363,7 +366,7 @@ func TestGetBlock(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
 	}
-	if err.Error() != "GetBlock by Hash is not yet implemented" {
+	if err.Error() != "gRPC GetBlock by Hash is not yet implemented" {
 		t.Fatal("GetBlock hash unimplemented error message failed")
 	}
 
@@ -525,7 +528,7 @@ func TestNewZRPCFromConf(t *testing.T) {
 	}
 
 	// can't pass an integer
-	connCfg, err = connFromConf(10)
+	_, err = connFromConf(10)
 	if err == nil {
 		t.Fatal("connFromConf unexpected success")
 	}
@@ -570,8 +573,8 @@ func TestMempoolFilter(t *testing.T) {
 	}
 	for i := 0; i < len(actual); i++ {
 		if actual[i] != expected[i] {
-			t.Fatal(fmt.Sprintf("mempool: expected: %s actual: %s",
-				expected[i], actual[i]))
+			t.Fatalf("mempool: expected: %s actual: %s",
+				expected[i], actual[i])
 		}
 	}
 	// If the exclude list is empty, return the entire mempool.
@@ -589,8 +592,8 @@ func TestMempoolFilter(t *testing.T) {
 	}
 	for i := 0; i < len(actual); i++ {
 		if actual[i] != expected[i] {
-			t.Fatal(fmt.Sprintf("mempool: expected: %s actual: %s",
-				expected[i], actual[i]))
+			t.Fatalf("mempool: expected: %s actual: %s",
+				expected[i], actual[i])
 		}
 	}
 

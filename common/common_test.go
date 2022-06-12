@@ -25,16 +25,10 @@ import (
 // be useful across multiple tests.
 
 var (
-	testT *testing.T
-
-	// The various stub callbacks need to sequence through states
-	step int
-
-	getblockchaininfoReply []byte
-	logger                 = logrus.New()
-
-	blocks [][]byte // four test blocks
-
+	testT     *testing.T
+	step      int // The various stub callbacks need to sequence through states
+	logger    = logrus.New()
+	blocks    [][]byte // four test blocks
 	testcache *BlockCache
 )
 
@@ -199,11 +193,14 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		// height 380640
 		return blocks[0], nil
 	case 3:
+		checkSleepMethod(0, 0, "getblock", method)
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 4:
 		checkSleepMethod(0, 0, "getbestblockhash", method)
 		// This hash doesn't matter, won't match anything
 		r, _ := json.Marshal("010101")
 		return r, nil
-	case 4:
+	case 5:
 		checkSleepMethod(0, 0, "getblock", method)
 		var height string
 		err := json.Unmarshal(params[0], &height)
@@ -215,24 +212,27 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		}
 		// height 380641
 		return blocks[1], nil
-	case 5:
+	case 6:
+		checkSleepMethod(0, 0, "getblock", method)
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 7:
 		// Return the expected block hash, so we're synced, should
 		// then sleep for 2 seconds, then another getbestblockhash
 		checkSleepMethod(0, 0, "getbestblockhash", method)
 		r, _ := json.Marshal(displayHash(testcache.GetLatestHash()))
 		return r, nil
-	case 6:
+	case 8:
 		// Simulate still no new block, still synced, should
 		// sleep for 2 seconds, then another getbestblockhash
 		checkSleepMethod(1, 2, "getbestblockhash", method)
 		r, _ := json.Marshal(displayHash(testcache.GetLatestHash()))
 		return r, nil
-	case 7:
+	case 9:
 		// Simulate new block (any non-matching hash will do)
 		checkSleepMethod(2, 4, "getbestblockhash", method)
 		r, _ := json.Marshal("aabb")
 		return r, nil
-	case 8:
+	case 10:
 		checkSleepMethod(2, 4, "getblock", method)
 		var height string
 		err := json.Unmarshal(params[0], &height)
@@ -244,20 +244,23 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		}
 		// height 380642
 		return blocks[2], nil
-	case 9:
+	case 11:
+		checkSleepMethod(2, 4, "getblock", method)
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 12:
 		// Simulate still no new block, still synced, should
 		// sleep for 2 seconds, then another getbestblockhash
 		checkSleepMethod(2, 4, "getbestblockhash", method)
 		r, _ := json.Marshal(displayHash(testcache.GetLatestHash()))
 		return r, nil
-	case 10:
+	case 13:
 		// There are 3 blocks in the cache (380640-642), so let's
 		// simulate a 1-block reorg, new version (replacement) of 380642
 		checkSleepMethod(3, 6, "getbestblockhash", method)
 		// hash doesn't matter, just something that doesn't match
 		r, _ := json.Marshal("4545")
 		return r, nil
-	case 11:
+	case 14:
 		// It thinks there may simply be a new block, but we'll say
 		// there is no block at this height (380642 was replaced).
 		checkSleepMethod(3, 6, "getblock", method)
@@ -270,13 +273,13 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 			testT.Fatal("incorrect height requested")
 		}
 		return nil, errors.New("-8: Block height out of range")
-	case 12:
+	case 15:
 		// It will re-ask the best hash (let's make no change)
 		checkSleepMethod(3, 6, "getbestblockhash", method)
 		// hash doesn't matter, just something that doesn't match
 		r, _ := json.Marshal("4545")
 		return r, nil
-	case 13:
+	case 16:
 		// It should have backed up one block
 		checkSleepMethod(3, 6, "getblock", method)
 		var height string
@@ -289,14 +292,17 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		}
 		// height 380642
 		return blocks[2], nil
-	case 14:
+	case 17:
+		checkSleepMethod(3, 6, "getblock", method)
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 18:
 		// We're back to the same state as case 9, and this time
 		// we'll make it back up 2 blocks (rather than one)
 		checkSleepMethod(3, 6, "getbestblockhash", method) // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXX
 		// hash doesn't matter, just something that doesn't match
 		r, _ := json.Marshal("5656")
 		return r, nil
-	case 15:
+	case 19:
 		// It thinks there may simply be a new block, but we'll say
 		// there is no block at this height (380642 was replaced).
 		checkSleepMethod(3, 6, "getblock", method)
@@ -309,12 +315,12 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 			testT.Fatal("incorrect height requested")
 		}
 		return nil, errors.New("-8: Block height out of range")
-	case 16:
+	case 20:
 		checkSleepMethod(3, 6, "getbestblockhash", method)
 		// hash doesn't matter, just something that doesn't match
 		r, _ := json.Marshal("5656")
 		return r, nil
-	case 17:
+	case 21:
 		// Like case 13, it should have backed up one block, but
 		// this time we'll make it back up one more
 		checkSleepMethod(3, 6, "getblock", method)
@@ -327,12 +333,12 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 			testT.Fatal("incorrect height requested")
 		}
 		return nil, errors.New("-8: Block height out of range")
-	case 18:
+	case 22:
 		checkSleepMethod(3, 6, "getbestblockhash", method)
 		// hash doesn't matter, just something that doesn't match
 		r, _ := json.Marshal("5656")
 		return r, nil
-	case 19:
+	case 23:
 		// It should have backed up one more
 		checkSleepMethod(3, 6, "getblock", method)
 		var height string
@@ -344,6 +350,9 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 			testT.Fatal("incorrect height requested")
 		}
 		return blocks[1], nil
+	case 24:
+		checkSleepMethod(3, 6, "getblock", method)
+		return []byte("{\"Tx\": [\"00\"]}"), nil
 	}
 	testT.Error("blockIngestorStub called too many times")
 	return nil, nil
@@ -357,7 +366,7 @@ func TestBlockIngestor(t *testing.T) {
 	os.RemoveAll(unitTestPath)
 	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, -1)
 	BlockIngestor(testcache, 11)
-	if step != 19 {
+	if step != 24 {
 		t.Error("unexpected final step", step)
 	}
 	step = 0
@@ -389,19 +398,23 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// Sunny-day
 		return blocks[0], nil
 	case 2:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 3:
 		if height != "380641" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
 		return blocks[1], nil
-	case 3:
+	case 4:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 5:
 		if height != "380642" {
 			testT.Error("unexpected height", height)
 		}
 		// Simulate that we're synced (caught up);
 		// this should cause one 10s sleep (then retry).
 		return nil, errors.New("-8: Block height out of range")
-	case 4:
+	case 6:
 		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -411,7 +424,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// Simulate that we're still caught up; this should cause a 1s
 		// wait then a check for reorg to shorter chain (back up one).
 		return nil, errors.New("-8: Block height out of range")
-	case 5:
+	case 7:
 		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -422,7 +435,9 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// Return the expected block (as normally happens, no actual reorg),
 		// ingestor will immediately re-request the next block (42).
 		return blocks[1], nil
-	case 6:
+	case 8:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 9:
 		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -431,7 +446,9 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		}
 		// Block 42 has now finally appeared, it will immediately ask for 43.
 		return blocks[2], nil
-	case 7:
+	case 10:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 11:
 		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -442,7 +459,9 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// this causes a 1s sleep and then back up one block (to 42).
 		blocks[3][9]++ // first byte of the prevhash
 		return blocks[3], nil
-	case 8:
+	case 12:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 13:
 		blocks[3][9]-- // repair first byte of the prevhash
 		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
@@ -451,7 +470,9 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 			testT.Error("unexpected height ", height)
 		}
 		return blocks[2], nil
-	case 9:
+	case 14:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 15:
 		if sleepCount != 1 || sleepDuration != 2*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -461,7 +482,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		// Instead of returning expected (43), simulate block unmarshal
 		// failure, should cause 10s sleep, retry
 		return nil, nil
-	case 10:
+	case 16:
 		if sleepCount != 2 || sleepDuration != 12*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -470,7 +491,9 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		}
 		// Back to sunny-day
 		return blocks[3], nil
-	case 11:
+	case 17:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 18:
 		if sleepCount != 2 || sleepDuration != 12*time.Second {
 			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 		}
@@ -522,7 +545,7 @@ func TestGetBlockRange(t *testing.T) {
 		if err.Error() != "block requested is newer than latest block" {
 			t.Fatal("unexpected error:", err)
 		}
-	case _ = <-blockChan:
+	case <-blockChan:
 		t.Fatal("reading height 22 should have failed")
 	}
 
@@ -547,17 +570,23 @@ func getblockStubReverse(method string, params []json.RawMessage) (json.RawMessa
 		// Sunny-day
 		return blocks[2], nil
 	case 2:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 3:
 		if height != "380641" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
 		return blocks[1], nil
-	case 3:
+	case 4:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
+	case 5:
 		if height != "380640" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
 		return blocks[0], nil
+	case 6:
+		return []byte("{\"Tx\": [\"00\"]}"), nil
 	}
 	testT.Error("getblockStub called too many times")
 	return nil, nil
