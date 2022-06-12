@@ -167,7 +167,7 @@ func DarksideApplyStaged(height int) error {
 		}
 	}
 	if len(state.activeBlocks) == 0 {
-		return errors.New("No active blocks after applying staged blocks")
+		return errors.New("no active blocks after applying staged blocks")
 	}
 
 	// Add staged transactions into blocks. Note we're not trying to

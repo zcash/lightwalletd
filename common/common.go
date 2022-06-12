@@ -349,8 +349,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.Fatal("bad getbestblockhash return:", err, result)
 		}
-		lastBestBlockHash := []byte{}
-		lastBestBlockHash, err = hex.DecodeString(hashHex)
+		lastBestBlockHash, err := hex.DecodeString(hashHex)
 		if err != nil {
 			Log.Fatal("error decoding getbestblockhash", err, hashHex)
 		}

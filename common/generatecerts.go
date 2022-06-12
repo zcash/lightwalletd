@@ -19,6 +19,9 @@ import (
 func GenerateCerts() *tls.Certificate {
 
 	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		Log.Fatal("Failed to generate key")
+	}
 	publicKey := &privKey.PublicKey
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
