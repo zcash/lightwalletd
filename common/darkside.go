@@ -62,6 +62,22 @@ type stagedTx struct {
 // the command line.
 var DarksideEnabled bool
 
+func darksideSetTxID(tx *parser.Transaction) {
+	// SHA256d
+	// This is correct for V4 transactions, but not for V5, but in this test
+	// environment, it's harmless (the incorrect txid calculation can't be
+	// detected). This will be fixed when lightwalletd calculates txids correctly .
+	digest := sha256.Sum256(tx.Bytes())
+	digest = sha256.Sum256(digest[:])
+	tx.SetTxID(digest[:])
+}
+
+func darksideSetBlockTxID(block *parser.Block) {
+	for _, tx := range block.Transactions() {
+		darksideSetTxID(tx)
+	}
+}
+
 // DarksideInit should be called once at startup in darksidewalletd mode.
 func DarksideInit(c *BlockCache, timeout int) {
 	Log.Info("Darkside mode running")
@@ -415,6 +431,20 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		if index >= len(state.activeBlocks) {
 			return nil, errors.New(notFoundErr)
 		}
+		if len(params) > 1 && string(params[1]) == "1" {
+			// verbose mode, all that's currently needed is txid
+			block := parser.NewBlock()
+			block.ParseFromSlice(state.activeBlocks[index])
+			darksideSetBlockTxID((block))
+			var r struct {
+				Tx []string `json:"tx"`
+			}
+			r.Tx = make([]string, 0)
+			for _, tx := range block.Transactions() {
+				r.Tx = append(r.Tx, hex.EncodeToString(tx.GetDisplayHash()))
+			}
+			return json.Marshal(r)
+		}
 		return json.Marshal(hex.EncodeToString(state.activeBlocks[index]))
 
 	case "getbestblockhash":
@@ -455,6 +485,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		if len(rest) != 0 {
 			return nil, errors.New("transaction serialization is too long")
 		}
+		darksideSetTxID(tx)
 		state.incomingTransactions = append(state.incomingTransactions, txBytes)
 
 		return []byte(hex.EncodeToString(tx.GetDisplayHash())), nil
@@ -464,6 +495,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		addTxToReply := func(txBytes []byte) {
 			ctx := parser.NewTransaction()
 			ctx.ParseFromSlice(txBytes)
+			darksideSetTxID(ctx)
 			reply = append(reply, hex.EncodeToString(ctx.GetDisplayHash()))
 		}
 		for _, blockBytes := range state.stagedBlocks {
@@ -538,6 +570,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 		for _, b := range blocks {
 			block := parser.NewBlock()
 			_, _ = block.ParseFromSlice(b)
+			darksideSetBlockTxID(block)
 			for _, tx := range block.Transactions() {
 				if bytes.Equal(tx.GetDisplayHash(), txid) {
 					return marshalReply(tx, block.GetHeight())
@@ -558,6 +591,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 	for _, stx := range state.stagedTransactions {
 		tx := parser.NewTransaction()
 		_, _ = tx.ParseFromSlice(stx.bytes)
+		darksideSetTxID(tx)
 		if bytes.Equal(tx.GetDisplayHash(), txid) {
 			return marshalReply(tx, 0), nil
 		}
