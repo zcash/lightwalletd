@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,6 +28,7 @@ type lwdStreamer struct {
 	cache      *common.BlockCache
 	chainName  string
 	pingEnable bool
+	mutex      sync.Mutex
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
@@ -57,12 +59,15 @@ func checkTaddress(taddr string) error {
 
 // GetLatestBlock returns the height of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
+	// Lock to ensure we return consistent height and hash
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	latestBlock := s.cache.GetLatestHeight()
-	latestHash := s.cache.GetLatestHash()
 
 	if latestBlock == -1 {
 		return nil, errors.New("cache is empty, server is probably not yet ready")
 	}
+	latestHash := s.cache.GetLatestHash()
 
 	return &walletrpc.BlockID{Height: uint64(latestBlock), Hash: latestHash}, nil
 }
@@ -151,11 +156,10 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 // 'end' inclusively.
 func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	blockChan := make(chan *walletrpc.CompactBlock)
-	errChan := make(chan error)
 	if span.Start == nil || span.End == nil {
 		return errors.New("must specify start and end heights")
 	}
-
+	errChan := make(chan error)
 	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
 
 	for {
@@ -410,6 +414,9 @@ var mempoolList []string
 var lastMempool time.Time
 
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
 	if time.Since(lastMempool).Seconds() >= 2 {
 		lastMempool = time.Now()
 		// Refresh our copy of the mempool.
