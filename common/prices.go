@@ -228,6 +228,9 @@ func writeHistoricalPricesMap() {
 // have fetched if no more than 3 hours old, else an error. An error
 // should not occur unless we can't reach enough price oracles.
 func GetCurrentPrice() (float64, error) {
+	if DarksideEnabled {
+		return 222.333, nil
+	}
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -251,6 +254,9 @@ func day(t time.Time) string {
 // GetHistoricalPrice returns the price for the given day, but only
 // accurate to day granularity.
 func GetHistoricalPrice(ts time.Time) (float64, *time.Time, error) {
+	if DarksideEnabled {
+		return 333.444, &ts, nil
+	}
 	dt := day(ts)
 	canonicalTime, err := time.Parse("2006-01-02", dt)
 	if err != nil {
