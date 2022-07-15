@@ -466,6 +466,11 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 			}
 			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
 			if tx.HasShieldedElements() {
+				txidBytes, err := hex.DecodeString(txidstr)
+				if err != nil {
+					return err
+				}
+				tx.SetTxID(txidBytes)
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}

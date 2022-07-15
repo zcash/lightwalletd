@@ -54,7 +54,6 @@ func GetMempool(sendToClient func(*walletrpc.RawTransaction) error) error {
 			if g_lastBlockChainInfo.BestBlockHash != blockChainInfo.BestBlockHash {
 				// A new block has arrived
 				g_lastBlockChainInfo = blockChainInfo
-				Log.Infoln("Latest Block changed, clearing everything")
 				// We're the first thread to notice, clear cached state.
 				g_txidSeen = map[txid]struct{}{}
 				g_txList = []*walletrpc.RawTransaction{}
@@ -89,8 +88,6 @@ func GetMempool(sendToClient func(*walletrpc.RawTransaction) error) error {
 
 // RefreshMempoolTxns gets all new mempool txns and sends any new ones to waiting clients
 func refreshMempoolTxns() error {
-	Log.Infoln("Refreshing mempool")
-
 	params := []json.RawMessage{}
 	result, rpcErr := RawRequest("getrawmempool", params)
 	if rpcErr != nil {
@@ -132,7 +129,6 @@ func refreshMempoolTxns() error {
 		if err != nil {
 			return err
 		}
-		Log.Infoln("appending", txidstr)
 		newRtx := &walletrpc.RawTransaction{
 			Data:   txBytes,
 			Height: uint64(g_lastBlockChainInfo.Blocks),
