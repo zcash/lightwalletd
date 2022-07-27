@@ -41,7 +41,7 @@
  # ************************************************************************/
 
 # Create layer in case you want to modify local lightwalletd code
-FROM golang:1.13 AS lightwalletd_base
+FROM golang AS lightwalletd_base
 
 ADD . /go/src/github.com/zcash/lightwalletd
 WORKDIR /go/src/github.com/zcash/lightwalletd
