@@ -170,7 +170,18 @@ func checkSleepMethod(count int, duration time.Duration, expected string, method
 }
 
 // There are four test blocks, 0..3
+// To make the tests easier to understand, we fake out the hash of the block at height X
+// by just prepending "0000" to X in string form. For example, the "hash" of block 380640
+// is "0000380640". It may be better to make the (fake) hashes 32 bytes (64 characters),
+// and that may be required in the future, but for now this works okay.
 func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	var arg string
+	if len(params) > 1 {
+		err := json.Unmarshal(params[0], &arg)
+		if err != nil {
+			testT.Fatal("could not unmarshal", method, "arg:", params[0])
+		}
+	}
 	step++
 	// request the first two blocks very quickly (syncing),
 	// then next block isn't yet available
@@ -182,19 +193,17 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		return r, nil
 	case 2:
 		checkSleepMethod(0, 0, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380640" {
+		if arg != "380640" {
 			testT.Fatal("incorrect height requested")
 		}
 		// height 380640
-		return blocks[0], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
 	case 3:
 		checkSleepMethod(0, 0, "getblock", method)
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380640" {
+			testT.Fatal("incorrect hash requested")
+		}
+		return blocks[0], nil
 	case 4:
 		checkSleepMethod(0, 0, "getbestblockhash", method)
 		// This hash doesn't matter, won't match anything
@@ -202,19 +211,17 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		return r, nil
 	case 5:
 		checkSleepMethod(0, 0, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380641" {
+		if arg != "380641" {
 			testT.Fatal("incorrect height requested")
 		}
 		// height 380641
-		return blocks[1], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380641\"}"), nil
 	case 6:
 		checkSleepMethod(0, 0, "getblock", method)
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380641" {
+			testT.Fatal("incorrect hash requested")
+		}
+		return blocks[1], nil
 	case 7:
 		// Return the expected block hash, so we're synced, should
 		// then sleep for 2 seconds, then another getbestblockhash
@@ -234,19 +241,17 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		return r, nil
 	case 10:
 		checkSleepMethod(2, 4, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380642" {
+		if arg != "380642" {
 			testT.Fatal("incorrect height requested")
 		}
 		// height 380642
-		return blocks[2], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380642\"}"), nil
 	case 11:
 		checkSleepMethod(2, 4, "getblock", method)
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380642" {
+			testT.Fatal("incorrect hash requested")
+		}
+		return blocks[2], nil
 	case 12:
 		// Simulate still no new block, still synced, should
 		// sleep for 2 seconds, then another getbestblockhash
@@ -264,12 +269,7 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		// It thinks there may simply be a new block, but we'll say
 		// there is no block at this height (380642 was replaced).
 		checkSleepMethod(3, 6, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380643" {
+		if arg != "380643" {
 			testT.Fatal("incorrect height requested")
 		}
 		return nil, errors.New("-8: Block height out of range")
@@ -282,23 +282,21 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 	case 16:
 		// It should have backed up one block
 		checkSleepMethod(3, 6, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380642" {
+		if arg != "380642" {
 			testT.Fatal("incorrect height requested")
 		}
 		// height 380642
-		return blocks[2], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380642\"}"), nil
 	case 17:
 		checkSleepMethod(3, 6, "getblock", method)
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380642" {
+			testT.Fatal("incorrect height requested")
+		}
+		return blocks[2], nil
 	case 18:
 		// We're back to the same state as case 9, and this time
 		// we'll make it back up 2 blocks (rather than one)
-		checkSleepMethod(3, 6, "getbestblockhash", method) // XXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXX
+		checkSleepMethod(3, 6, "getbestblockhash", method)
 		// hash doesn't matter, just something that doesn't match
 		r, _ := json.Marshal("5656")
 		return r, nil
@@ -306,12 +304,7 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		// It thinks there may simply be a new block, but we'll say
 		// there is no block at this height (380642 was replaced).
 		checkSleepMethod(3, 6, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380643" {
+		if arg != "380643" {
 			testT.Fatal("incorrect height requested")
 		}
 		return nil, errors.New("-8: Block height out of range")
@@ -324,12 +317,7 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 		// Like case 13, it should have backed up one block, but
 		// this time we'll make it back up one more
 		checkSleepMethod(3, 6, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
-		}
-		if height != "380642" {
+		if arg != "380642" {
 			testT.Fatal("incorrect height requested")
 		}
 		return nil, errors.New("-8: Block height out of range")
@@ -341,18 +329,16 @@ func blockIngestorStub(method string, params []json.RawMessage) (json.RawMessage
 	case 23:
 		// It should have backed up one more
 		checkSleepMethod(3, 6, "getblock", method)
-		var height string
-		err := json.Unmarshal(params[0], &height)
-		if err != nil {
-			testT.Fatal("could not unmarshal height")
+		if arg != "380641" {
+			testT.Fatal("incorrect height requested")
 		}
-		if height != "380641" {
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380641\"}"), nil
+	case 24:
+		checkSleepMethod(3, 6, "getblock", method)
+		if arg != "0000380641" {
 			testT.Fatal("incorrect height requested")
 		}
 		return blocks[1], nil
-	case 24:
-		checkSleepMethod(3, 6, "getblock", method)
-		return []byte("{\"Tx\": [\"00\"]}"), nil
 	}
 	testT.Error("blockIngestorStub called too many times")
 	return nil, nil
@@ -383,8 +369,8 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 	if method != "getblock" {
 		testT.Error("unexpected method")
 	}
-	var height string
-	err := json.Unmarshal(params[0], &height)
+	var arg string
+	err := json.Unmarshal(params[0], &arg)
 	if err != nil {
 		testT.Fatal("could not unmarshal height")
 	}
@@ -392,116 +378,27 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 	step++
 	switch step {
 	case 1:
-		if height != "380640" {
-			testT.Error("unexpected height")
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
+	case 2:
+		if arg != "0000380640" {
+			testT.Error("unexpected hash")
 		}
 		// Sunny-day
 		return blocks[0], nil
-	case 2:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
 	case 3:
-		if height != "380641" {
-			testT.Error("unexpected height")
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380641\"}"), nil
+	case 4:
+		if arg != "0000380641" {
+			testT.Error("unexpected hash")
 		}
 		// Sunny-day
 		return blocks[1], nil
-	case 4:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
 	case 5:
-		if height != "380642" {
-			testT.Error("unexpected height", height)
+		if arg != "380642" {
+			testT.Error("unexpected height")
 		}
-		// Simulate that we're synced (caught up);
-		// this should cause one 10s sleep (then retry).
+		// Simulate that we're synced (caught up, latest block 380641).
 		return nil, errors.New("-8: Block height out of range")
-	case 6:
-		if sleepCount != 1 || sleepDuration != 2*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380642" {
-			testT.Error("unexpected height", height)
-		}
-		// Simulate that we're still caught up; this should cause a 1s
-		// wait then a check for reorg to shorter chain (back up one).
-		return nil, errors.New("-8: Block height out of range")
-	case 7:
-		if sleepCount != 1 || sleepDuration != 2*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		// Back up to 41.
-		if height != "380641" {
-			testT.Error("unexpected height", height)
-		}
-		// Return the expected block (as normally happens, no actual reorg),
-		// ingestor will immediately re-request the next block (42).
-		return blocks[1], nil
-	case 8:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
-	case 9:
-		if sleepCount != 1 || sleepDuration != 2*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380642" {
-			testT.Error("unexpected height", height)
-		}
-		// Block 42 has now finally appeared, it will immediately ask for 43.
-		return blocks[2], nil
-	case 10:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
-	case 11:
-		if sleepCount != 1 || sleepDuration != 2*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380643" {
-			testT.Error("unexpected height", height)
-		}
-		// Simulate a reorg by modifying the block's hash temporarily,
-		// this causes a 1s sleep and then back up one block (to 42).
-		blocks[3][9]++ // first byte of the prevhash
-		return blocks[3], nil
-	case 12:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
-	case 13:
-		blocks[3][9]-- // repair first byte of the prevhash
-		if sleepCount != 1 || sleepDuration != 2*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380642" {
-			testT.Error("unexpected height ", height)
-		}
-		return blocks[2], nil
-	case 14:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
-	case 15:
-		if sleepCount != 1 || sleepDuration != 2*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380643" {
-			testT.Error("unexpected height ", height)
-		}
-		// Instead of returning expected (43), simulate block unmarshal
-		// failure, should cause 10s sleep, retry
-		return nil, nil
-	case 16:
-		if sleepCount != 2 || sleepDuration != 12*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380643" {
-			testT.Error("unexpected height ", height)
-		}
-		// Back to sunny-day
-		return blocks[3], nil
-	case 17:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
-	case 18:
-		if sleepCount != 2 || sleepDuration != 12*time.Second {
-			testT.Error("unexpected sleeps", sleepCount, sleepDuration)
-		}
-		if height != "380644" {
-			testT.Error("unexpected height ", height)
-		}
-		// next block not ready
-		return nil, nil
 	}
 	testT.Error("getblockStub called too many times")
 	return nil, nil
@@ -538,7 +435,7 @@ func TestGetBlockRange(t *testing.T) {
 		}
 	}
 
-	// try to read in block 380642, but this will fail (see case 3 above)
+	// try to read in block 380642, but this will fail (see case 5 above)
 	select {
 	case err := <-errChan:
 		// this will also catch context.DeadlineExceeded from the timeout
@@ -546,47 +443,59 @@ func TestGetBlockRange(t *testing.T) {
 			t.Fatal("unexpected error:", err)
 		}
 	case <-blockChan:
-		t.Fatal("reading height 22 should have failed")
+		t.Fatal("reading height 380642 should have failed")
 	}
 
+	if step != 5 {
+		t.Fatal("unexpected step:", step)
+	}
 	step = 0
 	os.RemoveAll(unitTestPath)
 }
 
 // There are four test blocks, 0..3
 func getblockStubReverse(method string, params []json.RawMessage) (json.RawMessage, error) {
-	var height string
-	err := json.Unmarshal(params[0], &height)
+	var arg string
+	err := json.Unmarshal(params[0], &arg)
 	if err != nil {
-		testT.Fatal("could not unmarshal height")
+		testT.Fatal("could not unmarshal arg")
 	}
 
 	step++
 	switch step {
 	case 1:
-		if height != "380642" {
+		if arg != "380642" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
-		return blocks[2], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380642\"}"), nil
 	case 2:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380642" {
+			testT.Error("unexpected hash")
+		}
+		return blocks[2], nil
 	case 3:
-		if height != "380641" {
+		if arg != "380641" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
-		return blocks[1], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380641\"}"), nil
 	case 4:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380641" {
+			testT.Error("unexpected hash")
+		}
+		return blocks[1], nil
 	case 5:
-		if height != "380640" {
+		if arg != "380640" {
 			testT.Error("unexpected height")
 		}
 		// Sunny-day
-		return blocks[0], nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
 	case 6:
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		if arg != "0000380640" {
+			testT.Error("unexpected hash")
+		}
+		return blocks[0], nil
 	}
 	testT.Error("getblockStub called too many times")
 	return nil, nil
@@ -634,6 +543,9 @@ func TestGetBlockRangeReverse(t *testing.T) {
 		if cBlock.Height != 380640 {
 			t.Fatal("unexpected Height:", cBlock.Height)
 		}
+	}
+	if step != 6 {
+		t.Fatal("unexpected step:", step)
 	}
 	step = 0
 	os.RemoveAll(unitTestPath)

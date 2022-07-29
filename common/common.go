@@ -151,7 +151,8 @@ type (
 
 	// reply to getblock verbose=1 (json includes txid list)
 	ZcashRpcReplyGetblock1 struct {
-		Tx []string
+		Hash string
+		Tx   []string
 	}
 )
 
@@ -235,21 +236,51 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 }
 
 func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
+	// `block.ParseFromSlice` correctly parses blocks containing v5
+	// transactions, but incorrectly computes the IDs of the v5 transactions.
+	// We temporarily paper over this bug by fetching the correct txids via a
+	// verbose getblock RPC call, which returns the txids.
+	//
+	// Unfortunately, this RPC doesn't return the raw hex for the block,
+	// so a second getblock RPC (non-verbose) is needed (below).
+	// https://github.com/zcash/lightwalletd/issues/392
+
 	params := make([]json.RawMessage, 2)
 	heightJSON, err := json.Marshal(strconv.Itoa(height))
 	if err != nil {
 		Log.Fatal("getBlockFromRPC bad height argument", height, err)
 	}
 	params[0] = heightJSON
-	params[1] = json.RawMessage("0") // non-verbose (raw hex)
+	// Fetch the block using the verbose option ("1") because it provides
+	// both the list of txids, which we're not yet able to compute for
+	// Orchard (V5) transactions, and the block hash (block ID), which
+	// we need to fetch the raw data format of the same block. Don't fetch
+	// by height in case a reorg occurs between the two getblock calls;
+	// using block hash ensures that we're fetching the same block.
+	params[1] = json.RawMessage("1")
 	result, rpcErr := RawRequest("getblock", params)
-
-	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
 		// Check to see if we are requesting a height the zcashd doesn't have yet
 		if (strings.Split(rpcErr.Error(), ":"))[0] == "-8" {
 			return nil, nil
 		}
+		return nil, errors.Wrap(rpcErr, "error requesting verbose block")
+	}
+	var block1 ZcashRpcReplyGetblock1
+	err = json.Unmarshal(result, &block1)
+	if err != nil {
+		return nil, err
+	}
+	blockHash, err := json.Marshal(block1.Hash)
+	if err != nil {
+		Log.Fatal("getBlockFromRPC bad block hash", block1.Hash)
+	}
+	params[0] = blockHash
+	params[1] = json.RawMessage("0") // non-verbose (raw hex)
+	result, rpcErr = RawRequest("getblock", params)
+
+	// For some reason, the error responses are not JSON
+	if rpcErr != nil {
 		return nil, errors.Wrap(rpcErr, "error requesting block")
 	}
 
@@ -272,36 +303,17 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	if len(rest) != 0 {
 		return nil, errors.New("received overlong message")
 	}
-
 	if block.GetHeight() != height {
 		return nil, errors.New("received unexpected height block")
 	}
-
-	// `block.ParseFromSlice` correctly parses blocks containing v5 transactions, but
-	// incorrectly computes the IDs of the v5 transactions. We temporarily paper over this
-	// bug by fetching the correct txids via a second getblock RPC call.
-	// https://github.com/zcash/lightwalletd/issues/392
-	{
-		params[1] = json.RawMessage("1") // JSON with list of txids
-		result, rpcErr := RawRequest("getblock", params)
-		if rpcErr != nil {
-			return nil, errors.Wrap(rpcErr, "error requesting verbose block")
-		}
-		var block1 ZcashRpcReplyGetblock1
-		err = json.Unmarshal(result, &block1)
+	for i, t := range block.Transactions() {
+		txid, err := hex.DecodeString(block1.Tx[i])
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "error decoding getblock txid")
 		}
-		for i, t := range block.Transactions() {
-			txid, err := hex.DecodeString(block1.Tx[i])
-			if err != nil {
-				return nil, errors.Wrap(err, "error decoding getblock txid")
-			}
-			// convert from big-endian
-			t.SetTxID(parser.Reverse(txid))
-		}
+		// convert from big-endian
+		t.SetTxID(parser.Reverse(txid))
 	}
-
 	return block.ToCompact(), nil
 }
 
@@ -369,7 +381,9 @@ func BlockIngestor(c *BlockCache, rep int) {
 		var block *walletrpc.CompactBlock
 		block, err = getBlockFromRPC(height)
 		if err != nil {
-			Log.Fatal("getblock ", height, " failed, will retry: ", err)
+			Log.Info("getblock ", height, " failed, will retry: ", err)
+			Time.Sleep(8 * time.Second)
+			continue
 		}
 		if block != nil && c.HashMatch(block.PrevHash) {
 			if err = c.Add(height, block); err != nil {
