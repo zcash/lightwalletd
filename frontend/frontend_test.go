@@ -136,23 +136,29 @@ func TestGetTransaction(t *testing.T) {
 }
 
 func getblockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method != "getblock" {
+		testT.Fatal("unexpected method:", method)
+	}
 	step++
-	var height string
-	err := json.Unmarshal(params[0], &height)
+	var arg string
+	err := json.Unmarshal(params[0], &arg)
 	if err != nil {
 		testT.Fatal("could not unmarshal height")
-	}
-	if height != "380640" {
-		testT.Fatal("unexpected getblock height", height)
 	}
 
 	// Test retry logic (for the moment, it's very simple, just one retry).
 	switch step {
 	case 1:
-		return blocks[0], nil
-	case 2:
+		if arg != "380640" {
+			testT.Fatal("unexpected getblock height", arg)
+		}
 		// verbose mode (getblock height 1), return transaction list
-		return []byte("{\"Tx\": [\"00\"]}"), nil
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
+	case 2:
+		if arg != "0000380640" {
+			testT.Fatal("unexpected getblock height", arg)
+		}
+		return blocks[0], nil
 	case 3:
 		return nil, errors.New("getblock test error, too many requests")
 	}
