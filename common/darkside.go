@@ -404,48 +404,67 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(info)
 
 	case "getblock":
-		var heightStr string
-		err := json.Unmarshal(params[0], &heightStr)
+		var heightOrHashStr string
+		err := json.Unmarshal(params[0], &heightOrHashStr)
 		if err != nil {
 			return nil, errors.New("failed to parse getblock request")
 		}
-
-		height, err := strconv.Atoi(heightStr)
-		if err != nil {
-			return nil, errors.New("error parsing height as integer")
-		}
-		state.mutex.RLock()
-		defer state.mutex.RUnlock()
-		const notFoundErr = "-8:"
-		if len(state.activeBlocks) == 0 {
-			return nil, errors.New(notFoundErr)
-		}
-		if height > state.latestHeight {
-			return nil, errors.New(notFoundErr)
-		}
-		if height < state.startHeight {
-			return nil, errors.New(fmt.Sprint("getblock: requesting height ", height,
-				" is less than sapling activation height"))
-		}
-		index := height - state.startHeight
-		if index >= len(state.activeBlocks) {
-			return nil, errors.New(notFoundErr)
+		var blockIndex int
+		if len(heightOrHashStr) < 64 {
+			// argument is a height
+			height, err := strconv.Atoi(heightOrHashStr)
+			if err != nil {
+				return nil, errors.New("error parsing height as integer")
+			}
+			state.mutex.RLock()
+			defer state.mutex.RUnlock()
+			const notFoundErr = "-8:"
+			if len(state.activeBlocks) == 0 {
+				return nil, errors.New(notFoundErr)
+			}
+			if height > state.latestHeight {
+				return nil, errors.New(notFoundErr)
+			}
+			if height < state.startHeight {
+				return nil, errors.New(fmt.Sprint("getblock: requesting height ", height,
+					" is less than sapling activation height"))
+			}
+			blockIndex = height - state.startHeight
+			if blockIndex >= len(state.activeBlocks) {
+				return nil, errors.New(notFoundErr)
+			}
+		} else {
+			// argument is a block hash
+			var b []uint8
+			for blockIndex, b = range state.activeBlocks {
+				block := parser.NewBlock()
+				block.ParseFromSlice(b)
+				if heightOrHashStr == hex.EncodeToString(block.GetDisplayHash()) {
+					break
+				}
+			}
+			if blockIndex >= len(state.activeBlocks) {
+				return nil, errors.New(fmt.Sprint("getblock: hash ", heightOrHashStr,
+					" not found"))
+			}
 		}
 		if len(params) > 1 && string(params[1]) == "1" {
 			// verbose mode, all that's currently needed is txid
 			block := parser.NewBlock()
-			block.ParseFromSlice(state.activeBlocks[index])
-			darksideSetBlockTxID((block))
+			block.ParseFromSlice(state.activeBlocks[blockIndex])
+			darksideSetBlockTxID(block)
 			var r struct {
-				Tx []string `json:"tx"`
+				Tx   []string `json:"tx"`
+				Hash string   `json:"hash"`
 			}
 			r.Tx = make([]string, 0)
 			for _, tx := range block.Transactions() {
 				r.Tx = append(r.Tx, hex.EncodeToString(tx.GetDisplayHash()))
 			}
+			r.Hash = hex.EncodeToString(block.GetDisplayHash())
 			return json.Marshal(r)
 		}
-		return json.Marshal(hex.EncodeToString(state.activeBlocks[index]))
+		return json.Marshal(hex.EncodeToString(state.activeBlocks[blockIndex]))
 
 	case "getbestblockhash":
 		state.mutex.RLock()
