@@ -418,7 +418,10 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 		return block, nil
 	}
 
-	// Not in the cache, ask zcashd
+	// Not in the cache
+	if DarksideEnabled {
+		return nil, errors.New("block not found in cache, should always be in cache in darkside mode")
+	}
 	block, err := getBlockFromRPC(height)
 	if err != nil {
 		return nil, err
