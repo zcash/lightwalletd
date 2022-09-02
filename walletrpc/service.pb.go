@@ -88,8 +88,9 @@ type BlockRange struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Start *BlockID `protobuf:"bytes,1,opt,name=start,proto3" json:"start,omitempty"`
-	End   *BlockID `protobuf:"bytes,2,opt,name=end,proto3" json:"end,omitempty"`
+	Start               *BlockID `protobuf:"bytes,1,opt,name=start,proto3" json:"start,omitempty"`
+	End                 *BlockID `protobuf:"bytes,2,opt,name=end,proto3" json:"end,omitempty"`
+	SpamFilterThreshold uint64   `protobuf:"varint,3,opt,name=spamFilterThreshold,proto3" json:"spamFilterThreshold,omitempty"`
 }
 
 func (x *BlockRange) Reset() {
@@ -136,6 +137,13 @@ func (x *BlockRange) GetEnd() *BlockID {
 		return x.End
 	}
 	return nil
+}
+
+func (x *BlockRange) GetSpamFilterThreshold() uint64 {
+	if x != nil {
+		return x.SpamFilterThreshold
+	}
+	return 0
 }
 
 // A TxFilter contains the information needed to identify a particular

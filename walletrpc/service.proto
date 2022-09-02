@@ -20,6 +20,7 @@ message BlockID {
 message BlockRange {
     BlockID start = 1;
     BlockID end = 2;
+    uint64 spamFilterThreshold = 3;
 }
 
 // A TxFilter contains the information needed to identify a particular

@@ -160,7 +160,7 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		return errors.New("must specify start and end heights")
 	}
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height), int(span.SpamFilterThreshold))
 
 	for {
 		select {

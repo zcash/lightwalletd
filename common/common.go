@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/protobuf/proto"
 )
 
 // 'make build' will overwrite this string with the output of git-describe (tag)
@@ -433,8 +434,38 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	return block, nil
 }
 
+// Filters out blocks that have spammy transactions
+func FilterSpammyBlock(block *walletrpc.CompactBlock, spamFilterThreshold int) *walletrpc.CompactBlock {
+	if spamFilterThreshold == 0 {
+		return block
+	}
+
+	// Make a copy of the block so we can modify it
+	newBlock := proto.Clone(block).(*walletrpc.CompactBlock)
+
+	// Filter out Sapling transactions above the threshold by removing epk and ciphertext
+	for _, tx := range newBlock.Vtx {
+		if len(tx.Outputs)+len(tx.Actions) > spamFilterThreshold {
+			// Remove epk and ciphertext for Sapling Outputs
+			for _, outputs := range tx.Outputs {
+				outputs.Ciphertext = nil
+				outputs.Epk = nil
+			}
+
+			// Remove epk and ciphertext and nullifier for Actions
+			for _, action := range tx.Actions {
+				action.Ciphertext = nil
+				action.EphemeralKey = nil
+				action.Nullifier = nil
+			}
+		}
+	}
+
+	return newBlock
+}
+
 // GetBlockRange returns a sequence of consecutive blocks in the given range.
-func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, start, end int) {
+func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, start, end int, spamFilterThreshold int) {
 	// Go over [start, end] inclusive
 	low := start
 	high := end
@@ -442,6 +473,7 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 		// reverse the order
 		low, high = end, start
 	}
+
 	for i := low; i <= high; i++ {
 		j := i
 		if start > end {
@@ -453,7 +485,7 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 			errOut <- err
 			return
 		}
-		blockOut <- block
+		blockOut <- FilterSpammyBlock(block, spamFilterThreshold)
 	}
 	errOut <- nil
 }
