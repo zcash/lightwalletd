@@ -51,6 +51,10 @@ type darksideState struct {
 	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
 
 	stagedTreeStates map[uint64]*DarksideTreeState
+
+	// This is a one-entry cache performance cheat.
+	cacheBlockHash  string
+	cacheBlockIndex int
 }
 
 var state darksideState
@@ -447,17 +451,23 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			}
 		} else {
 			// argument is a block hash
-			var b []uint8
-			for blockIndex, b = range state.activeBlocks {
-				block := parser.NewBlock()
-				block.ParseFromSlice(b)
-				if heightOrHashStr == hex.EncodeToString(block.GetDisplayHash()) {
-					break
+			if state.cacheBlockHash == heightOrHashStr {
+				// There is a good chance we'll take this path, much faster than
+				// iterating the activeBlocks list.
+				blockIndex = state.cacheBlockIndex
+			} else {
+				var b []uint8
+				for blockIndex, b = range state.activeBlocks {
+					block := parser.NewBlock()
+					block.ParseFromSlice(b)
+					if heightOrHashStr == hex.EncodeToString(block.GetDisplayHash()) {
+						break
+					}
 				}
-			}
-			if blockIndex >= len(state.activeBlocks) {
-				return nil, errors.New(fmt.Sprint("getblock: hash ", heightOrHashStr,
-					" not found"))
+				if blockIndex >= len(state.activeBlocks) {
+					return nil, errors.New(fmt.Sprint("getblock: hash ", heightOrHashStr,
+						" not found"))
+				}
 			}
 		}
 		if len(params) > 1 && string(params[1]) == "1" {
@@ -474,6 +484,8 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 				r.Tx = append(r.Tx, hex.EncodeToString(tx.GetDisplayHash()))
 			}
 			r.Hash = hex.EncodeToString(block.GetDisplayHash())
+			state.cacheBlockHash = r.Hash
+			state.cacheBlockIndex = blockIndex
 			return json.Marshal(r)
 		}
 		return json.Marshal(hex.EncodeToString(state.activeBlocks[blockIndex]))
