@@ -405,13 +405,23 @@ func DarksideClearIncomingTransactions() {
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
 	switch method {
 	case "getblockchaininfo":
+		state.mutex.RLock()
+		defer state.mutex.RUnlock()
+		if len(state.activeBlocks) == 0 {
+			Log.Fatal("getblockchaininfo: no blocks")
+		}
+		index := state.latestHeight - state.startHeight
+		block := parser.NewBlock()
+		block.ParseFromSlice(state.activeBlocks[index])
+		hash := hex.EncodeToString(block.GetDisplayHash())
 		blockchaininfo := &ZcashdRpcReplyGetblockchaininfo{
 			Chain: state.chainName,
 			Upgrades: map[string]Upgradeinfo{
 				"76b809bb": {ActivationHeight: state.startHeight},
 			},
-			Blocks:    state.latestHeight,
-			Consensus: ConsensusInfo{state.branchID, state.branchID},
+			Blocks:        state.latestHeight,
+			Consensus:     ConsensusInfo{state.branchID, state.branchID},
+			BestBlockHash: hash,
 		}
 		return json.Marshal(blockchaininfo)
 

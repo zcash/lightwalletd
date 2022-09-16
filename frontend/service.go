@@ -62,14 +62,15 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	// Lock to ensure we return consistent height and hash
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	latestBlock := s.cache.GetLatestHeight()
-
-	if latestBlock == -1 {
-		return nil, errors.New("cache is empty, server is probably not yet ready")
+	blockChainInfo, err := common.GetBlockChainInfo()
+	if err != nil {
+		return nil, err
 	}
-	latestHash := s.cache.GetLatestHash()
-
-	return &walletrpc.BlockID{Height: uint64(latestBlock), Hash: latestHash}, nil
+	bestBlockHash, err := hex.DecodeString(blockChainInfo.BestBlockHash)
+	if err != nil {
+		return nil, err
+	}
+	return &walletrpc.BlockID{Height: uint64(blockChainInfo.Blocks), Hash: []byte(bestBlockHash)}, nil
 }
 
 // GetTaddressTxids is a streaming RPC that returns transaction IDs that have
@@ -237,11 +238,11 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 }
 
 func (s *lwdStreamer) GetLatestTreeState(ctx context.Context, in *walletrpc.Empty) (*walletrpc.TreeState, error) {
-	latestHeight := s.cache.GetLatestHeight()
-
-	if latestHeight == -1 {
-		return nil, errors.New("Cache is empty. Server is probably not yet ready")
+	blockChainInfo, err := common.GetBlockChainInfo()
+	if err != nil {
+		return nil, err
 	}
+	latestHeight := blockChainInfo.Blocks
 	return s.GetTreeState(ctx, &walletrpc.BlockID{Height: uint64(latestHeight)})
 }
 
