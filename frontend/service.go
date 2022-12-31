@@ -459,7 +459,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 				return err
 			}
 
-			// conver to binary
+			// convert to binary
 			txBytes, err := hex.DecodeString(txStr)
 			if err != nil {
 				return err

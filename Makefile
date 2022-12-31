@@ -108,7 +108,7 @@ docker_img:
 docker_img_run:
 	docker run -i --name zcashdlwd zcash_lwd_base
 
-# Execture a bash process on zcashdlwdcontainer
+# Execute a bash process on zcashdlwdcontainer
 docker_img_bash:
 	docker exec -it zcashdlwd bash
 
