@@ -57,7 +57,7 @@ func checkTaddress(taddr string) error {
 	return nil
 }
 
-// GetLatestBlock returns the height of the best chain, according to zcashd.
+// GetLatestBlock returns the height and hash of the best chain, according to zcashd.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	// Lock to ensure we return consistent height and hash
 	s.mutex.Lock()
