@@ -135,57 +135,62 @@ func TestGetTransaction(t *testing.T) {
 	}
 }
 
-func getblockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
-	if method != "getblock" {
-		testT.Fatal("unexpected method:", method)
-	}
+func getLatestBlockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
 	step++
-	var arg string
-	err := json.Unmarshal(params[0], &arg)
-	if err != nil {
-		testT.Fatal("could not unmarshal height")
-	}
 
 	// Test retry logic (for the moment, it's very simple, just one retry).
 	switch step {
 	case 1:
+		if method != "getblock" {
+			testT.Fatal("unexpected method:", method)
+		}
+		var arg string
+		err := json.Unmarshal(params[0], &arg)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
 		if arg != "380640" {
 			testT.Fatal("unexpected getblock height", arg)
 		}
 		// verbose mode (getblock height 1), return transaction list
 		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
 	case 2:
+		if method != "getblock" {
+			testT.Fatal("unexpected method:", method)
+		}
+		var arg string
+		err := json.Unmarshal(params[0], &arg)
+		if err != nil {
+			testT.Fatal("could not unmarshal height")
+		}
 		if arg != "0000380640" {
-			testT.Fatal("unexpected getblock height", arg)
+			testT.Fatal("unexpected getblock hash", arg)
 		}
 		return blocks[0], nil
 	case 3:
+		if method != "getblockchaininfo" {
+			testT.Fatal("unexpected method:", method)
+		}
+		return []byte("{\"Blocks\": 380640, " +
+			"\"BestBlockHash\": " +
+			"\"913b07faeb835a29bd3a1727876fe1c65aaeb10c7cde36ccd038b2b3445e0a00\"}"), nil
+
+	case 4:
 		return nil, errors.New("getblock test error, too many requests")
 	}
-	testT.Fatal("unexpected call to getblockStub")
+	testT.Fatal("unexpected call to getLatestBlockStub")
 	return nil, nil
 }
 
 func TestGetLatestBlock(t *testing.T) {
 	testT = t
-	common.RawRequest = getblockStub
+	common.RawRequest = getLatestBlockStub
 	lwd, cache := testsetup()
 
 	// This argument is not used (it may be in the future)
 	req := &walletrpc.ChainSpec{}
 
-	blockID, err := lwd.GetLatestBlock(context.Background(), req)
-	if err == nil {
-		t.Fatal("GetLatestBlock should have failed, empty cache")
-	}
-	if err.Error() != "cache is empty, server is probably not yet ready" {
-		t.Fatal("GetLatestBlock incorrect error", err)
-	}
-	if blockID != nil {
-		t.Fatal("unexpected blockID", blockID)
-	}
-
-	// This does zcashd rpc "getblock", calls getblockStub() above
+	// This does zcashd rpc "getblock", calls getLatestBlockStub() above
 	block, err := common.GetBlock(cache, 380640)
 	if err != nil {
 		t.Fatal("getBlockFromRPC failed", err)
@@ -193,7 +198,7 @@ func TestGetLatestBlock(t *testing.T) {
 	if err = cache.Add(380640, block); err != nil {
 		t.Fatal("cache.Add failed:", err)
 	}
-	blockID, err = lwd.GetLatestBlock(context.Background(), req)
+	blockID, err := lwd.GetLatestBlock(context.Background(), req)
 	if err != nil {
 		t.Fatal("lwd.GetLatestBlock failed", err)
 	}
@@ -353,6 +358,37 @@ func TestGetTaddressTxidsNilArgs(t *testing.T) {
 			t.Fatal("GetBlockRange nil range argument should fail")
 		}
 	}
+}
+
+func getblockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method != "getblock" {
+		testT.Fatal("unexpected method:", method)
+	}
+	step++
+	var arg string
+	err := json.Unmarshal(params[0], &arg)
+	if err != nil {
+		testT.Fatal("could not unmarshal height")
+	}
+
+	// Test retry logic (for the moment, it's very simple, just one retry).
+	switch step {
+	case 1:
+		if arg != "380640" {
+			testT.Fatal("unexpected getblock height", arg)
+		}
+		// verbose mode (getblock height 1), return transaction list
+		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
+	case 2:
+		if arg != "0000380640" {
+			testT.Fatal("unexpected getblock height", arg)
+		}
+		return blocks[0], nil
+	case 3:
+		return nil, errors.New("getblock test error, too many requests")
+	}
+	testT.Fatal("unexpected call to getblockStub")
+	return nil, nil
 }
 
 func TestGetBlock(t *testing.T) {
