@@ -148,7 +148,35 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	if err != nil {
 		return nil, err
 	}
+	return cBlock, err
+}
 
+// GetBlockNullifiers is the same as GetBlock except that it returns the compact block
+// with actions containing only the nullifiers (a subset of the full compact block).
+func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
+	if id.Height == 0 && id.Hash == nil {
+		return nil, errors.New("request for unspecified identifier")
+	}
+
+	// Precedence: a hash is more specific than a height. If we have it, use it first.
+	if id.Hash != nil {
+		// TODO: Get block by hash
+		return nil, errors.New("gRPC GetBlock by Hash is not yet implemented")
+	}
+	cBlock, err := common.GetBlock(s.cache, int(id.Height))
+
+	if err != nil {
+		return nil, err
+	}
+	for _, tx := range cBlock.Vtx {
+		for i, action := range tx.Actions {
+			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+		}
+		tx.Outputs = nil
+	}
+	// these are not needed (we prefer to save bandwidth)
+	cBlock.SaplingCommitmentTreeSize = 0
+	cBlock.OrchardCommitmentTreeSize = 0
 	return cBlock, err
 }
 
@@ -171,6 +199,38 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 		case cBlock := <-blockChan:
 			err := resp.Send(cBlock)
 			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// GetBlockRangeNullifiers is the same as GetBlockRange except that only
+// the actions contain only nullifiers (a subset of the full compact block).
+func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeNullifiersServer) error {
+	blockChan := make(chan *walletrpc.CompactBlock)
+	if span.Start == nil || span.End == nil {
+		return errors.New("must specify start and end heights")
+	}
+	errChan := make(chan error)
+	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+
+	for {
+		select {
+		case err := <-errChan:
+			// this will also catch context.DeadlineExceeded from the timeout
+			return err
+		case cBlock := <-blockChan:
+			for _, tx := range cBlock.Vtx {
+				for i, action := range tx.Actions {
+					tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+				}
+				tx.Outputs = nil
+			}
+			// these are not needed (we prefer to save bandwidth)
+			cBlock.SaplingCommitmentTreeSize = 0
+			cBlock.OrchardCommitmentTreeSize = 0
+			if err := resp.Send(cBlock); err != nil {
 				return err
 			}
 		}
