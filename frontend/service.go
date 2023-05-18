@@ -335,6 +335,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 			return nil, errors.New("sendTransaction couldn't parse error code")
 		}
 	} else {
+		// Return the transaction ID (txid) as hex string.
 		errMsg = string(result)
 	}
 

@@ -23,7 +23,6 @@ type darksideState struct {
 	branchID    string
 	chainName   string
 	cache       *BlockCache
-	mutex       sync.RWMutex
 
 	// This is the highest (latest) block height currently being presented
 	// by the mock zcashd.
@@ -58,6 +57,11 @@ type darksideState struct {
 }
 
 var state darksideState
+
+// mutex protects `state`; it's not within `state` because the
+// `state` can be reallocated (by Reset()), and that action
+// should be protected.
+var mutex sync.Mutex
 
 type stagedTx struct {
 	height int
@@ -109,6 +113,8 @@ func DarksideInit(c *BlockCache, timeout int) {
 // that are returned by GetLightdInfo().
 func DarksideReset(sa int, bi, cn string) error {
 	Log.Info("DarksideReset(saplingActivation=", sa, ")")
+	mutex.Lock()
+	defer mutex.Unlock()
 	stopIngestor()
 	state = darksideState{
 		resetted:             true,
@@ -180,8 +186,8 @@ func setPrevhash() {
 // If this returns an error, the state could be weird; perhaps it may
 // be better to simply crash.
 func DarksideApplyStaged(height int) error {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
@@ -266,7 +272,11 @@ func DarksideApplyStaged(height int) error {
 // DarksideGetIncomingTransactions returns all transactions we're
 // received via SendTransaction().
 func DarksideGetIncomingTransactions() [][]byte {
-	return state.incomingTransactions
+	var r [][]byte
+	mutex.Lock()
+	r = append(r, state.incomingTransactions...)
+	mutex.Unlock()
+	return r
 }
 
 // Add the serialized block to the staging list, but do some sanity checks first.
@@ -292,6 +302,8 @@ func darksideStageBlock(caller string, b []byte) error {
 // DarksideStageBlocks opens and reads blocks from the given URL and
 // adds them to the staging area.
 func DarksideStageBlocks(url string) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
@@ -325,6 +337,8 @@ func DarksideStageBlocks(url string) error {
 
 // DarksideStageBlockStream adds the block to the staging area
 func DarksideStageBlockStream(blockHex string) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
@@ -341,6 +355,8 @@ func DarksideStageBlockStream(blockHex string) error {
 
 // DarksideStageBlocksCreate creates empty blocks and adds them to the staging area.
 func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
@@ -399,14 +415,16 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 
 // DarksideClearIncomingTransactions empties the incoming transaction list.
 func DarksideClearIncomingTransactions() {
+	mutex.Lock()
 	state.incomingTransactions = make([][]byte, 0)
+	mutex.Unlock()
 }
 
 func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessage, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
 	switch method {
 	case "getblockchaininfo":
-		state.mutex.RLock()
-		defer state.mutex.RUnlock()
 		if len(state.activeBlocks) == 0 {
 			Log.Fatal("getblockchaininfo: no blocks")
 		}
@@ -442,8 +460,6 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			if err != nil {
 				return nil, errors.New("error parsing height as integer")
 			}
-			state.mutex.RLock()
-			defer state.mutex.RUnlock()
 			const notFoundErr = "-8:"
 			if len(state.activeBlocks) == 0 {
 				return nil, errors.New(notFoundErr)
@@ -501,8 +517,6 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(hex.EncodeToString(state.activeBlocks[blockIndex]))
 
 	case "getbestblockhash":
-		state.mutex.RLock()
-		defer state.mutex.RUnlock()
 		if len(state.activeBlocks) == 0 {
 			Log.Fatal("getbestblockhash: no blocks")
 		}
@@ -687,7 +701,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 }
 
 // DarksideStageTransaction adds the given transaction to the staging area.
-func DarksideStageTransaction(height int, txBytes []byte) error {
+func stageTransaction(height int, txBytes []byte) error {
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
@@ -708,9 +722,18 @@ func DarksideStageTransaction(height int, txBytes []byte) error {
 	return nil
 }
 
+// DarksideStageTransaction adds the given transaction to the staging area.
+func DarksideStageTransaction(height int, txBytes []byte) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return stageTransaction(height, txBytes)
+}
+
 // DarksideStageTransactionsURL reads a list of transactions (hex-encoded, one
 // per line) from the given URL, and associates them with the given height.
 func DarksideStageTransactionsURL(height int, url string) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted {
 		return errors.New("please call Reset first")
 	}
@@ -735,30 +758,37 @@ func DarksideStageTransactionsURL(height int, url string) error {
 		if err != nil {
 			return err
 		}
-		if err = DarksideStageTransaction(height, transactionBytes); err != nil {
+		if err = stageTransaction(height, transactionBytes); err != nil {
 			return err
 		}
 	}
 	return scan.Err()
-
 }
 
 func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
+	mutex.Lock()
 	state.getAddressUtxos = append(state.getAddressUtxos, arg)
+	mutex.Unlock()
 	return nil
 }
 
 func DarksideClearAddressUtxos() error {
+	mutex.Lock()
 	state.getAddressUtxos = nil
+	mutex.Unlock()
 	return nil
 }
 
 func DarksideClearAllTreeStates() error {
+	mutex.Lock()
 	state.stagedTreeStates = make(map[uint64]*DarksideTreeState)
+	mutex.Unlock()
 	return nil
 }
 
 func DarksideAddTreeState(arg DarksideTreeState) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted || state.stagedTreeStates == nil {
 		return errors.New("please call Reset first")
 	}
@@ -768,6 +798,8 @@ func DarksideAddTreeState(arg DarksideTreeState) error {
 }
 
 func DarksideRemoveTreeState(arg uint64) error {
+	mutex.Lock()
+	defer mutex.Unlock()
 	if !state.resetted || state.stagedTreeStates == nil {
 		return errors.New("please call Reset first")
 	}
