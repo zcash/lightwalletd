@@ -151,8 +151,16 @@ type (
 
 	// reply to getblock verbose=1 (json includes txid list)
 	ZcashRpcReplyGetblock1 struct {
-		Hash string
-		Tx   []string
+		Hash  string
+		Tx    []string
+		Trees struct {
+			Sapling struct {
+				Size uint32
+			}
+			Orchard struct {
+				Size uint32
+			}
+		}
 	}
 )
 
@@ -322,7 +330,10 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		// convert from big-endian
 		t.SetTxID(parser.Reverse(txid))
 	}
-	return block.ToCompact(), nil
+	r := block.ToCompact()
+	r.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
+	r.OrchardCommitmentTreeSize = block1.Trees.Orchard.Size
+	return r, nil
 }
 
 var (
