@@ -228,7 +228,9 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	var offset int64
 	c.starts = nil
 	c.starts = append(c.starts, 0)
-	for i := 0; i < len(lengths)/4; i++ {
+	nBlocks := len(lengths) / 4
+	Log.Info("Reading ", nBlocks, " blocks (since Sapling activation) from disk cache ...")
+	for i := 0; i < nBlocks; i++ {
 		if len(lengths[:4]) < 4 {
 			Log.Warning("lengths file has a partial entry")
 			c.recoverFromCorruption(c.nextBlock)
@@ -252,7 +254,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 		c.nextBlock++
 	}
 	c.setDbFiles(c.nextBlock)
-	Log.Info("Found ", c.nextBlock-c.firstBlock, " blocks in cache")
+	Log.Info("Done reading ", c.nextBlock-c.firstBlock, " blocks from disk cache")
 	return c
 }
 
