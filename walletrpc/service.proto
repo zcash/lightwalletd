@@ -118,6 +118,23 @@ message TreeState {
     string orchardTree = 6; // orchard commitment tree state
 }
 
+enum ShieldedProtocol {
+    SAPLING = 0;
+    ORCHARD = 1;
+}
+
+message GetSubtreeRootsArg {
+    uint64 startIndex = 1;                  // Index identifying where to start returning subtree roots
+    ShieldedProtocol shieldedProtocol = 2;  // Shielded protocol to return subtree roots for
+    uint64 limit = 3;                       // Maximum number of entries to return, or 0 for all entries.
+}
+message SubtreeRoot {
+    uint64 index = 1;                       // The index of the subtree. Each subtree containx 2^16 leaves.
+    string rootHash = 2;                    // The Merkle root of the subtree.
+    string completingBlockHash = 3;         // The hash of the block that completed this subtree.
+    uint64 completingBlockHeight = 4;       // The height of the block that completed this subtree in the main chain.
+}
+
 // Results are sorted by height, which makes it easy to issue another
 // request that picks up from where the previous left off.
 message GetAddressUtxosArg {
@@ -180,6 +197,10 @@ service CompactTxStreamer {
     // The block can be specified by either height or hash.
     rpc GetTreeState(BlockID) returns (TreeState) {}
     rpc GetLatestTreeState(Empty) returns (TreeState) {}
+
+    // Returns a stream of information about roots of subtrees of the Sapling and Orchard
+    // note commitment trees.
+    rpc GetSubtreeRoots(GetSubtreeRootsArg) returns (stream SubtreeRoot) {}
 
     rpc GetAddressUtxos(GetAddressUtxosArg) returns (GetAddressUtxosReplyList) {}
     rpc GetAddressUtxosStream(GetAddressUtxosArg) returns (stream GetAddressUtxosReply) {}
