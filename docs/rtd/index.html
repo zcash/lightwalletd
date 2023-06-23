@@ -297,6 +297,10 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.GetSubtreeRootsArg"><span class="badge">M</span>GetSubtreeRootsArg</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.LightdInfo"><span class="badge">M</span>LightdInfo</a>
                 </li>
               
@@ -313,6 +317,10 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.SubtreeRoot"><span class="badge">M</span>SubtreeRoot</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter"><span class="badge">M</span>TransparentAddressBlockFilter</a>
                 </li>
               
@@ -324,6 +332,10 @@
                   <a href="#cash.z.wallet.sdk.rpc.TxFilter"><span class="badge">M</span>TxFilter</a>
                 </li>
               
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.ShieldedProtocol"><span class="badge">E</span>ShieldedProtocol</a>
+                </li>
               
               
               
@@ -1271,6 +1283,44 @@ There is no staging or applying for these, very simple.</p></td>
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.GetSubtreeRootsArg">GetSubtreeRootsArg</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>startIndex</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>Index identifying where to start returning subtree roots </p></td>
+                </tr>
+              
+                <tr>
+                  <td>shieldedProtocol</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.ShieldedProtocol">ShieldedProtocol</a></td>
+                  <td></td>
+                  <td><p>Shielded protocol to return subtree roots for </p></td>
+                </tr>
+              
+                <tr>
+                  <td>limit</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>Maximum number of entries to return, or 0 for all entries. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.LightdInfo">LightdInfo</h3>
         <p>LightdInfo returns various information about this lightwalletd instance</p><p>and the state of the blockchain.</p>
 
@@ -1479,6 +1529,51 @@ There is no staging or applying for these, very simple.</p></td>
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.SubtreeRoot">SubtreeRoot</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>index</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>The index of the subtree. Each subtree containx 2^16 leaves. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>rootHash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The 32-byte Merkle root of the subtree. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>completingBlockHash</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The hash of the block that completed this subtree. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>completingBlockHeight</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>The height of the block that completed this subtree in the main chain. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</h3>
         <p>TransparentAddressBlockFilter restricts the results to the given address</p><p>or block range.</p>
 
@@ -1609,6 +1704,29 @@ There is no staging or applying for these, very simple.</p></td>
       
 
       
+        <h3 id="cash.z.wallet.sdk.rpc.ShieldedProtocol">ShieldedProtocol</h3>
+        <p></p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>SAPLING</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ORCHARD</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
 
       
 
@@ -1729,6 +1847,14 @@ The block can be specified by either height or hash.</p></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TreeState">TreeState</a></td>
                 <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>GetSubtreeRoots</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetSubtreeRootsArg">GetSubtreeRootsArg</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.SubtreeRoot">SubtreeRoot</a> stream</td>
+                <td><p>Returns a stream of information about roots of subtrees of the Sapling and Orchard
+note commitment trees.</p></td>
               </tr>
             
               <tr>

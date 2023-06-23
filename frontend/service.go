@@ -675,6 +675,62 @@ func (s *lwdStreamer) GetAddressUtxos(ctx context.Context, arg *walletrpc.GetAdd
 	return &walletrpc.GetAddressUtxosReplyList{AddressUtxos: addressUtxos}, nil
 }
 
+func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp walletrpc.CompactTxStreamer_GetSubtreeRootsServer) error {
+	switch arg.ShieldedProtocol {
+	case walletrpc.ShieldedProtocol_sapling:
+		break
+	case walletrpc.ShieldedProtocol_orchard:
+		break
+	default:
+		return errors.New("unrecognized shielded protocol")
+	}
+	protocol, err := json.Marshal(arg.ShieldedProtocol.String())
+	startIndexJSON, err := json.Marshal(arg.StartIndex)
+	if err != nil {
+		return errors.New("bad startIndex")
+	}
+	maxEntriesJSON, err := json.Marshal(arg.MaxEntries)
+	if err != nil {
+		return errors.New("bad maxEntries")
+	}
+	params := []json.RawMessage{
+		protocol,
+		startIndexJSON,
+		maxEntriesJSON,
+	}
+	result, rpcErr := common.RawRequest("z_getsubtreesbyindex", params)
+
+	if rpcErr != nil {
+		return rpcErr
+	}
+	var reply common.ZcashdRpcReplyGetsubtreebyindex
+	err = json.Unmarshal(result, &reply)
+	if err != nil {
+		return err
+	}
+	for i := 0; i < int(arg.MaxEntries) && i < len(reply.Subtrees); i++ {
+		subtree := reply.Subtrees[i]
+		block, err := common.GetBlock(s.cache, subtree.End_height)
+		if block == nil {
+			return errors.New("getblock failed")
+		}
+		roothash, err := hex.DecodeString(subtree.Root)
+		if err != nil {
+			return errors.New("bad root hex string")
+		}
+		r := walletrpc.SubtreeRoot{
+			RootHash:              roothash,
+			CompletingBlockHash:   parser.Reverse(block.Hash),
+			CompletingBlockHeight: block.Height,
+		}
+		err = resp.Send(&r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil // success
+}
+
 func (s *lwdStreamer) GetAddressUtxosStream(arg *walletrpc.GetAddressUtxosArg, resp walletrpc.CompactTxStreamer_GetAddressUtxosStreamServer) error {
 	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
 		return resp.Send(utxo)

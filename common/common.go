@@ -162,6 +162,14 @@ type (
 			}
 		}
 	}
+
+	// reply to z_getsubtreesbyindex
+	ZcashdRpcReplyGetsubtreebyindex struct {
+		Subtrees []struct {
+			Root       string
+			End_height int
+		}
+	}
 )
 
 // FirstRPC tests that we can successfully reach zcashd through the RPC
@@ -261,11 +269,11 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	// so a second getblock RPC (non-verbose) is needed (below).
 	// https://github.com/zcash/lightwalletd/issues/392
 
-	params := make([]json.RawMessage, 2)
 	heightJSON, err := json.Marshal(strconv.Itoa(height))
 	if err != nil {
 		Log.Fatal("getBlockFromRPC bad height argument", height, err)
 	}
+	params := make([]json.RawMessage, 2)
 	params[0] = heightJSON
 	// Fetch the block using the verbose option ("1") because it provides
 	// both the list of txids, which we're not yet able to compute for

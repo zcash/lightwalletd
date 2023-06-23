@@ -59,6 +59,9 @@ type CompactTxStreamerClient interface {
 	// The block can be specified by either height or hash.
 	GetTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*TreeState, error)
 	GetLatestTreeState(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TreeState, error)
+	// Returns a stream of information about roots of subtrees of the Sapling and Orchard
+	// note commitment trees.
+	GetSubtreeRoots(ctx context.Context, in *GetSubtreeRootsArg, opts ...grpc.CallOption) (CompactTxStreamer_GetSubtreeRootsClient, error)
 	GetAddressUtxos(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (*GetAddressUtxosReplyList, error)
 	GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error)
 	// Return information about this lightwalletd instance and the blockchain
@@ -341,6 +344,38 @@ func (c *compactTxStreamerClient) GetLatestTreeState(ctx context.Context, in *Em
 	return out, nil
 }
 
+func (c *compactTxStreamerClient) GetSubtreeRoots(ctx context.Context, in *GetSubtreeRootsArg, opts ...grpc.CallOption) (CompactTxStreamer_GetSubtreeRootsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[6], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetSubtreeRoots", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &compactTxStreamerGetSubtreeRootsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CompactTxStreamer_GetSubtreeRootsClient interface {
+	Recv() (*SubtreeRoot, error)
+	grpc.ClientStream
+}
+
+type compactTxStreamerGetSubtreeRootsClient struct {
+	grpc.ClientStream
+}
+
+func (x *compactTxStreamerGetSubtreeRootsClient) Recv() (*SubtreeRoot, error) {
+	m := new(SubtreeRoot)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (*GetAddressUtxosReplyList, error) {
 	out := new(GetAddressUtxosReplyList)
 	err := c.cc.Invoke(ctx, "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos", in, out, opts...)
@@ -351,7 +386,7 @@ func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAd
 }
 
 func (c *compactTxStreamerClient) GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[6], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[7], "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -441,6 +476,9 @@ type CompactTxStreamerServer interface {
 	// The block can be specified by either height or hash.
 	GetTreeState(context.Context, *BlockID) (*TreeState, error)
 	GetLatestTreeState(context.Context, *Empty) (*TreeState, error)
+	// Returns a stream of information about roots of subtrees of the Sapling and Orchard
+	// note commitment trees.
+	GetSubtreeRoots(*GetSubtreeRootsArg, CompactTxStreamer_GetSubtreeRootsServer) error
 	GetAddressUtxos(context.Context, *GetAddressUtxosArg) (*GetAddressUtxosReplyList, error)
 	GetAddressUtxosStream(*GetAddressUtxosArg, CompactTxStreamer_GetAddressUtxosStreamServer) error
 	// Return information about this lightwalletd instance and the blockchain
@@ -495,6 +533,9 @@ func (UnimplementedCompactTxStreamerServer) GetTreeState(context.Context, *Block
 }
 func (UnimplementedCompactTxStreamerServer) GetLatestTreeState(context.Context, *Empty) (*TreeState, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLatestTreeState not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetSubtreeRoots(*GetSubtreeRootsArg, CompactTxStreamer_GetSubtreeRootsServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetSubtreeRoots not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetAddressUtxos(context.Context, *GetAddressUtxosArg) (*GetAddressUtxosReplyList, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAddressUtxos not implemented")
@@ -796,6 +837,27 @@ func _CompactTxStreamer_GetLatestTreeState_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CompactTxStreamer_GetSubtreeRoots_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetSubtreeRootsArg)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CompactTxStreamerServer).GetSubtreeRoots(m, &compactTxStreamerGetSubtreeRootsServer{stream})
+}
+
+type CompactTxStreamer_GetSubtreeRootsServer interface {
+	Send(*SubtreeRoot) error
+	grpc.ServerStream
+}
+
+type compactTxStreamerGetSubtreeRootsServer struct {
+	grpc.ServerStream
+}
+
+func (x *compactTxStreamerGetSubtreeRootsServer) Send(m *SubtreeRoot) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 func _CompactTxStreamer_GetAddressUtxos_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAddressUtxosArg)
 	if err := dec(in); err != nil {
@@ -952,6 +1014,11 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "GetMempoolStream",
 			Handler:       _CompactTxStreamer_GetMempoolStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetSubtreeRoots",
+			Handler:       _CompactTxStreamer_GetSubtreeRoots_Handler,
 			ServerStreams: true,
 		},
 		{
