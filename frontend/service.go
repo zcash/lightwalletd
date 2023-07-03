@@ -175,8 +175,8 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 		tx.Outputs = nil
 	}
 	// these are not needed (we prefer to save bandwidth)
-	cBlock.SaplingCommitmentTreeSize = 0
-	cBlock.OrchardCommitmentTreeSize = 0
+	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
+	cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
 	return cBlock, err
 }
 
@@ -228,8 +228,8 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 				tx.Outputs = nil
 			}
 			// these are not needed (we prefer to save bandwidth)
-			cBlock.SaplingCommitmentTreeSize = 0
-			cBlock.OrchardCommitmentTreeSize = 0
+			cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
+			cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
 			if err := resp.Send(cBlock); err != nil {
 				return err
 			}

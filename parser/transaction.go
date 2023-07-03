@@ -214,9 +214,9 @@ func (p *output) ParseFromSlice(data []byte, version uint32) ([]byte, error) {
 
 func (p *output) ToCompact() *walletrpc.CompactSaplingOutput {
 	return &walletrpc.CompactSaplingOutput{
-		Cmu:        p.cmu,
-		Epk:        p.ephemeralKey,
-		Ciphertext: p.encCiphertext[:52],
+		Cmu:          p.cmu,
+		EphemeralKey: p.ephemeralKey,
+		Ciphertext:   p.encCiphertext[:52],
 	}
 }
 

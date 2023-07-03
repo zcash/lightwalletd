@@ -179,6 +179,10 @@
             <ul>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.ChainMetadata"><span class="badge">M</span>ChainMetadata</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.CompactBlock"><span class="badge">M</span>CompactBlock</a>
                 </li>
               
@@ -358,6 +362,37 @@
       <p></p>
 
       
+        <h3 id="cash.z.wallet.sdk.rpc.ChainMetadata">ChainMetadata</h3>
+        <p>ChainMetadata represents information about the state of the chain as of a given block.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>saplingCommitmentTreeSize</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>the size of the Sapling note commitment tree as of the end of this block </p></td>
+                </tr>
+              
+                <tr>
+                  <td>orchardCommitmentTreeSize</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p>the size of the Orchard note commitment tree as of the end of this block </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</h3>
         <p>CompactBlock is a packaging of ONLY the data from a block that's needed to:</p><p>1. Detect a payment to your shielded Sapling address</p><p>2. Detect a spend of your shielded Sapling notes</p><p>3. Update your witnesses to generate new Sapling spend proofs.</p>
 
@@ -418,17 +453,10 @@
                 </tr>
               
                 <tr>
-                  <td>saplingCommitmentTreeSize</td>
-                  <td><a href="#uint32">uint32</a></td>
+                  <td>chainMetadata</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.ChainMetadata">ChainMetadata</a></td>
                   <td></td>
-                  <td><p>the size of the Sapling note commitment tree as of the end of this block </p></td>
-                </tr>
-              
-                <tr>
-                  <td>orchardCommitmentTreeSize</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>the size of the Orchard note commitment tree as of the end of this block </p></td>
+                  <td><p>information about the state of the chain as of this block </p></td>
                 </tr>
               
             </tbody>
@@ -473,7 +501,7 @@
                   <td>ciphertext</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>[52] The note plaintext component of the encCiphertext field </p></td>
+                  <td><p>[52] The first 52 bytes of the encCiphertext field </p></td>
                 </tr>
               
             </tbody>
@@ -484,7 +512,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactSaplingOutput">CompactSaplingOutput</h3>
-        <p>output is a Sapling Output Description as described in section 7.4 of the</p><p>Zcash protocol spec. Total size is 948.</p>
+        <p>output encodes the `cmu` field, `ephemeralKey` field, and a 52-byte prefix of the</p><p>`encCiphertext` field of a Sapling Output Description. These fields are described in</p><p>section 7.4 of the Zcash protocol spec:</p><p>https://zips.z.cash/protocol/protocol.pdf#outputencodingandconsensus</p><p>Total size is 116 bytes.</p>
 
         
           <table class="field-table">
@@ -501,7 +529,7 @@
                 </tr>
               
                 <tr>
-                  <td>epk</td>
+                  <td>ephemeralKey</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
                   <td><p>ephemeral public key </p></td>
@@ -559,7 +587,11 @@
                   <td>index</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p>the index within the full block </p></td>
+                  <td><p>Index and hash will allow the receiver to call out to chain
+explorers or other data structures to retrieve more information
+about this transaction.
+
+the index within the full block </p></td>
                 </tr>
               
                 <tr>
@@ -576,22 +608,22 @@
                   <td><p>The transaction fee: present if server can provide. In the case of a
 stateless server and a transaction with transparent inputs, this will be
 unset because the calculation requires reference to prior transactions.
-in a pure-Sapling context, the fee will be calculable as:
-   valueBalance &#43; (sum(vPubNew) - sum(vPubOld) - sum(tOut)) </p></td>
+If there are no transparent inputs, the fee will be calculable as:
+   valueBalanceSapling &#43; valueBalanceOrchard &#43; sum(vPubNew) - sum(vPubOld) - sum(tOut) </p></td>
                 </tr>
               
                 <tr>
                   <td>spends</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.CompactSaplingSpend">CompactSaplingSpend</a></td>
                   <td>repeated</td>
-                  <td><p>inputs </p></td>
+                  <td><p> </p></td>
                 </tr>
               
                 <tr>
                   <td>outputs</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.CompactSaplingOutput">CompactSaplingOutput</a></td>
                   <td>repeated</td>
-                  <td><p>outputs </p></td>
+                  <td><p> </p></td>
                 </tr>
               
                 <tr>
@@ -1308,8 +1340,8 @@ There is no staging or applying for these, very simple.</p></td>
                 </tr>
               
                 <tr>
-                  <td>limit</td>
-                  <td><a href="#uint64">uint64</a></td>
+                  <td>maxEntries</td>
+                  <td><a href="#uint32">uint32</a></td>
                   <td></td>
                   <td><p>Maximum number of entries to return, or 0 for all entries. </p></td>
                 </tr>
@@ -1540,13 +1572,6 @@ There is no staging or applying for these, very simple.</p></td>
             <tbody>
               
                 <tr>
-                  <td>index</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p>The index of the subtree. Each subtree containx 2^16 leaves. </p></td>
-                </tr>
-              
-                <tr>
                   <td>rootHash</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
@@ -1713,13 +1738,13 @@ There is no staging or applying for these, very simple.</p></td>
           <tbody>
             
               <tr>
-                <td>SAPLING</td>
+                <td>sapling</td>
                 <td>0</td>
                 <td><p></p></td>
               </tr>
             
               <tr>
-                <td>ORCHARD</td>
+                <td>orchard</td>
                 <td>1</td>
                 <td><p></p></td>
               </tr>

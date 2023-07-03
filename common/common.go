@@ -339,8 +339,8 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		t.SetTxID(parser.Reverse(txid))
 	}
 	r := block.ToCompact()
-	r.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
-	r.OrchardCommitmentTreeSize = block1.Trees.Orchard.Size
+	r.ChainMetadata.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
+	r.ChainMetadata.OrchardCommitmentTreeSize = block1.Trees.Orchard.Size
 	return r, nil
 }
 
