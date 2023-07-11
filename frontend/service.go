@@ -689,14 +689,16 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 	if err != nil {
 		return errors.New("bad startIndex")
 	}
-	maxEntriesJSON, err := json.Marshal(arg.MaxEntries)
-	if err != nil {
-		return errors.New("bad maxEntries")
-	}
 	params := []json.RawMessage{
 		protocol,
 		startIndexJSON,
-		maxEntriesJSON,
+	}
+	if arg.MaxEntries > 0 {
+		maxEntriesJSON, err := json.Marshal(arg.MaxEntries)
+		if err != nil {
+			return errors.New("bad maxEntries")
+		}
+		params = append(params, maxEntriesJSON)
 	}
 	result, rpcErr := common.RawRequest("z_getsubtreesbyindex", params)
 
@@ -708,7 +710,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 	if err != nil {
 		return err
 	}
-	for i := 0; i < int(arg.MaxEntries) && i < len(reply.Subtrees); i++ {
+	for i := 0; i < len(reply.Subtrees); i++ {
 		subtree := reply.Subtrees[i]
 		block, err := common.GetBlock(s.cache, subtree.End_height)
 		if block == nil {
