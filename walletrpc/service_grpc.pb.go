@@ -85,8 +85,8 @@ type CompactTxStreamerClient interface {
 	// The block can be specified by either height or hash.
 	GetTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*TreeState, error)
 	GetLatestTreeState(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*TreeState, error)
-	// Returns a stream of information about roots of subtrees of the Sapling and Orchard
-	// note commitment trees.
+	// Returns a stream of information about roots of subtrees of the note commitment tree
+	// for the specified shielded protocol (Sapling or Orchard).
 	GetSubtreeRoots(ctx context.Context, in *GetSubtreeRootsArg, opts ...grpc.CallOption) (CompactTxStreamer_GetSubtreeRootsClient, error)
 	GetAddressUtxos(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (*GetAddressUtxosReplyList, error)
 	GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error)
@@ -502,8 +502,8 @@ type CompactTxStreamerServer interface {
 	// The block can be specified by either height or hash.
 	GetTreeState(context.Context, *BlockID) (*TreeState, error)
 	GetLatestTreeState(context.Context, *Empty) (*TreeState, error)
-	// Returns a stream of information about roots of subtrees of the Sapling and Orchard
-	// note commitment trees.
+	// Returns a stream of information about roots of subtrees of the note commitment tree
+	// for the specified shielded protocol (Sapling or Orchard).
 	GetSubtreeRoots(*GetSubtreeRootsArg, CompactTxStreamer_GetSubtreeRootsServer) error
 	GetAddressUtxos(context.Context, *GetAddressUtxosArg) (*GetAddressUtxosReplyList, error)
 	GetAddressUtxosStream(*GetAddressUtxosArg, CompactTxStreamer_GetAddressUtxosStreamServer) error

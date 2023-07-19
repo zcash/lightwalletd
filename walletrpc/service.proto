@@ -197,8 +197,8 @@ service CompactTxStreamer {
     rpc GetTreeState(BlockID) returns (TreeState) {}
     rpc GetLatestTreeState(Empty) returns (TreeState) {}
 
-    // Returns a stream of information about roots of subtrees of the Sapling and Orchard
-    // note commitment trees.
+    // Returns a stream of information about roots of subtrees of the note commitment tree
+    // for the specified shielded protocol (Sapling or Orchard).
     rpc GetSubtreeRoots(GetSubtreeRootsArg) returns (stream SubtreeRoot) {}
 
     rpc GetAddressUtxos(GetAddressUtxosArg) returns (GetAddressUtxosReplyList) {}
