@@ -771,7 +771,13 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 	if err != nil || !match {
 		return nil, errors.New("invalid chain name")
 	}
-	err = common.DarksideReset(int(ms.SaplingActivation), ms.BranchID, ms.ChainName)
+	err = common.DarksideReset(
+		int(ms.SaplingActivation),
+		ms.BranchID,
+		ms.ChainName,
+		ms.StartSaplingCommitmentTreeSize,
+		ms.StartOrchardCommitmentTreeSize,
+	)
 	if err != nil {
 		return nil, err
 	}

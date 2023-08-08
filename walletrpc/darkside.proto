@@ -12,6 +12,8 @@ message DarksideMetaState {
     int32 saplingActivation = 1;
     string branchID = 2;
     string chainName = 3;
+    uint32 startSaplingCommitmentTreeSize = 4;
+    uint32 startOrchardCommitmentTreeSize = 5;
 }
 
 // A block is a hex-encoded string.

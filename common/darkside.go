@@ -28,6 +28,11 @@ type darksideState struct {
 	// by the mock zcashd.
 	latestHeight int
 
+	// Size of the Sapling commitment tree as of `startHeight - 1`.
+	startSaplingTreeSize uint32
+	// Size of the Orchard commitment tree as of `startHeight - 1`.
+	startOrchardTreeSize uint32
+
 	// These blocks (up to and including tip) are presented by mock zcashd.
 	// activeBlocks[0] is the block at height startHeight.
 	activeBlocks []*activeBlock // full blocks, binary, as from zcashd getblock rpc
@@ -64,12 +69,16 @@ var state darksideState
 var mutex sync.Mutex
 
 type activeBlock struct {
-	bytes []byte
+	bytes           []byte
+	saplingTreeSize uint32
+	orchardTreeSize uint32
 }
 
 type stagedTx struct {
-	height int
-	bytes  []byte
+	height         int
+	saplingOutputs int
+	orchardActions int
+	bytes          []byte
 }
 
 type DarksideTreeState struct {
@@ -115,7 +124,7 @@ func DarksideInit(c *BlockCache, timeout int) {
 
 // DarksideReset allows the wallet test code to specify values
 // that are returned by GetLightdInfo().
-func DarksideReset(sa int, bi, cn string) error {
+func DarksideReset(sa int, bi, cn string, sst, sot uint32) error {
 	Log.Info("DarksideReset(saplingActivation=", sa, ")")
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -126,6 +135,8 @@ func DarksideReset(sa int, bi, cn string) error {
 		latestHeight:         -1,
 		branchID:             bi,
 		chainName:            cn,
+		startSaplingTreeSize: sst,
+		startOrchardTreeSize: sot,
 		cache:                state.cache,
 		activeBlocks:         make([]*activeBlock, 0),
 		stagedBlocks:         make([][]byte, 0),
@@ -157,11 +168,39 @@ func addBlockActive(blockBytes []byte) error {
 		return errors.New(fmt.Sprint("adding block at height ", blockHeight,
 			" is lower than Sapling activation height ", state.startHeight))
 	}
+	// Determine the Sapling and Orchard commitment tree sizes for the new block.
+	countSaplingOutputs := func(block *parser.Block) uint32 {
+		var count = 0
+		for _, tx := range block.Transactions() {
+			count += tx.SaplingOutputsCount()
+		}
+		return uint32(count)
+	}
+	countOrchardActions := func(block *parser.Block) uint32 {
+		var count = 0
+		for _, tx := range block.Transactions() {
+			count += tx.OrchardActionsCount()
+		}
+		return uint32(count)
+	}
+	var prevSaplingTreeSize uint32
+	var prevOrchardTreeSize uint32
+	if blockHeight-state.startHeight > 0 {
+		// The new block connects to the previous one.
+		prevSaplingTreeSize = state.activeBlocks[blockHeight-state.startHeight-1].saplingTreeSize
+		prevOrchardTreeSize = state.activeBlocks[blockHeight-state.startHeight-1].orchardTreeSize
+	} else {
+		// This is the first block.
+		prevSaplingTreeSize = state.startSaplingTreeSize
+		prevOrchardTreeSize = state.startOrchardTreeSize
+	}
 	// Drop the block that will be overwritten, and its children, then add block.
 	state.activeBlocks = state.activeBlocks[:blockHeight-state.startHeight]
 	state.activeBlocks = append(state.activeBlocks,
 		&activeBlock{
-			bytes: blockBytes,
+			bytes:           blockBytes,
+			saplingTreeSize: prevSaplingTreeSize + countSaplingOutputs(block),
+			orchardTreeSize: prevOrchardTreeSize + countOrchardActions(block),
 		})
 	return nil
 }
@@ -256,6 +295,11 @@ func DarksideApplyStaged(height int) error {
 		block[68]++ // hack HashFinalSaplingRoot to mod the block hash
 		block = append(block, tx.bytes...)
 		state.activeBlocks[tx.height-state.startHeight].bytes = block
+		// Now increment this and every subsequent block's commitment tree sizes.
+		for _, b := range state.activeBlocks[tx.height-state.startHeight:] {
+			b.saplingTreeSize += uint32(tx.saplingOutputs)
+			b.orchardTreeSize += uint32(tx.orchardActions)
+		}
 	}
 	maxHeight := state.startHeight + len(state.activeBlocks) - 1
 	if height > maxHeight {
@@ -509,14 +553,24 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			block.ParseFromSlice(state.activeBlocks[blockIndex].bytes)
 			darksideSetBlockTxID(block)
 			var r struct {
-				Tx   []string `json:"tx"`
-				Hash string   `json:"hash"`
+				Tx    []string `json:"tx"`
+				Hash  string   `json:"hash"`
+				Trees struct {
+					Sapling struct {
+						Size uint32
+					}
+					Orchard struct {
+						Size uint32
+					}
+				}
 			}
 			r.Tx = make([]string, 0)
 			for _, tx := range block.Transactions() {
 				r.Tx = append(r.Tx, hex.EncodeToString(tx.GetDisplayHash()))
 			}
 			r.Hash = hex.EncodeToString(block.GetDisplayHash())
+			r.Trees.Sapling.Size = state.activeBlocks[blockIndex].saplingTreeSize
+			r.Trees.Orchard.Size = state.activeBlocks[blockIndex].orchardTreeSize
 			state.cacheBlockHash = r.Hash
 			state.cacheBlockIndex = blockIndex
 			return json.Marshal(r)
@@ -739,8 +793,10 @@ func stageTransaction(height int, txBytes []byte) error {
 	}
 	state.stagedTransactions = append(state.stagedTransactions,
 		stagedTx{
-			height: height,
-			bytes:  txBytes,
+			height:         height,
+			saplingOutputs: tx.SaplingOutputsCount(),
+			orchardActions: tx.OrchardActionsCount(),
+			bytes:          txBytes,
 		})
 	return nil
 }

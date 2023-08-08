@@ -369,6 +369,16 @@ func (tx *Transaction) HasShieldedElements() bool {
 	return tx.version >= 4 && nshielded > 0
 }
 
+// SaplingOutputsCount returns the number of Sapling outputs in the transaction.
+func (tx *Transaction) SaplingOutputsCount() int {
+	return len(tx.shieldedOutputs)
+}
+
+// OrchardActionsCount returns the number of Orchard actions in the transaction.
+func (tx *Transaction) OrchardActionsCount() int {
+	return len(tx.orchardActions)
+}
+
 // ToCompact converts the given (full) transaction to compact format.
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	ctx := &walletrpc.CompactTx{
