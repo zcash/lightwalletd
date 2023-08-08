@@ -360,11 +360,14 @@ func TestGetTaddressTxidsNilArgs(t *testing.T) {
 	}
 }
 
+var lmrt *testing.T
+
 func getblockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
 	if method != "getblock" {
 		testT.Fatal("unexpected method:", method)
 	}
 	step++
+	testT.Log("getblockStub new step: ", step)
 	var arg string
 	err := json.Unmarshal(params[0], &arg)
 	if err != nil {
@@ -381,7 +384,7 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
 	case 2:
 		if arg != "0000380640" {
-			testT.Fatal("unexpected getblock height", arg)
+			testT.Fatal("unexpected getblock hash", arg)
 		}
 		return blocks[0], nil
 	case 3:
@@ -395,15 +398,18 @@ func TestGetBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
 	lwd, _ := testsetup()
+	testT.Log("starting TestGetBlock")
 
 	_, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{})
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
 	}
+	testT.Log("about to TestGetBlock")
 	_, err = lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 0})
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
 	}
+	testT.Log("about to TestGetBlock")
 	_, err = lwd.GetBlock(context.Background(), &walletrpc.BlockID{Hash: []byte{0}})
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
@@ -413,6 +419,7 @@ func TestGetBlock(t *testing.T) {
 	}
 
 	// getblockStub() case 1: return error
+	testT.Log("about to TestGetBlock")
 	block, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 380640})
 	if err != nil {
 		t.Fatal("GetBlock failed:", err)
@@ -421,6 +428,7 @@ func TestGetBlock(t *testing.T) {
 		t.Fatal("GetBlock returned unexpected block:", err)
 	}
 	// getblockStub() case 2: return error
+	testT.Log("about to TestGetBlock")
 	block, err = lwd.GetBlock(context.Background(), &walletrpc.BlockID{Height: 380640})
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
@@ -428,6 +436,7 @@ func TestGetBlock(t *testing.T) {
 	if block != nil {
 		t.Fatal("GetBlock returned unexpected non-nil block")
 	}
+	testT.Log("end TestGetBlock")
 	step = 0
 }
 
