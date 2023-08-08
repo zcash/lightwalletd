@@ -153,6 +153,7 @@ type (
 	ZcashRpcReplyGetblock1 struct {
 		Hash  string
 		Tx    []string
+		Hex   string
 		Trees struct {
 			Sapling struct {
 				Size uint32
@@ -275,21 +276,38 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	}
 	params := make([]json.RawMessage, 2)
 	params[0] = heightJSON
-	// Fetch the block using the verbose option ("1") because it provides
-	// both the list of txids, which we're not yet able to compute for
-	// Orchard (V5) transactions, and the block hash (block ID), which
-	// we need to fetch the raw data format of the same block. Don't fetch
+
+	// We're not (yet) able to compute v5 transactions IDs (from the raw
+	// serialized transaction), so we get this from zcashd 'getblock'.
+	//
+	// First try verbose=3, which returns a JSON object with exactly
+	// what's needed: the block raw hex and the list of txids.
+	//
+	// If unsuccessful (zcashd isn't upgraded),
+	// fetch the block using the verbose option ("1") because it provides
+	// both the list of txids and the block hash (block ID), which we then
+	// use to fetch the raw data format of the same block. Don't fetch
 	// by height in case a reorg occurs between the two getblock calls;
 	// using block hash ensures that we're fetching the same block.
-	params[1] = json.RawMessage("1")
+	params[1] = json.RawMessage("3")
 	result, rpcErr := RawRequest("getblock", params)
 	if rpcErr != nil {
 		// Check to see if we are requesting a height the zcashd doesn't have yet
 		if (strings.Split(rpcErr.Error(), ":"))[0] == "-8" {
 			return nil, nil
 		}
-		return nil, errors.Wrap(rpcErr, "error requesting verbose block")
+		// zcashd must not be upgraded to support verbose=3
+		params[1] = json.RawMessage("1")
+		result, rpcErr = RawRequest("getblock", params)
+		if rpcErr != nil {
+			// Check to see if we are requesting a height the zcashd doesn't have yet
+			if (strings.Split(rpcErr.Error(), ":"))[0] == "-8" {
+				return nil, nil
+			}
+			return nil, errors.Wrap(rpcErr, "error requesting verbose block")
+		}
 	}
+	// This type works for both the verbose=1 or 3 reply.
 	var block1 ZcashRpcReplyGetblock1
 	err = json.Unmarshal(result, &block1)
 	if err != nil {
@@ -299,26 +317,26 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	if err != nil {
 		Log.Fatal("getBlockFromRPC bad block hash", block1.Hash)
 	}
-	params[0] = blockHash
-	params[1] = json.RawMessage("0") // non-verbose (raw hex)
-	result, rpcErr = RawRequest("getblock", params)
+	if block1.Hex == "" {
+		// the getblock verbose=3 attempt must have failed, get the raw hex now
+		params[0] = blockHash
+		params[1] = json.RawMessage("0") // non-verbose (raw hex, non-JSON)
+		result, rpcErr = RawRequest("getblock", params)
 
-	// For some reason, the error responses are not JSON
-	if rpcErr != nil {
-		return nil, errors.Wrap(rpcErr, "error requesting block")
+		// For some reason, the error responses are not JSON
+		if rpcErr != nil {
+			return nil, errors.Wrap(rpcErr, "error requesting block")
+		}
+
+		err = json.Unmarshal(result, &block1.Hex)
+		if err != nil {
+			return nil, errors.Wrap(err, "error reading JSON response")
+		}
 	}
-
-	var blockDataHex string
-	err = json.Unmarshal(result, &blockDataHex)
+	blockData, err := hex.DecodeString(block1.Hex)
 	if err != nil {
-		return nil, errors.Wrap(err, "error reading JSON response")
+		return nil, errors.Wrap(err, "error decoding getblock raw block hex string")
 	}
-
-	blockData, err := hex.DecodeString(blockDataHex)
-	if err != nil {
-		return nil, errors.Wrap(err, "error decoding getblock output")
-	}
-
 	block := parser.NewBlock()
 	rest, err := block.ParseFromSlice(blockData)
 	if err != nil {
