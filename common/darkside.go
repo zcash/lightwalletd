@@ -30,7 +30,7 @@ type darksideState struct {
 
 	// These blocks (up to and including tip) are presented by mock zcashd.
 	// activeBlocks[0] is the block at height startHeight.
-	activeBlocks [][]byte // full blocks, binary, as from zcashd getblock rpc
+	activeBlocks []*activeBlock // full blocks, binary, as from zcashd getblock rpc
 
 	// Staged blocks are waiting to be applied (by ApplyStaged()) to activeBlocks.
 	// They are in order of arrival (not necessarily sorted by height), and are
@@ -62,6 +62,10 @@ var state darksideState
 // `state` can be reallocated (by Reset()), and that action
 // should be protected.
 var mutex sync.Mutex
+
+type activeBlock struct {
+	bytes []byte
+}
 
 type stagedTx struct {
 	height int
@@ -123,7 +127,7 @@ func DarksideReset(sa int, bi, cn string) error {
 		branchID:             bi,
 		chainName:            cn,
 		cache:                state.cache,
-		activeBlocks:         make([][]byte, 0),
+		activeBlocks:         make([]*activeBlock, 0),
 		stagedBlocks:         make([][]byte, 0),
 		incomingTransactions: make([][]byte, 0),
 		stagedTransactions:   make([]stagedTx, 0),
@@ -155,17 +159,20 @@ func addBlockActive(blockBytes []byte) error {
 	}
 	// Drop the block that will be overwritten, and its children, then add block.
 	state.activeBlocks = state.activeBlocks[:blockHeight-state.startHeight]
-	state.activeBlocks = append(state.activeBlocks, blockBytes)
+	state.activeBlocks = append(state.activeBlocks,
+		&activeBlock{
+			bytes: blockBytes,
+		})
 	return nil
 }
 
 // Set missing prev hashes of the blocks in the active chain
 func setPrevhash() {
 	var prevhash []byte
-	for _, blockBytes := range state.activeBlocks {
+	for _, activeBlock := range state.activeBlocks {
 		// Set this block's prevhash.
 		block := parser.NewBlock()
-		rest, err := block.ParseFromSlice(blockBytes)
+		rest, err := block.ParseFromSlice(activeBlock.bytes)
 		if err != nil {
 			Log.Fatal(err)
 		}
@@ -173,7 +180,7 @@ func setPrevhash() {
 			Log.Fatal(errors.New("block is too long"))
 		}
 		if prevhash != nil {
-			copy(blockBytes[4:4+32], prevhash)
+			copy(activeBlock.bytes[4:4+32], prevhash)
 		}
 		prevhash = block.GetEncodableHash()
 		Log.Info("Darkside active block height ", block.GetHeight(), " hash ",
@@ -220,7 +227,7 @@ func DarksideApplyStaged(height int) error {
 		if tx.height >= state.startHeight+len(state.activeBlocks) {
 			return errors.New("transaction height too high")
 		}
-		block := state.activeBlocks[tx.height-state.startHeight]
+		block := state.activeBlocks[tx.height-state.startHeight].bytes
 		// The next one or 3 bytes encode the number of transactions to follow,
 		// little endian.
 		nTxFirstByte := block[1487]
@@ -248,7 +255,7 @@ func DarksideApplyStaged(height int) error {
 		}
 		block[68]++ // hack HashFinalSaplingRoot to mod the block hash
 		block = append(block, tx.bytes...)
-		state.activeBlocks[tx.height-state.startHeight] = block
+		state.activeBlocks[tx.height-state.startHeight].bytes = block
 	}
 	maxHeight := state.startHeight + len(state.activeBlocks) - 1
 	if height > maxHeight {
@@ -430,7 +437,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		index := state.latestHeight - state.startHeight
 		block := parser.NewBlock()
-		block.ParseFromSlice(state.activeBlocks[index])
+		block.ParseFromSlice(state.activeBlocks[index].bytes)
 		hash := hex.EncodeToString(block.GetDisplayHash())
 		blockchaininfo := &ZcashdRpcReplyGetblockchaininfo{
 			Chain: state.chainName,
@@ -482,10 +489,10 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 				// iterating the activeBlocks list.
 				blockIndex = state.cacheBlockIndex
 			} else {
-				var b []uint8
+				var b *activeBlock
 				for blockIndex, b = range state.activeBlocks {
 					block := parser.NewBlock()
-					block.ParseFromSlice(b)
+					block.ParseFromSlice(b.bytes)
 					if heightOrHashStr == hex.EncodeToString(block.GetDisplayHash()) {
 						break
 					}
@@ -499,7 +506,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		if len(params) > 1 && string(params[1]) == "1" {
 			// verbose mode, all that's currently needed is txid
 			block := parser.NewBlock()
-			block.ParseFromSlice(state.activeBlocks[blockIndex])
+			block.ParseFromSlice(state.activeBlocks[blockIndex].bytes)
 			darksideSetBlockTxID(block)
 			var r struct {
 				Tx   []string `json:"tx"`
@@ -514,7 +521,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			state.cacheBlockIndex = blockIndex
 			return json.Marshal(r)
 		}
-		return json.Marshal(hex.EncodeToString(state.activeBlocks[blockIndex]))
+		return json.Marshal(hex.EncodeToString(state.activeBlocks[blockIndex].bytes))
 
 	case "getbestblockhash":
 		if len(state.activeBlocks) == 0 {
@@ -522,7 +529,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		index := state.latestHeight - state.startHeight
 		block := parser.NewBlock()
-		block.ParseFromSlice(state.activeBlocks[index])
+		block.ParseFromSlice(state.activeBlocks[index].bytes)
 		hash := hex.EncodeToString(block.GetDisplayHash())
 		return json.Marshal(hash)
 
@@ -667,21 +674,37 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 	// Linear search for the tx, somewhat inefficient but this is test code
 	// and there aren't many blocks. If this becomes a performance problem,
 	// we can maintain a map of transactions indexed by txid.
+	findTxInBlock := func(b []byte) json.RawMessage {
+		block := parser.NewBlock()
+		_, _ = block.ParseFromSlice(b)
+		darksideSetBlockTxID(block)
+		for _, tx := range block.Transactions() {
+			if bytes.Equal(tx.GetDisplayHash(), txid) {
+				return marshalReply(tx, block.GetHeight())
+			}
+		}
+		return nil
+	}
+	findTxInActiveBlocks := func(blocks []*activeBlock) json.RawMessage {
+		for _, b := range blocks {
+			ret := findTxInBlock(b.bytes)
+			if ret != nil {
+				return ret
+			}
+		}
+		return nil
+	}
 	findTxInBlocks := func(blocks [][]byte) json.RawMessage {
 		for _, b := range blocks {
-			block := parser.NewBlock()
-			_, _ = block.ParseFromSlice(b)
-			darksideSetBlockTxID(block)
-			for _, tx := range block.Transactions() {
-				if bytes.Equal(tx.GetDisplayHash(), txid) {
-					return marshalReply(tx, block.GetHeight())
-				}
+			ret := findTxInBlock(b)
+			if ret != nil {
+				return ret
 			}
 		}
 		return nil
 	}
 	// Search for the transaction (by txid) in the 3 places it could be.
-	reply := findTxInBlocks(state.activeBlocks)
+	reply := findTxInActiveBlocks(state.activeBlocks)
 	if reply != nil {
 		return reply, nil
 	}
