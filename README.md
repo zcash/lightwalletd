@@ -39,7 +39,7 @@ You must start a local instance of `zcashd`, and its `.zcash/zcash.conf` file mu
 (set the user and password strings accordingly):
 ```
 txindex=1
-insightexplorer=1
+lightwalletd=1
 experimentalfeatures=1
 rpcuser=xxxxx
 rpcpassword=xxxxx
