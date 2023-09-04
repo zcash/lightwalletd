@@ -907,7 +907,7 @@ func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.Tree
 
 // removes a TreeState from the cache if present
 func (s *DarksideStreamer) RemoveTreeState(ctx context.Context, arg *walletrpc.BlockID) (*walletrpc.Empty, error) {
-	err := common.DarksideRemoveTreeState(arg.Height)
+	err := common.DarksideRemoveTreeState(arg)
 
 	return &walletrpc.Empty{}, err
 }
