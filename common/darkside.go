@@ -480,7 +480,8 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 	switch method {
 	case "getblockchaininfo":
 		if len(state.activeBlocks) == 0 {
-			Log.Fatal("getblockchaininfo: no blocks")
+			return nil, errors.New("GetLightdInfo requires at least one block, " +
+				"please stage and apply one or more blocks.")
 		}
 		index := state.latestHeight - state.startHeight
 		block := parser.NewBlock()
