@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/zcash/lightwalletd/parser"
+	"github.com/zcash/lightwalletd/walletrpc"
 )
 
 type darksideState struct {
@@ -54,7 +55,8 @@ type darksideState struct {
 	// Unordered list of replies
 	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
 
-	stagedTreeStates map[uint64]*DarksideTreeState
+	stagedTreeStates       map[uint64]*DarksideTreeState
+	stagedTreeStatesByHash map[string]*DarksideTreeState
 
 	// This is a one-entry cache performance cheat.
 	cacheBlockHash  string
@@ -130,19 +132,20 @@ func DarksideReset(sa int, bi, cn string, sst, sot uint32) error {
 	defer mutex.Unlock()
 	stopIngestor()
 	state = darksideState{
-		resetted:             true,
-		startHeight:          sa,
-		latestHeight:         -1,
-		branchID:             bi,
-		chainName:            cn,
-		startSaplingTreeSize: sst,
-		startOrchardTreeSize: sot,
-		cache:                state.cache,
-		activeBlocks:         make([]*activeBlock, 0),
-		stagedBlocks:         make([][]byte, 0),
-		incomingTransactions: make([][]byte, 0),
-		stagedTransactions:   make([]stagedTx, 0),
-		stagedTreeStates:     make(map[uint64]*DarksideTreeState),
+		resetted:               true,
+		startHeight:            sa,
+		latestHeight:           -1,
+		branchID:               bi,
+		chainName:              cn,
+		startSaplingTreeSize:   sst,
+		startOrchardTreeSize:   sot,
+		cache:                  state.cache,
+		activeBlocks:           make([]*activeBlock, 0),
+		stagedBlocks:           make([][]byte, 0),
+		incomingTransactions:   make([][]byte, 0),
+		stagedTransactions:     make([]stagedTx, 0),
+		stagedTreeStates:       make(map[uint64]*DarksideTreeState),
+		stagedTreeStatesByHash: make(map[string]*DarksideTreeState),
 	}
 	state.cache.Reset(sa)
 	return nil
@@ -656,24 +659,26 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(utxosReply)
 
 	case "z_gettreestate":
-		var heightStr string
-		err := json.Unmarshal(params[0], &heightStr)
+		var heightOrHashStr string
+		err := json.Unmarshal(params[0], &heightOrHashStr)
 		if err != nil {
-			return nil, errors.New("failed to parse gettreestate request")
+			return nil, errors.New("failed to parse z_gettreestate request")
 		}
-
-		height, err := strconv.Atoi(heightStr)
-		if err != nil {
-			return nil, errors.New("error parsing height as integer")
+		var treeState *DarksideTreeState
+		if len(heightOrHashStr) < 64 {
+			// argument is a height
+			height, err := strconv.Atoi(heightOrHashStr)
+			if err != nil {
+				return nil, errors.New("error parsing height as integer")
+			}
+			treeState = state.stagedTreeStates[uint64(height)]
+		} else {
+			treeState = state.stagedTreeStatesByHash[heightOrHashStr]
 		}
-
-		treeState := state.stagedTreeStates[uint64(height)]
-
 		if treeState == nil {
 			return nil, errors.New(fmt.Sprint(
-				"there is no TreeState Staged for height \"",
-				height,
-				"\". Stage it using AddTreeState() first"))
+				"No TreeState exists for the given height or block hash. " +
+					"Stage it using AddTreeState() first"))
 		}
 
 		zcashdTreeState := &ZcashdRpcReplyGettreestate{}
@@ -873,15 +878,25 @@ func DarksideAddTreeState(arg DarksideTreeState) error {
 	}
 
 	state.stagedTreeStates[arg.Height] = &arg
+	state.stagedTreeStatesByHash[arg.Hash] = &arg
 	return nil
 }
 
-func DarksideRemoveTreeState(arg uint64) error {
+func DarksideRemoveTreeState(arg *walletrpc.BlockID) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if !state.resetted || state.stagedTreeStates == nil {
 		return errors.New("please call Reset first")
 	}
-	delete(state.stagedTreeStates, arg)
+	if arg.Height > 0 {
+		treestate := state.stagedTreeStates[arg.Height]
+		delete(state.stagedTreeStatesByHash, treestate.Hash)
+		delete(state.stagedTreeStates, treestate.Height)
+	} else {
+		h := hex.EncodeToString(arg.Hash)
+		treestate := state.stagedTreeStatesByHash[h]
+		delete(state.stagedTreeStatesByHash, treestate.Hash)
+		delete(state.stagedTreeStates, treestate.Height)
+	}
 	return nil
 }
