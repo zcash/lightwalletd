@@ -498,7 +498,10 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(blockchaininfo)
 
 	case "getinfo":
-		info := &ZcashdRpcReplyGetinfo{}
+		info := &ZcashdRpcReplyGetinfo{
+			Build:      "darksidewallet-build",
+			Subversion: "darksidewallet-subversion",
+		}
 		return json.Marshal(info)
 
 	case "getblock":
