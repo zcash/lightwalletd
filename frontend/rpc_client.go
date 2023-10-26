@@ -59,6 +59,10 @@ func connFromConf(confPath interface{}) (*rpcclient.ConnConfig, error) {
 	username := cfg.Section("").Key("rpcuser").String()
 	password := cfg.Section("").Key("rpcpassword").String()
 
+	if password == "" {
+		return nil, errors.New("rpcpassword not found (or empty), please add rpcpassword= to zcash.conf")
+	}
+
 	// Connect to local Zcash RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
 		Host:         net.JoinHostPort(rpcaddr, rpcport),
