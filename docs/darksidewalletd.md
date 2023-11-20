@@ -27,7 +27,7 @@ mitigates these risks, but users should still be cautious.
 
 Lightwalletd and most dependencies of lightwalletd, including Go version 1.11 or
 later, but not zcashd. Since Darksidewalletd mocks zcashd, it can run standalone
-and does use zcashd to get blocks or send and receive transactions.
+and does not use zcashd to get blocks or send and receive transactions.
 
 For the tutorial the `grpcurl` tool is needed to call the `darksidewalletd`
 gRPC API.
