@@ -58,6 +58,9 @@ type darksideState struct {
 	stagedTreeStates       map[uint64]*DarksideTreeState
 	stagedTreeStatesByHash map[string]*DarksideTreeState
 
+	// Subtree by protocol
+	stagedSaplingSubtreeRoots map[uint64]*DarksideSubtree
+	stagedOrchardSubtreeRoots map[uint64]*DarksideSubtree
 	// This is a one-entry cache performance cheat.
 	cacheBlockHash  string
 	cacheBlockIndex int
@@ -90,6 +93,12 @@ type DarksideTreeState struct {
 	Time        uint32
 	SaplingTree string
 	OrchardTree string
+}
+
+type DarksideSubtree struct {
+	rootHash              []byte
+	completingBlockHash   []byte
+	completingBlockHeight uint64
 }
 
 // DarksideEnabled is true if --darkside-very-insecure was given on
@@ -867,6 +876,8 @@ func DarksideClearAddressUtxos() error {
 	return nil
 }
 
+/// TreeStates
+
 func DarksideClearAllTreeStates() error {
 	mutex.Lock()
 	state.stagedTreeStates = make(map[uint64]*DarksideTreeState)
@@ -901,6 +912,72 @@ func DarksideRemoveTreeState(arg *walletrpc.BlockID) error {
 		treestate := state.stagedTreeStatesByHash[h]
 		delete(state.stagedTreeStatesByHash, treestate.Hash)
 		delete(state.stagedTreeStates, treestate.Height)
+	}
+	return nil
+}
+
+/// Subtrees
+
+func DarksideClearAllSubTreeRoots() error {
+	mutex.Lock()
+	state.stagedSaplingSubtreeRoots = make(map[uint64]*DarksideSubtree)
+	state.stagedOrchardSubtreeRoots = make(map[uint64]*DarksideSubtree)
+	mutex.Unlock()
+	return nil
+}
+
+func DarksideAddSubtree(arg DarksideSubtree, shieldedProtocol int32) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	if !state.resetted || state.stagedTreeStates == nil {
+		return errors.New("please call Reset first")
+	}
+
+	switch shieldedProtocol {
+	case 0:
+		state.stagedSaplingSubtreeRoots[arg.completingBlockHeight] = &arg
+	case 1:
+		state.stagedOrchardSubtreeRoots[arg.completingBlockHeight] = &arg
+	}
+	return nil
+}
+
+func DarksideAddSubtrees(arg []DarksideSubtree, shieldedProtocol int32) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	if !state.resetted || state.stagedTreeStates == nil {
+		return errors.New("please call Reset first")
+	}
+
+	var cache map[uint64]*DarksideSubtree
+
+	switch shieldedProtocol {
+	case 0:
+		cache = state.stagedSaplingSubtreeRoots
+	case 1:
+		cache = state.stagedOrchardSubtreeRoots
+	}
+
+	for i := 0; i < len(arg); i++ {
+		subtree := arg[i]
+
+		cache[subtree.completingBlockHeight] = &subtree
+	}
+
+	return nil
+}
+
+func DarksideRemoveSubTree(height uint64, shieldedProtocol int32) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	if !state.resetted || state.stagedTreeStates == nil {
+		return errors.New("please call Reset first")
+	}
+	switch shieldedProtocol {
+	case 0:
+		delete(state.stagedSaplingSubtreeRoots, height)
+	case 1:
+		delete(state.stagedOrchardSubtreeRoots, height)
 	}
 	return nil
 }
