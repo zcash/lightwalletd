@@ -52,8 +52,8 @@ message DarksideSubTreeIndex {
 
 message DarksideSubTreeRoots {
     ShieldedProtocol shieldedProtocol = 1;
-    int32 index 2;
-    repeat SubTreeRoot subtrees = 3;
+    int32 index = 2;
+    repeated SubtreeRoot subtrees = 3;
 }
 
 // Darksidewalletd maintains two staging areas, blocks and transactions. The
@@ -148,7 +148,7 @@ service DarksideStreamer {
     rpc AddSubTreeRoot(DarksideSubTreeRoots) returns (Empty) {}
 
     // Adds a stream of SubTreeRoots
-    rpc AddSubTreeRootStream(DarksideSubTreeRoots stream) returns (Empty){}
+    rpc AddSubTreeRootStream(stream DarksideSubTreeRoots) returns (Empty) {}
 
     // Removes all subtrees for the given height from cache if present (can't fail)
     rpc RemoveSubTreeRootsForIndex(DarksideSubTreeIndex) returns (Empty) {}
