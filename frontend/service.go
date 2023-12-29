@@ -919,3 +919,70 @@ func (s *DarksideStreamer) ClearAllTreeStates(ctx context.Context, arg *walletrp
 
 	return &walletrpc.Empty{}, err
 }
+
+/// subtrees
+
+func (s *DarksideStreamer) AddSubTreeRootStream(subtree walletrpc.DarksideStreamer_AddSubTreeRootStreamServer) error {
+	for {
+		subtreeRoots, err := subtree.Recv()
+		if err == io.EOF {
+			subtree.SendAndClose(&walletrpc.Empty{})
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+
+		var darkSubtrees []common.DarksideSubtree
+
+		for _, source := range subtreeRoots.Subtrees {
+			// Convert each element and append to the targetSlice
+			targetElement := common.DarksideSubtree{
+				RootHash:              source.RootHash,
+				CompletingBlockHeight: source.CompletingBlockHeight,
+				CompletingBlockHash:   source.CompletingBlockHash,
+			}
+
+			darkSubtrees = append(darkSubtrees, targetElement)
+		}
+		err = common.DarksideAddSubtreesForIndex(subtreeRoots.Index, darkSubtrees, subtreeRoots.ShieldedProtocol)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// Adds a Subtre to the cached tree states
+func (s *DarksideStreamer) AddSubTreeRoots(ctx context.Context, arg *walletrpc.DarksideSubTreeRoots) (*walletrpc.Empty, error) {
+
+	var targetSlice []common.DarksideSubtree
+
+	for _, source := range arg.Subtrees {
+		// Convert each element and append to the targetSlice
+		targetElement := common.DarksideSubtree{
+			RootHash:              source.RootHash,
+			CompletingBlockHeight: source.CompletingBlockHeight,
+			CompletingBlockHash:   source.CompletingBlockHash,
+		}
+
+		targetSlice = append(targetSlice, targetElement)
+	}
+
+	err := common.DarksideAddSubtreesForIndex(arg.Index, targetSlice, arg.ShieldedProtocol)
+
+	return &walletrpc.Empty{}, err
+}
+
+// removes a SubtreeRoots for a given index from the cache if present
+func (s *DarksideStreamer) RemoveSubTreeRootsForIndex(ctx context.Context, arg *walletrpc.DarksideSubTreeIndex) (*walletrpc.Empty, error) {
+	err := common.DarksideRemoveSubTree(arg.Index, arg.ShieldedProtocol)
+
+	return &walletrpc.Empty{}, err
+}
+
+// Clears all the SubTreeRoots present in the cache.
+func (s *DarksideStreamer) ClearAllSubTreeRoots(ctx context.Context, arg *walletrpc.Empty) (*walletrpc.Empty, error) {
+	err := common.DarksideClearAllSubTreeRoots()
+
+	return &walletrpc.Empty{}, err
+}

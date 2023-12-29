@@ -47,7 +47,7 @@ message DarksideEmptyBlocks {
 
 message DarksideSubTreeIndex {
     ShieldedProtocol shieldedProtocol = 1;
-    uint64 height = 2;
+    int32 index = 2;
 }
 
 message DarksideSubTreeRoots {

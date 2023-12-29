@@ -97,9 +97,9 @@ type DarksideTreeState struct {
 }
 
 type DarksideSubtree struct {
-	rootHash              []byte
-	completingBlockHash   []byte
-	completingBlockHeight uint64
+	RootHash              []byte
+	CompletingBlockHash   []byte
+	CompletingBlockHeight uint64
 }
 
 // DarksideEnabled is true if --darkside-very-insecure was given on
@@ -746,8 +746,8 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 				Root       string
 				End_height int
 			}{
-				Root:       string(source.rootHash),
-				End_height: int(source.completingBlockHeight),
+				Root:       string(source.RootHash),
+				End_height: int(source.CompletingBlockHeight),
 			}
 			targetSlice = append(targetSlice, targetElement)
 		}
@@ -975,36 +975,7 @@ func DarksideClearAllSubTreeRoots() error {
 	return nil
 }
 
-// / Adds a darkside subtree for a given index and protocol to the state cache
-func DarksideAddSubtree(index int32, subtree DarksideSubtree, shieldedProtocol int32) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-	if !state.resetted || state.stagedSaplingSubtreeRoots == nil || state.stagedOrchardSubtreeRoots == nil {
-		return errors.New("please call Reset first")
-	}
-
-	switch shieldedProtocol {
-	case 0:
-		subtreeForIndex := state.stagedSaplingSubtreeRoots[index]
-		if subtreeForIndex == nil {
-			subtreeForIndex = make([]DarksideSubtree, 10)
-		}
-		subtreeForIndex = append(subtreeForIndex, subtree)
-
-		state.stagedSaplingSubtreeRoots[index] = subtreeForIndex
-	case 1:
-		subtreeForIndex := state.stagedOrchardSubtreeRoots[index]
-		if subtreeForIndex == nil {
-			subtreeForIndex = make([]DarksideSubtree, 10)
-		}
-		subtreeForIndex = append(subtreeForIndex, subtree)
-
-		state.stagedOrchardSubtreeRoots[index] = subtreeForIndex
-	}
-	return nil
-}
-
-func DarksideAddSubtreesForIndex(index int32, arg []DarksideSubtree, shieldedProtocol int32) error {
+func DarksideAddSubtreesForIndex(index int32, arg []DarksideSubtree, shieldedProtocol walletrpc.ShieldedProtocol) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if !state.resetted || state.stagedSaplingSubtreeRoots == nil || state.stagedOrchardSubtreeRoots == nil {
@@ -1014,9 +985,9 @@ func DarksideAddSubtreesForIndex(index int32, arg []DarksideSubtree, shieldedPro
 	var cache map[int32][]DarksideSubtree
 
 	switch shieldedProtocol {
-	case 0:
+	case walletrpc.ShieldedProtocol_sapling:
 		cache = state.stagedSaplingSubtreeRoots
-	case 1:
+	case walletrpc.ShieldedProtocol_orchard:
 		cache = state.stagedOrchardSubtreeRoots
 	}
 
@@ -1037,16 +1008,16 @@ func DarksideAddSubtreesForIndex(index int32, arg []DarksideSubtree, shieldedPro
 	return nil
 }
 
-func DarksideRemoveSubTree(index int32, shieldedProtocol int32) error {
+func DarksideRemoveSubTree(index int32, shieldedProtocol walletrpc.ShieldedProtocol) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 	if !state.resetted || state.stagedSaplingSubtreeRoots == nil || state.stagedOrchardSubtreeRoots == nil {
 		return errors.New("please call Reset first")
 	}
 	switch shieldedProtocol {
-	case 0:
+	case walletrpc.ShieldedProtocol_sapling:
 		delete(state.stagedSaplingSubtreeRoots, index)
-	case 1:
+	case walletrpc.ShieldedProtocol_orchard:
 		delete(state.stagedOrchardSubtreeRoots, index)
 	}
 	return nil
