@@ -715,6 +715,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			return nil, errors.New("failed to parse z_getsubtreesbyindex request")
 		}
 
+		var limit = subtreeRequest.MaxEntries
 		var cache map[int32][]DarksideSubtree
 
 		switch subtreeRequest.ShieldedProtocol {
@@ -724,7 +725,8 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			cache = state.stagedOrchardSubtreeRoots
 		}
 
-		var subtrees = cache[int32(subtreeRequest.StartIndex)]
+		// get the first :limit entries of the subtrees.
+		var subtrees = cache[int32(subtreeRequest.StartIndex)][:limit]
 
 		if subtrees == nil {
 			return nil, errors.New(fmt.Sprint(
