@@ -61,6 +61,10 @@ type darksideState struct {
 	// This is a one-entry cache performance cheat.
 	cacheBlockHash  string
 	cacheBlockIndex int
+
+	// Cache of artificial z_getsubtreebyindex subtree entries,
+	// indexed by protocol (currently, sapling (0) or orchard (1)).
+	subtrees map[walletrpc.ShieldedProtocol]darksideProtocolSubtreeRoots
 }
 
 var state darksideState
@@ -90,6 +94,16 @@ type DarksideTreeState struct {
 	Time        uint32
 	SaplingTree string
 	OrchardTree string
+}
+
+type darksideSubtree struct {
+	root      []byte
+	endHash   []byte
+	endHeight int
+}
+type darksideProtocolSubtreeRoots struct {
+	startIndex uint32
+	subtrees   []darksideSubtree
 }
 
 // DarksideEnabled is true if --darkside-very-insecure was given on
@@ -146,6 +160,7 @@ func DarksideReset(sa int, bi, cn string, sst, sot uint32) error {
 		stagedTransactions:     make([]stagedTx, 0),
 		stagedTreeStates:       make(map[uint64]*DarksideTreeState),
 		stagedTreeStatesByHash: make(map[string]*DarksideTreeState),
+		subtrees:               make(map[walletrpc.ShieldedProtocol]darksideProtocolSubtreeRoots),
 	}
 	state.cache.Reset(sa)
 	return nil
@@ -698,9 +713,42 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 
 		return json.Marshal(zcashdTreeState)
 
+	case "z_getsubtreesbyindex":
+		// This is implemented by DarksideGetSubtreeRoots().
+		return nil, errors.New("z_getsubtreesbyindex should never be called")
+
 	default:
 		return nil, errors.New("there was an attempt to call an unsupported RPC: " + method)
 	}
+}
+
+// Normally we would implement this functionality in the darksideRawRequest(), but this
+// gRPC handler requires calling GetBlock, and we don't have a good way to fake that.
+func DarksideGetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp walletrpc.CompactTxStreamer_GetSubtreeRootsServer) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	subtrees := state.subtrees[arg.ShieldedProtocol]
+	if arg.StartIndex < subtrees.startIndex {
+		return errors.New("startIndex too low")
+	}
+	sliceIndex := arg.StartIndex - subtrees.startIndex
+	var limit int = len(subtrees.subtrees) - int(sliceIndex)
+	if limit > int(arg.MaxEntries) {
+		limit = int(arg.MaxEntries)
+	}
+	for i := 0; i < limit; i++ {
+		s := subtrees.subtrees[int(sliceIndex)+i]
+		r := walletrpc.SubtreeRoot{
+			RootHash:              s.root,
+			CompletingBlockHash:   s.endHash,
+			CompletingBlockHeight: uint64(s.endHeight),
+		}
+		err := resp.Send(&r)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error) {
@@ -901,6 +949,26 @@ func DarksideRemoveTreeState(arg *walletrpc.BlockID) error {
 		treestate := state.stagedTreeStatesByHash[h]
 		delete(state.stagedTreeStatesByHash, treestate.Hash)
 		delete(state.stagedTreeStates, treestate.Height)
+	}
+	return nil
+}
+
+func DarksideSetSubtreeRoots(arg_subtrees *walletrpc.DarksideSubtreeRoots) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+	if !state.resetted {
+		return errors.New("please call Reset first")
+	}
+	state.subtrees[arg_subtrees.ShieldedProtocol] = darksideProtocolSubtreeRoots{
+		startIndex: arg_subtrees.StartIndex,
+		subtrees:   make([]darksideSubtree, len(arg_subtrees.SubtreeRoots)),
+	}
+	for i := 0; i < len(arg_subtrees.SubtreeRoots); i++ {
+		s := &state.subtrees[arg_subtrees.ShieldedProtocol].subtrees[i]
+		arg := arg_subtrees.SubtreeRoots[i]
+		s.root = arg.RootHash
+		s.endHeight = int(arg.CompletingBlockHeight)
+		s.endHash = arg.CompletingBlockHash
 	}
 	return nil
 }

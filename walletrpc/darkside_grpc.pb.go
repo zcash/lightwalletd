@@ -37,6 +37,7 @@ const (
 	DarksideStreamer_AddTreeState_FullMethodName              = "/cash.z.wallet.sdk.rpc.DarksideStreamer/AddTreeState"
 	DarksideStreamer_RemoveTreeState_FullMethodName           = "/cash.z.wallet.sdk.rpc.DarksideStreamer/RemoveTreeState"
 	DarksideStreamer_ClearAllTreeStates_FullMethodName        = "/cash.z.wallet.sdk.rpc.DarksideStreamer/ClearAllTreeStates"
+	DarksideStreamer_SetSubtreeRoots_FullMethodName           = "/cash.z.wallet.sdk.rpc.DarksideStreamer/SetSubtreeRoots"
 )
 
 // DarksideStreamerClient is the client API for DarksideStreamer service.
@@ -112,6 +113,9 @@ type DarksideStreamerClient interface {
 	RemoveTreeState(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*Empty, error)
 	// Clear the list of GetTreeStates entries (can't fail)
 	ClearAllTreeStates(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*Empty, error)
+	// Sets the subtree roots cache (for GetSubtreeRoots),
+	// replacing any existing entries
+	SetSubtreeRoots(ctx context.Context, in *DarksideSubtreeRoots, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type darksideStreamerClient struct {
@@ -321,6 +325,15 @@ func (c *darksideStreamerClient) ClearAllTreeStates(ctx context.Context, in *Emp
 	return out, nil
 }
 
+func (c *darksideStreamerClient) SetSubtreeRoots(ctx context.Context, in *DarksideSubtreeRoots, opts ...grpc.CallOption) (*Empty, error) {
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, DarksideStreamer_SetSubtreeRoots_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DarksideStreamerServer is the server API for DarksideStreamer service.
 // All implementations must embed UnimplementedDarksideStreamerServer
 // for forward compatibility
@@ -394,6 +407,9 @@ type DarksideStreamerServer interface {
 	RemoveTreeState(context.Context, *BlockID) (*Empty, error)
 	// Clear the list of GetTreeStates entries (can't fail)
 	ClearAllTreeStates(context.Context, *Empty) (*Empty, error)
+	// Sets the subtree roots cache (for GetSubtreeRoots),
+	// replacing any existing entries
+	SetSubtreeRoots(context.Context, *DarksideSubtreeRoots) (*Empty, error)
 	mustEmbedUnimplementedDarksideStreamerServer()
 }
 
@@ -442,6 +458,9 @@ func (UnimplementedDarksideStreamerServer) RemoveTreeState(context.Context, *Blo
 }
 func (UnimplementedDarksideStreamerServer) ClearAllTreeStates(context.Context, *Empty) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ClearAllTreeStates not implemented")
+}
+func (UnimplementedDarksideStreamerServer) SetSubtreeRoots(context.Context, *DarksideSubtreeRoots) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetSubtreeRoots not implemented")
 }
 func (UnimplementedDarksideStreamerServer) mustEmbedUnimplementedDarksideStreamerServer() {}
 
@@ -727,6 +746,24 @@ func _DarksideStreamer_ClearAllTreeStates_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DarksideStreamer_SetSubtreeRoots_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DarksideSubtreeRoots)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DarksideStreamerServer).SetSubtreeRoots(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DarksideStreamer_SetSubtreeRoots_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DarksideStreamerServer).SetSubtreeRoots(ctx, req.(*DarksideSubtreeRoots))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DarksideStreamer_ServiceDesc is the grpc.ServiceDesc for DarksideStreamer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -777,6 +814,10 @@ var DarksideStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ClearAllTreeStates",
 			Handler:    _DarksideStreamer_ClearAllTreeStates_Handler,
+		},
+		{
+			MethodName: "SetSubtreeRoots",
+			Handler:    _DarksideStreamer_SetSubtreeRoots_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -164,11 +164,46 @@ type (
 	}
 
 	// reply to z_getsubtreesbyindex
+	//
+	// Each shielded transaction output of a particular shielded pool
+	// type (Saping or Orchard) can be considered to have an index,
+	// beginning with zero at the start of the chain (genesis block,
+	// although there were no Sapling or Orchard transactions until
+	// later). Each group of 2^16 (65536) of these is called a subtree.
+	//
+	// This data structure indicates the merkle root hash, and the
+	// block height that the last output of this group falls on.
+	// For example, Sapling output number 65535, which is the last
+	// output in the first subtree, occurred somewhere within block
+	// 558822. This height is returned by z_getsubtreesbyindex 0 1
+	// (a request to return the subtree of the first group, and only
+	// return one entry rather than all entries to the tip of the chain).
+	//
+	// Here is that example, except return (up to) 2 entries:
+	//
+	// $ zcash-cli z_getsubtreesbyindex sapling 0 2
+	// {
+	//  "pool": "sapling",
+	//  "start_index": 0,
+	//  "subtrees": [
+	//    {
+	//      "root": "754bb593ea42d231a7ddf367640f09bbf59dc00f2c1d2003cc340e0c016b5b13",
+	//      "end_height": 558822
+	//    },
+	//    {
+	//      "root": "03654c3eacbb9b93e122cf6d77b606eae29610f4f38a477985368197fd68e02d",
+	//      "end_height": 670209
+	//    }
+	//   ]
+	// }
+	//
+	Subtree struct {
+		Root       string
+		End_height int
+	}
+
 	ZcashdRpcReplyGetsubtreebyindex struct {
-		Subtrees []struct {
-			Root       string
-			End_height int
-		}
+		Subtrees []Subtree
 	}
 )
 
