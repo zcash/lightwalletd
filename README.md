@@ -20,7 +20,7 @@ limitations of light wallets that use lightwalletd.
 
 [lightwalletd](https://github.com/zcash/lightwalletd) is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain. Currently, lightwalletd supports the Sapling protocol version and beyond as its primary concern. The intended purpose of lightwalletd is to support the development and operation of mobile-friendly shielded light wallets.
 
-lightwalletd is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain for mobile and other wallets, such as [Zecwallet](https://github.com/adityapk00/zecwallet-lite-lib).
+lightwalletd is a backend service that provides a bandwidth-efficient interface to the Zcash blockchain for mobile and other wallets, such as [Zashi](https://github.com/Electric-Coin-Company/zashi-android) and [Ywallet](https://github.com/hhanh00/zwallet).
 
 To view status of [CI pipeline](https://gitlab.com/zcash/lightwalletd/pipelines)
 
