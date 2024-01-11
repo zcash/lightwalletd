@@ -677,15 +677,20 @@ func (s *lwdStreamer) GetAddressUtxos(ctx context.Context, arg *walletrpc.GetAdd
 }
 
 func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp walletrpc.CompactTxStreamer_GetSubtreeRootsServer) error {
+	if common.DarksideEnabled {
+		return common.DarksideGetSubtreeRoots(arg, resp)
+	}
 	switch arg.ShieldedProtocol {
 	case walletrpc.ShieldedProtocol_sapling:
-		break
 	case walletrpc.ShieldedProtocol_orchard:
 		break
 	default:
 		return errors.New("unrecognized shielded protocol")
 	}
 	protocol, err := json.Marshal(arg.ShieldedProtocol.String())
+	if err != nil {
+		return errors.New("bad shielded protocol specifier")
+	}
 	startIndexJSON, err := json.Marshal(arg.StartIndex)
 	if err != nil {
 		return errors.New("bad startIndex")
@@ -916,6 +921,12 @@ func (s *DarksideStreamer) RemoveTreeState(ctx context.Context, arg *walletrpc.B
 // Clears all the TreeStates present in the cache.
 func (s *DarksideStreamer) ClearAllTreeStates(ctx context.Context, arg *walletrpc.Empty) (*walletrpc.Empty, error) {
 	err := common.DarksideClearAllTreeStates()
+
+	return &walletrpc.Empty{}, err
+}
+
+func (s *DarksideStreamer) SetSubtreeRoots(ctx context.Context, arg *walletrpc.DarksideSubtreeRoots) (*walletrpc.Empty, error) {
+	err := common.DarksideSetSubtreeRoots(arg)
 
 	return &walletrpc.Empty{}, err
 }

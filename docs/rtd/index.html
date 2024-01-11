@@ -234,6 +234,10 @@
                 </li>
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.DarksideSubtreeRoots"><span class="badge">M</span>DarksideSubtreeRoots</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL"><span class="badge">M</span>DarksideTransactionsURL</a>
                 </li>
               
@@ -816,6 +820,44 @@ If there are no transparent inputs, the fee will be calculable as:
 
         
       
+        <h3 id="cash.z.wallet.sdk.rpc.DarksideSubtreeRoots">DarksideSubtreeRoots</h3>
+        <p></p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>shieldedProtocol</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.ShieldedProtocol">ShieldedProtocol</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>startIndex</td>
+                  <td><a href="#uint32">uint32</a></td>
+                  <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>subtreeRoots</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.SubtreeRoot">SubtreeRoot</a></td>
+                  <td>repeated</td>
+                  <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
         <h3 id="cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</h3>
         <p>DarksideTransactionsURL refers to an HTTP source that contains a list</p><p>of hex-encoded transactions, one per line, that are to be associated</p><p>with the given height (fake-mined into the block at that height)</p>
 
@@ -998,6 +1040,14 @@ There is no staging or applying for these, very simple.</p></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
                 <td><p>Clear the list of GetTreeStates entries (can&#39;t fail)</p></td>
+              </tr>
+            
+              <tr>
+                <td>SetSubtreeRoots</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.DarksideSubtreeRoots">DarksideSubtreeRoots</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
+                <td><p>Sets the subtree roots cache (for GetSubtreeRoots),
+replacing any existing entries</p></td>
               </tr>
             
           </tbody>
@@ -1831,7 +1881,8 @@ There is no staging or applying for these, very simple.</p></td>
                 <td>GetTaddressTxids</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p>Return the txids corresponding to the given t-address within the given block range</p></td>
+                <td><p>Return the transactions corresponding to the given t-address within the given block range
+NB - this method is misnamed, it returns transactions, not transaction IDs.</p></td>
               </tr>
             
               <tr>

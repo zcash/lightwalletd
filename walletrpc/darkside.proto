@@ -45,6 +45,12 @@ message DarksideEmptyBlocks {
     int32 count = 3;
 }
 
+message DarksideSubtreeRoots {
+    ShieldedProtocol shieldedProtocol = 1;
+    uint32 startIndex = 2;
+    repeated SubtreeRoot subtreeRoots = 3;
+}
+
 // Darksidewalletd maintains two staging areas, blocks and transactions. The
 // Stage*() gRPCs add items to the staging area; ApplyStaged() "applies" everything
 // in the staging area to the working (operational) state that the mock zcashd
@@ -132,4 +138,8 @@ service DarksideStreamer {
 
     // Clear the list of GetTreeStates entries (can't fail)
     rpc ClearAllTreeStates(Empty) returns (Empty) {}
+
+    // Sets the subtree roots cache (for GetSubtreeRoots),
+    // replacing any existing entries
+    rpc SetSubtreeRoots(DarksideSubtreeRoots) returns (Empty) {}
 }
