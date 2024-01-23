@@ -7,11 +7,12 @@ package common
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
@@ -323,7 +324,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		if (strings.Split(rpcErr.Error(), ":"))[0] == "-8" {
 			return nil, nil
 		}
-		return nil, errors.Wrap(rpcErr, "error requesting verbose block")
+		return nil, fmt.Errorf("error requesting verbose block: %w", rpcErr)
 	}
 	var block1 ZcashRpcReplyGetblock1
 	err = json.Unmarshal(result, &block1)
@@ -340,24 +341,24 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
-		return nil, errors.Wrap(rpcErr, "error requesting block")
+		return nil, fmt.Errorf("error requesting block: %w", rpcErr)
 	}
 
 	var blockDataHex string
 	err = json.Unmarshal(result, &blockDataHex)
 	if err != nil {
-		return nil, errors.Wrap(err, "error reading JSON response")
+		return nil, fmt.Errorf("error reading JSON response: %w", err)
 	}
 
 	blockData, err := hex.DecodeString(blockDataHex)
 	if err != nil {
-		return nil, errors.Wrap(err, "error decoding getblock output")
+		return nil, fmt.Errorf("error decoding getblock output: %w", err)
 	}
 
 	block := parser.NewBlock()
 	rest, err := block.ParseFromSlice(blockData)
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing block")
+		return nil, fmt.Errorf("error parsing block: %w", err)
 	}
 	if len(rest) != 0 {
 		return nil, errors.New("received overlong message")
@@ -368,7 +369,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	for i, t := range block.Transactions() {
 		txid, err := hex.DecodeString(block1.Tx[i])
 		if err != nil {
-			return nil, errors.Wrap(err, "error decoding getblock txid")
+			return nil, fmt.Errorf("error decoding getblock txid: %w", err)
 		}
 		// convert from big-endian
 		t.SetTxID(parser.Reverse(txid))

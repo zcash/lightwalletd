@@ -10,7 +10,6 @@ import (
 	"encoding/binary"
 	"hash/fnv"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -209,7 +208,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	if err != nil {
 		Log.Fatal("open ", c.lengthsName, " failed: ", err)
 	}
-	lengths, err := ioutil.ReadFile(c.lengthsName)
+	lengths, err := os.ReadFile(c.lengthsName)
 	if err != nil {
 		Log.Fatal("read ", c.lengthsName, " failed: ", err)
 	}
