@@ -8,10 +8,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	protobuf "github.com/golang/protobuf/proto"
 )
@@ -26,7 +24,7 @@ func TestCompactBlocks(t *testing.T) {
 	}
 	var compactTests []compactTest
 
-	blockJSON, err := ioutil.ReadFile("../testdata/compact_blocks.json")
+	blockJSON, err := os.ReadFile("../testdata/compact_blocks.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +39,7 @@ func TestCompactBlocks(t *testing.T) {
 		block := NewBlock()
 		blockData, err = block.ParseFromSlice(blockData)
 		if err != nil {
-			t.Error(errors.Wrap(err, fmt.Sprintf("parsing testnet block %d", test.BlockHeight)))
+			t.Error(fmt.Errorf("error parsing testnet block %d: %w", test.BlockHeight, err))
 			continue
 		}
 		if len(blockData) > 0 {

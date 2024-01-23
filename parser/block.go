@@ -7,8 +7,8 @@ package parser
 
 import (
 	"fmt"
+    "errors"
 
-	"github.com/pkg/errors"
 	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -134,7 +134,7 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	hdr := NewBlockHeader()
 	data, err = hdr.ParseFromSlice(data)
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing block header")
+		return nil, fmt.Errorf("parsing block header: %w", err)
 	}
 
 	s := bytestring.String(data)
@@ -150,7 +150,7 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 		tx := NewTransaction()
 		data, err = tx.ParseFromSlice(data)
 		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("parsing transaction %d", i))
+			return nil, fmt.Errorf("error parsing transaction %d: %w", i, err)
 		}
 		vtx = append(vtx, tx)
 	}

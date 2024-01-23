@@ -5,10 +5,11 @@
 package frontend
 
 import (
+	"errors"
+	"fmt"
 	"net"
 
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/pkg/errors"
 	"github.com/zcash/lightwalletd/common"
 	ini "gopkg.in/ini.v1"
 )
@@ -40,7 +41,7 @@ func NewZRPCFromFlags(opts *common.Options) (*rpcclient.Client, error) {
 func connFromConf(confPath interface{}) (*rpcclient.ConnConfig, error) {
 	cfg, err := ini.Load(confPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read config file")
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	rpcaddr := cfg.Section("").Key("rpcbind").String()

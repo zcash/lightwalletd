@@ -6,9 +6,9 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -105,7 +105,7 @@ func (tx *Transaction) ParseTransparent(data []byte) ([]byte, error) {
 		ti := &tx.transparentInputs[i]
 		s, err = ti.ParseFromSlice([]byte(s))
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing transparent input")
+			return nil, fmt.Errorf("error parsing transparent input: %w", err)
 		}
 	}
 
@@ -118,7 +118,7 @@ func (tx *Transaction) ParseTransparent(data []byte) ([]byte, error) {
 		to := &tx.transparentOutputs[i]
 		s, err = to.ParseFromSlice([]byte(s))
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing transparent output")
+			return nil, fmt.Errorf("error parsing transparent output: %w", err)
 		}
 	}
 	return []byte(s), nil
@@ -433,7 +433,7 @@ func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
 		newSpend := &tx.shieldedSpends[i]
 		s, err = newSpend.ParseFromSlice([]byte(s), 4)
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing shielded Spend")
+			return nil, fmt.Errorf("error parsing shielded Spend: %w", err)
 		}
 	}
 	if !s.ReadCompactSize(&outputCount) {
@@ -444,7 +444,7 @@ func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
 		newOutput := &tx.shieldedOutputs[i]
 		s, err = newOutput.ParseFromSlice([]byte(s), 4)
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing shielded Output")
+			return nil, fmt.Errorf("error parsing shielded Output: %w", err)
 		}
 	}
 	var joinSplitCount int
@@ -458,7 +458,7 @@ func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
 			js := &tx.joinSplits[i]
 			s, err = js.ParseFromSlice([]byte(s))
 			if err != nil {
-				return nil, errors.Wrap(err, "while parsing JoinSplit")
+				return nil, fmt.Errorf("error parsing JoinSplit: %w", err)
 			}
 		}
 
@@ -509,7 +509,7 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		newSpend := &tx.shieldedSpends[i]
 		s, err = newSpend.ParseFromSlice([]byte(s), tx.version)
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing shielded Spend")
+			return nil, fmt.Errorf("error parsing shielded Spend: %w", err)
 		}
 	}
 	if !s.ReadCompactSize(&outputCount) {
@@ -523,7 +523,7 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		newOutput := &tx.shieldedOutputs[i]
 		s, err = newOutput.ParseFromSlice([]byte(s), tx.version)
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing shielded Output")
+			return nil, fmt.Errorf("error parsing shielded Output: %w", err)
 		}
 	}
 	if spendCount+outputCount > 0 && !s.Skip(8) {
@@ -556,7 +556,7 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		a := &tx.orchardActions[i]
 		s, err = a.ParseFromSlice([]byte(s))
 		if err != nil {
-			return nil, errors.Wrap(err, "while parsing orchard action")
+			return nil, fmt.Errorf("error parsing orchard action: %w", err)
 		}
 	}
 	if actionsCount > 0 {

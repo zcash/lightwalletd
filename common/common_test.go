@@ -7,14 +7,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -117,7 +116,7 @@ func TestGetLightdInfo(t *testing.T) {
 	FirstRPC()
 
 	// Ensure the retry happened as expected
-	logFile, err := ioutil.ReadFile("test-log")
+	logFile, err := os.ReadFile("test-log")
 	if err != nil {
 		t.Fatal("Cannot read test-log", err)
 	}

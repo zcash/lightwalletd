@@ -6,7 +6,6 @@ package common
 import (
 	"encoding/hex"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -32,7 +31,7 @@ func TestCache(t *testing.T) {
 	}
 	var compactTests []compactTest
 
-	blockJSON, err := ioutil.ReadFile("../testdata/compact_blocks.json")
+	blockJSON, err := os.ReadFile("../testdata/compact_blocks.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,9 +9,9 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"errors"
 	"math/big"
 
-	"github.com/pkg/errors"
 	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 )
 
