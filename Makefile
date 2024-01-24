@@ -29,7 +29,7 @@ LDFLAGS :=-ldflags "$(LDFLAGSSTRING)"
 
 # There are some files that are generated but are also in source control
 # (so that the average clone - build doesn't need the required tools)
-GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go walletrpc/darkside.proto
+GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go walletrpc/darkside.pb.go
 
 PWD := $(shell pwd)
 
@@ -145,13 +145,12 @@ install:
 
 # Update your protoc, protobufs, grpc, .pb.go files
 update-grpc:
-	go get -u github.com/golang/protobuf/proto
-	go get -u github.com/golang/protobuf/protoc-gen-go
+	go get -u google.golang.org/protobuf
 	go get -u google.golang.org/grpc
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative darkside.proto
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative compact_formats.proto
-	go mod tidy && go mod vendor
+	go mod tidy
 
 clean:
 	@echo "clean project..."
