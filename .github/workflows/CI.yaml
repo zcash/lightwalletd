@@ -24,6 +24,10 @@ jobs:
           go-version: ${{ matrix.go-version }}
         id: go
 
+      - name: Install golint
+        run: |
+          go get -u golang.org/x/lint/golint
+          
       - name: Lint check
         run: make lint
 
