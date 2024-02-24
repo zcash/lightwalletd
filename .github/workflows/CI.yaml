@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go-version: [1.11, latest]
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+        id: go
+
+      - name: Lint check
+        run: make lint
+
+      - name: Build ${{ matrix.go-version }}
+        run: |
+          make
+          make test
+
+      - name: Race conditions test
+        run: make race
+        continue-on-error: true
+
+      - name: Test coverage
+        run: |
+          make coverage
+          make coverage_report
+          make coverage_html
+        continue-on-error: true
+
+      - name: Deploy Docker
+        run: echo "TODO"
