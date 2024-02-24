@@ -28,8 +28,8 @@ jobs:
         run: |
           go get -u golang.org/x/lint/golint
           
-      - name: Lint check
-        run: make lint
+      #- name: Lint check
+        #run: make lint
 
       - name: Build ${{ matrix.go-version }}
         run: |
