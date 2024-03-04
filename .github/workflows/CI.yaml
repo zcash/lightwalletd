@@ -49,11 +49,12 @@ jobs:
           make coverage_html
 
   docker_set_env:
+    needs: [build]
     uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
 
   docker_build_push:
     uses: zcash/.github/.github/workflows/build-and-push-docker-hub.yaml@main
-    needs: docker_set_env
+    needs: [build, docker_set_env]
     with:
       image_name: ${{ github.event.repository.name }}
       image_tags: ${{ needs.set_env.outputs.tags }}
