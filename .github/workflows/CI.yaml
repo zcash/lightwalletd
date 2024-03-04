@@ -4,7 +4,10 @@ on:
   push:
     branches:
       - master
+    tags:
+      - "v*.*.*"
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -38,14 +41,24 @@ jobs:
 
       - name: Race conditions test
         run: make race
-        continue-on-error: true
 
       - name: Test coverage
         run: |
           make coverage
           make coverage_report
           make coverage_html
-        continue-on-error: true
 
-      - name: Deploy Docker
-        run: echo "TODO"
+  docker_set_env:
+    uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
+
+  docker_build_push:
+    uses: zcash/.github/.github/workflows/build-and-push-docker-gcp.yaml@main
+    needs: docker_set_env
+    with:
+      image_name: ${{ github.event.repository.name }}
+      image_tags: ${{ needs.set_env.outputs.tags }}
+      dockerfile: ./Dockerfile
+      context: .
+    secrets:
+      project_id: ${{ secrets.GCP_PROJECT_ID_PROD }}
+      credentials_json: ${{ secrets.GCP_SA_KEY }}
