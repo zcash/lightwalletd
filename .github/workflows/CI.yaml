@@ -52,7 +52,7 @@ jobs:
     uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
 
   docker_build_push:
-    uses: zcash/.github/.github/workflows/build-and-push-docker-gcp.yaml@main
+    uses: zcash/.github/.github/workflows/build-and-push-docker-hub.yaml@main
     needs: docker_set_env
     with:
       image_name: ${{ github.event.repository.name }}
@@ -60,5 +60,6 @@ jobs:
       dockerfile: ./Dockerfile
       context: .
     secrets:
-      project_id: ${{ secrets.GCP_PROJECT_ID_PROD }}
-      credentials_json: ${{ secrets.GCP_SA_KEY }}
+      dockerhub_registry: ${{ secrets.DOCKERHUB_REGISTRY }}
+      dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub_password: ${{ secrets.DOCKERHUB_PASSWORD }}
