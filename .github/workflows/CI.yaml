@@ -57,7 +57,7 @@ jobs:
     needs: [build, docker_set_env]
     with:
       image_name: ${{ github.event.repository.name }}
-      image_tags: ${{ needs.set_env.outputs.tags }}
+      image_tags: ${{ needs.docker_set_env.outputs.tags }}
       dockerfile: ./Dockerfile
       context: .
     secrets:
