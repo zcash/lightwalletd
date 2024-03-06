@@ -42,12 +42,6 @@ jobs:
       - name: Race conditions test
         run: make race
 
-      - name: Test coverage
-        run: |
-          make coverage
-          make coverage_report
-          make coverage_html
-
   docker_set_env:
     needs: [build]
     uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
