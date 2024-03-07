@@ -40,13 +40,13 @@ jobs:
 
   docker_set_env:
     needs: [build]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'release'
     uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
 
   docker_build_push:
     uses: zcash/.github/.github/workflows/build-and-push-docker-hub.yaml@main
     needs: [build, docker_set_env]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'release'
     with:
       image_name: ${{ github.event.repository.name }}
       image_tags: ${{ needs.docker_set_env.outputs.tags }}
