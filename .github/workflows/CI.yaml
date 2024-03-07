@@ -2,10 +2,10 @@ name: CI
 
 on:
   push:
-    branches:
-      - master
     tags:
       - "v*.*.*"
+  release:
+    types: [published]
   pull_request:
   workflow_dispatch:
 
