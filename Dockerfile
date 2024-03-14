@@ -1,35 +1,3 @@
-# /************************************************************************
- #  File: Dockerfile
- #  Author: gustavovalverde
- #  Date: 26/02/2023
- #  Description:  Used for devs that have not built zcashd or lightwalletd on
- #                on existing system
- #  USAGE:
- #
- #  To build image: docker build --target runner  --tag zcash_lwd_base .
- #  To run container: docker run --detach -it -p 9067:9067 -p 9068:9068 zcash_lwd_base
- #
- #  Once the block height is at least 280,000 you can go ahead and start lightwalletd
- #  make docker_img_run_lightwalletd_insecure_server
- #
- #  If you need a random bash session in the container, use:
- #  docker exec -it zcashdlwd bash
- #
- #  If you get kicked out of docker or it locks up...
- #  To restart, check to see what container you want to restart via docker ps -a
- #  Then, docker restart <container id>
- #  The reattach to it, docker attach <container id>
- #
- #  Known bugs/missing features/todos:
- #
- #  *** DO NOT USE IN PRODUCTION ***
- #
- #  - Create docker-compose with according .env scaffolding
- #  - Determine librustzcash bug that breaks zcashd alpine builds at runtime
- #  - Once versioning is stable add config flags for images
- #  - Add mainnet config once lightwalletd stack supports it
- #
- # ************************************************************************/
 ARG APP_HOME=/srv/lightwalletd
 ARG ZCASHD_CONF_PATH=$APP_HOME/zcash.conf
 ARG LWD_GRPC_PORT=9067
