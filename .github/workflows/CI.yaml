@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  release:
+    types: [published]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go-version: ['>=1.22.0']
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+        id: go
+
+      - name: Build ${{ matrix.go-version }}
+        run: |
+          make
+          make test
+
+      - name: Race conditions test
+        run: make race
+
+      - name: test Build Docker image
+        run: docker build .
+
+  docker_set_env:
+    needs: [build]
+    if: github.event_name == 'release'
+    uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
+
+  docker_build_push:
+    uses: zcash/.github/.github/workflows/build-and-push-docker-hub.yaml@main
+    needs: [build, docker_set_env]
+    if: github.event_name == 'release'
+    with:
+      image_name: ${{ github.event.repository.name }}
+      image_tags: ${{ needs.docker_set_env.outputs.tags }}
+      dockerfile: ./Dockerfile
+      context: .
+    secrets:
+      dockerhub_registry: ${{ secrets.DOCKERHUB_REGISTRY }}
+      dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+      dockerhub_password: ${{ secrets.DOCKERHUB_PASSWORD }}

@@ -39,7 +39,7 @@ ARG LWD_HTTP_PORT=9068
 ## Builder
 ##
 # Create layer in case you want to modify local lightwalletd code
-FROM golang:1.19 AS build
+FROM golang:1.22 AS build
 
 # Create and change to the app directory.
 WORKDIR /app
