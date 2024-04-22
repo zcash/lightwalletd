@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        go-version: ['>=1.22.0']
+        go-version: ['>=1.22.2']
 
     steps:
       - name: Check out code
