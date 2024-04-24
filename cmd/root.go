@@ -119,13 +119,13 @@ func startServer(opts *common.Options) error {
 
 	logger.SetLevel(logrus.Level(opts.LogLevel))
 
+	logging.LogToStderr = opts.GRPCLogging
+
 	common.Log.WithFields(logrus.Fields{
 		"gitCommit": common.GitCommit,
 		"buildDate": common.BuildDate,
 		"buildUser": common.BuildUser,
-	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
-
-	logging.LogToStderr = opts.GRPCLogging
+	}).Infof("Starting lightwalletd process version %s", common.Version)
 
 	// gRPC initialization
 	var server *grpc.Server
@@ -281,6 +281,8 @@ func startServer(opts *common.Options) error {
 		}
 		walletrpc.RegisterDarksideStreamerServer(server, service)
 	}
+
+	common.Log.Infof("Starting gRPC server on %s", opts.GRPCBindAddr)
 
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
