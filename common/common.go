@@ -43,6 +43,7 @@ type Options struct {
 	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`
+	NoCache             bool   `json:"nocache"`
 	SyncFromHeight      int    `json:"sync_from_height"`
 	DataDir             string `json:"data_dir"`
 	PingEnable          bool   `json:"ping_enable"`
@@ -476,9 +477,12 @@ func BlockIngestor(c *BlockCache, rep int) {
 // nil if no block exists at this height.
 func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	// First, check the cache to see if we have the block
-	block := cache.Get(height)
-	if block != nil {
-		return block, nil
+	var block *walletrpc.CompactBlock
+	if cache != nil {
+		block := cache.Get(height)
+		if block != nil {
+			return block, nil
+		}
 	}
 
 	// Not in the cache

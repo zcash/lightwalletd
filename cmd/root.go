@@ -55,6 +55,7 @@ var rootCmd = &cobra.Command{
 			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
 			DataDir:             viper.GetString("data-dir"),
 			Redownload:          viper.GetBool("redownload"),
+			NoCache:             viper.GetBool("nocache"),
 			SyncFromHeight:      viper.GetInt("sync-from-height"),
 			PingEnable:          viper.GetBool("ping-very-insecure"),
 			Darkside:            viper.GetBool("darkside-very-insecure"),
@@ -240,13 +241,22 @@ func startServer(opts *common.Options) error {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create db directory: %s\n\n", dbPath))
 		os.Exit(1)
 	}
-	syncFromHeight := opts.SyncFromHeight
-	if opts.Redownload {
-		syncFromHeight = 0
+	var cache *common.BlockCache
+	if opts.NoCache {
+		lengthsName, blocksName := common.DbFileNames(dbPath, chainName)
+		os.Remove(lengthsName)
+		os.Remove(blocksName)
+	} else {
+		syncFromHeight := opts.SyncFromHeight
+		if opts.Redownload {
+			syncFromHeight = 0
+		}
+		cache = common.NewBlockCache(dbPath, chainName, saplingHeight, syncFromHeight)
 	}
-	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, syncFromHeight)
 	if !opts.Darkside {
-		go common.BlockIngestor(cache, 0 /*loop forever*/)
+		if !opts.NoCache {
+			go common.BlockIngestor(cache, 0 /*loop forever*/)
+		}
 	} else {
 		// Darkside wants to control starting the block ingestor.
 		common.DarksideInit(cache, int(opts.DarksideTimeout))
@@ -330,6 +340,7 @@ func init() {
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
+	rootCmd.Flags().Bool("nocache", false, "don't maintain a compact blocks disk cache (to reduce storage)")
 	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zcashd start at this height")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
@@ -362,6 +373,8 @@ func init() {
 	viper.SetDefault("gen-cert-very-insecure", false)
 	viper.BindPFlag("redownload", rootCmd.Flags().Lookup("redownload"))
 	viper.SetDefault("redownload", false)
+	viper.BindPFlag("nocache", rootCmd.Flags().Lookup("nocache"))
+	viper.SetDefault("nocache", false)
 	viper.BindPFlag("sync-from-height", rootCmd.Flags().Lookup("sync-from-height"))
 	viper.SetDefault("sync-from-height", -1)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))

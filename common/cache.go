@@ -195,7 +195,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	c := &BlockCache{}
 	c.firstBlock = startHeight
 	c.nextBlock = startHeight
-	c.lengthsName, c.blocksName = dbFileNames(dbPath, chainName)
+	c.lengthsName, c.blocksName = DbFileNames(dbPath, chainName)
 	var err error
 	if err := os.MkdirAll(filepath.Join(dbPath, chainName), 0755); err != nil {
 		Log.Fatal("mkdir ", dbPath, " failed: ", err)
@@ -250,7 +250,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	return c
 }
 
-func dbFileNames(dbPath string, chainName string) (string, string) {
+func DbFileNames(dbPath string, chainName string) (string, string) {
 	return filepath.Join(dbPath, chainName, "lengths"),
 		filepath.Join(dbPath, chainName, "blocks")
 }
