@@ -243,13 +243,6 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 		}
 		offset += int64(length) + 8
 		c.starts = append(c.starts, offset)
-		// Check for corruption.
-		block := c.readBlock(c.nextBlock)
-		if block == nil {
-			Log.Warning("error reading block")
-			c.recoverFromCorruption(c.nextBlock)
-			break
-		}
 		c.nextBlock++
 	}
 	c.setDbFiles(c.nextBlock)
