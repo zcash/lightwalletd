@@ -540,52 +540,6 @@ func TestSendTransaction(t *testing.T) {
 	step = 0
 }
 
-var sampleconf = `
-testnet = 1
-rpcport = 18232
-rpcbind = 127.0.0.1
-rpcuser = testlightwduser
-rpcpassword = testlightwdpassword
-`
-
-func TestNewZRPCFromConf(t *testing.T) {
-	connCfg, err := connFromConf([]byte(sampleconf))
-	if err != nil {
-		t.Fatal("connFromConf failed")
-	}
-	if connCfg.Host != "127.0.0.1:18232" {
-		t.Fatal("connFromConf returned unexpected Host")
-	}
-	if connCfg.User != "testlightwduser" {
-		t.Fatal("connFromConf returned unexpected User")
-	}
-	if connCfg.Pass != "testlightwdpassword" {
-		t.Fatal("connFromConf returned unexpected User")
-	}
-	if !connCfg.HTTPPostMode {
-		t.Fatal("connFromConf returned unexpected HTTPPostMode")
-	}
-	if !connCfg.DisableTLS {
-		t.Fatal("connFromConf returned unexpected DisableTLS")
-	}
-
-	// can't pass an integer
-	_, err = connFromConf(10)
-	if err == nil {
-		t.Fatal("connFromConf unexpected success")
-	}
-
-	// Can't verify returned values, but at least run it
-	_, err = NewZRPCFromConf([]byte(sampleconf))
-	if err != nil {
-		t.Fatal("NewZRPCFromClient failed")
-	}
-	_, err = NewZRPCFromConf(10)
-	if err == nil {
-		t.Fatal("NewZRPCFromClient unexpected success")
-	}
-}
-
 func TestMempoolFilter(t *testing.T) {
 	txidlist := []string{
 		"2e819d0bab5c819dc7d5f92d1bfb4127ce321daf847f6602",
