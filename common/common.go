@@ -48,6 +48,7 @@ type Options struct {
 	PingEnable          bool   `json:"ping_enable"`
 	Darkside            bool   `json:"darkside"`
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
+	ProxyExchangeApis   bool   `json:"proxy_exchange_apis,omitempty"`
 }
 
 // RawRequest points to the function to send a an RPC request to zcashd;

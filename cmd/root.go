@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -14,10 +16,14 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/openconfig/grpctunnel/bidi"
+	tpb "github.com/openconfig/grpctunnel/proto/tunnel"
+	"github.com/openconfig/grpctunnel/tunnel"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
@@ -59,6 +65,7 @@ var rootCmd = &cobra.Command{
 			PingEnable:          viper.GetBool("ping-very-insecure"),
 			Darkside:            viper.GetBool("darkside-very-insecure"),
 			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
+			ProxyExchangeApis:   viper.GetBool("proxy-exchange-apis"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -176,6 +183,10 @@ func startServer(opts *common.Options) error {
 	// Enable reflection for debugging
 	if opts.LogLevel >= uint64(logrus.WarnLevel) {
 		reflection.Register(server)
+	}
+
+	if opts.ProxyExchangeApis {
+		proxyExchangeApis(server)
 	}
 
 	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
@@ -335,6 +346,7 @@ func init() {
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
+	rootCmd.Flags().Bool("proxy-exchange-apis", false, "allow light clients to query exchange APIs using lightwalletd's IP address")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
@@ -372,6 +384,8 @@ func init() {
 	viper.SetDefault("darkside-very-insecure", false)
 	viper.BindPFlag("darkside-timeout", rootCmd.Flags().Lookup("darkside-timeout"))
 	viper.SetDefault("darkside-timeout", 30)
+	viper.BindPFlag("proxy-exchange-apis", rootCmd.Flags().Lookup("proxy-exchange-apis"))
+	viper.SetDefault("proxy-exchange-apis", false)
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,
@@ -422,4 +436,92 @@ func initConfig() {
 func startHTTPServer(opts *common.Options) {
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(opts.HTTPBindAddr, nil)
+}
+
+func proxyExchangeApis(server *grpc.Server) {
+	common.Log.Info("Proxying exchange APIs to light clients")
+
+	addTargetHandler := func(t tunnel.Target) error {
+		common.Log.WithFields(logrus.Fields{"target": t}).Warn("client attempted to register target")
+		return fmt.Errorf("client targets are not permitted")
+	}
+
+	// Allowlist of APIs that light clients are permitted to connect to.
+	// We have one target per API, because the light client needs to know the domain name
+	// to use for their TLS connection.
+	apis := make(map[tunnel.Target]string)
+	apis[tunnel.Target{ID: "binanceApi", Type: "HTTPS"}] = "api.binance.com:443"
+	apis[tunnel.Target{ID: "coinbaseApi", Type: "HTTPS"}] = "api.exchange.coinbase.com:443"
+	apis[tunnel.Target{ID: "geminiApi", Type: "HTTPS"}] = "api.gemini.com:443"
+
+	registerHandler := func(ss tunnel.ServerSession) error {
+		common.Log.WithFields(logrus.Fields{"addr": ss.Addr, "target": ss.Target}).Info("session requested")
+		for target := range apis {
+			if ss.Target.ID == target.ID {
+				return nil
+			}
+		}
+		return fmt.Errorf("target not allowed: %s", ss.Target.ID)
+	}
+
+	// Handler for a proxy connection.
+	sessionHandler := func(ss tunnel.ServerSession, rwc io.ReadWriteCloser) error {
+		common.Log.WithFields(logrus.Fields{"addr": ss.Addr, "target": ss.Target}).Info("new session")
+
+		var dialAddr string
+		for target, addr := range apis {
+			if ss.Target.ID == target.ID && ss.Target.Type == target.Type {
+				dialAddr = addr
+				break
+			}
+		}
+		if len(dialAddr) == 0 {
+			return fmt.Errorf("no matching dial port found for target: %s|%s", ss.Target.ID, ss.Target.Type)
+		}
+
+		// TODO: Enforce per-client (`ss.Addr`) rate limit.
+
+		conn, err := net.Dial("tcp", dialAddr)
+		if err != nil {
+			return fmt.Errorf("failed to dial %s: %v", dialAddr, err)
+		}
+
+		// Proxy traffic between the gRPC connection and the TCP connection.
+		if err = bidi.Copy(rwc, conn); err != nil {
+			common.Log.WithFields(logrus.Fields{"error": err}).Info("error while proxying")
+		}
+
+		common.Log.WithFields(logrus.Fields{"addr": ss.Addr, "target": ss.Target}).Info("session ended")
+		return nil
+	}
+
+	var err error
+	ts, err := tunnel.NewServer(tunnel.ServerConfig{
+		AddTargetHandler: addTargetHandler,
+		RegisterHandler:  registerHandler,
+		Handler:          sessionHandler,
+		LocalTargets:     maps.Keys(apis),
+	})
+	if err != nil {
+		common.Log.WithFields(logrus.Fields{
+			"error": err,
+		}).Fatal("failed to create new gRPC tunnel server")
+	}
+	tpb.RegisterTunnelServer(server, ts)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	errChTS := ts.ErrorChan()
+	go func() {
+		for {
+			select {
+			case err := <-errChTS:
+				common.Log.WithFields(logrus.Fields{
+					"error": err,
+				}).Errorf("gRPC tunnel server error")
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 }
