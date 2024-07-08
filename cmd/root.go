@@ -198,7 +198,7 @@ func startServer(opts *common.Options) error {
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("setting up RPC connection to zcashd")
+			}).Fatal("setting up RPC connection to zebrad or zcashd")
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
 		common.RawRequest = rpcClient.RawRequest
@@ -210,7 +210,7 @@ func startServer(opts *common.Options) error {
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("getting initial information from zcashd")
+			}).Fatal("getting initial information from zebrad or zcashd")
 		}
 		common.Log.Info("Got sapling height ", getLightdInfo.SaplingActivationHeight,
 			" block height ", getLightdInfo.BlockHeight,
@@ -218,6 +218,10 @@ func startServer(opts *common.Options) error {
 			" branchID ", getLightdInfo.ConsensusBranchId)
 		saplingHeight = int(getLightdInfo.SaplingActivationHeight)
 		chainName = getLightdInfo.ChainName
+		if strings.Contains(getLightdInfo.ZcashdSubversion, "MagicBean") {
+			// The default is zebrad
+			common.NodeName = "zcashd"
+		}
 	}
 
 	dbPath := filepath.Join(opts.DataDir, "db")
@@ -339,12 +343,12 @@ func init() {
 	rootCmd.Flags().String("rpcport", "", "RPC host port")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
-	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
+	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zebrad or zcashd; reinitialize local cache files")
 	rootCmd.Flags().Bool("nocache", false, "don't maintain a compact blocks disk cache (to reduce storage)")
-	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zcashd start at this height")
+	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zebrad or zcashd, starting at this height")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
-	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
+	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zebrad for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
