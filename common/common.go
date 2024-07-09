@@ -464,8 +464,8 @@ func BlockIngestor(c *BlockCache, rep int) {
 			c.Sync()
 			Log.Info("Waiting for zcashd height to reach Sapling activation height ",
 				"(", c.GetFirstHeight(), ")...")
-			Time.Sleep(20 * time.Second)
-			return
+			Time.Sleep(120 * time.Second)
+			continue
 		}
 		Log.Info("REORG: dropping block ", height-1, " ", displayHash(c.GetLatestHash()))
 		c.Reorg(height - 1)
