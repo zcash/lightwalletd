@@ -25,6 +25,7 @@ var (
 	Branch    = ""
 	BuildDate = ""
 	BuildUser = ""
+	NodeName  = "zebrad"
 )
 
 type Options struct {
@@ -225,7 +226,7 @@ func FirstRPC() {
 		if retryCount > 10 {
 			Log.WithFields(logrus.Fields{
 				"timeouts": retryCount,
-			}).Fatal("unable to issue getblockchaininfo RPC call to zcashd node")
+			}).Fatal("unable to issue getblockchaininfo RPC call to zebrad or zcashd node")
 		}
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
@@ -418,7 +419,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("error zcashd getbestblockhash rpc")
+			}).Fatal("error " + NodeName + " getbestblockhash rpc")
 		}
 		var hashHex string
 		err = json.Unmarshal(result, &hashHex)
@@ -462,7 +463,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		}
 		if height == c.GetFirstHeight() {
 			c.Sync()
-			Log.Info("Waiting for zcashd height to reach Sapling activation height ",
+			Log.Info("Waiting for "+NodeName+" height to reach Sapling activation height ",
 				"(", c.GetFirstHeight(), ")...")
 			Time.Sleep(120 * time.Second)
 			continue

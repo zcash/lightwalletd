@@ -703,7 +703,7 @@ func TestMempoolStream(t *testing.T) {
 		t.Fatal("unexpected end time")
 	}
 	if step != 8 {
-		t.Fatal("unexpected number of zcashd RPCs")
+		t.Fatal("unexpected number of zebrad RPCs")
 	}
 
 	step = 0
