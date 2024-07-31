@@ -102,7 +102,7 @@ lwd-api.html: walletrpc/compact_formats.proto walletrpc/service.proto
 
 # Generate docker image
 docker_img:
-	docker build --target runner --tag zcash_lwd_base .
+	docker build --target runtime --tag zcash_lwd_base .
 
 # Run the above docker image in a container
 docker_img_run:

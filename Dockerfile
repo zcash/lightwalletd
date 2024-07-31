@@ -1,7 +1,5 @@
 ARG APP_HOME=/srv/lightwalletd
 ARG ZCASHD_CONF_PATH=$APP_HOME/zcash.conf
-ARG LWD_GRPC_PORT=9067
-ARG LWD_HTTP_PORT=9068
 
 ##
 ## Builder
@@ -28,26 +26,16 @@ COPY . ./
 # Build and install the binary.
 RUN go build -v -o /usr/local/bin/lightwalletd
 
-ARG ZCASHD_CONF_PATH
-
-RUN set -ex; \
-  { \
-    echo "rpcuser=zcashrpc"; \
-    echo "rpcpassword=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo ''`" \
-    echo "rpcbind=zcashd"; \
-    echo "rpcport=3434"; \
-  } > "/etc/zcash.conf"
-
 ##
-## Runner
+## Runtime
 ##
-FROM debian:bookworm-slim as runner
+FROM debian:bookworm-slim as runtime
 
 # Get the needed ARGs values
 ARG APP_HOME
 ARG ZCASHD_CONF_PATH
-ARG LWD_GRPC_PORT
-ARG LWD_HTTP_PORT
+ARG LWD_GRPC_PORT=9067
+ARG LWD_HTTP_PORT=9068
 ARG LWD_USER=lightwalletd
 ARG LWD_UID=2002
 
@@ -65,12 +53,19 @@ RUN mkdir -p /var/lib/lightwalletd/db && \
 WORKDIR ${APP_HOME}
 
 COPY --from=build /usr/local/bin/lightwalletd /usr/local/bin
-COPY --from=build --chown=${LWD_USER}:${LWD_USER} /etc/zcash.conf ./
 COPY ./docker/cert.key ./
 COPY ./docker/cert.pem ./
 
-EXPOSE $LWD_GRPC_PORT
-EXPOSE $LWD_HTTP_PORT
+RUN set -ex; \
+  { \
+    echo "rpcuser=zcashrpc"; \
+    echo "rpcpassword=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo ''`" \
+    echo "rpcbind=zcashd"; \
+    echo "rpcport=3434"; \
+  } > "${ZCASHD_CONF_PATH}"
+
+EXPOSE ${LWD_GRPC_PORT}
+EXPOSE ${LWD_HTTP_PORT}
 
 USER ${LWD_USER}
 

@@ -1,0 +1,90 @@
+name: zebra-lwd
+
+services:
+  lightwalletd:
+    image: electriccoinco/lightwalletd
+    platform: linux/amd64
+    build:
+      context: .
+      target: runtime
+    depends_on:
+      zebra:
+        condition: service_started
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          cpus: "2"
+          memory: 4G
+    configs:
+      - source: lwd_config
+        target: ${ZCASHD_CONF_PATH}
+        uid: '2002' # Golang's container default user uid
+        gid: '2002' # Golang's container default group gid
+    volumes:
+      - litewalletd-data:/var/lib/lightwalletd/db
+    #! This setup with --no-tls-very-insecure is only for testing purposes
+    #! For production environments follow the guidelines here: https://github.com/zcash/lightwalletd#production-usage
+    command: >
+      --no-tls-very-insecure
+      --grpc-bind-addr=0.0.0.0:${LWD_GRPC_PORT}
+      --http-bind-addr=0.0.0.0:${LWD_HTTP_PORT}
+      --zcash-conf-path=${ZCASHD_CONF_PATH}
+      --data-dir=/var/lib/lightwalletd/db
+      --log-file=/dev/stdout
+      --log-level=7
+    ports:
+      - "127.0.0.1:${LWD_GRPC_PORT}:${LWD_GRPC_PORT}" # gRPC
+      - "127.0.0.1:${LWD_HTTP_PORT}:${LWD_HTTP_PORT}" # HTTP
+
+  zebra:
+    image: zfnd/zebra
+    platform: linux/amd64
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          cpus: "4"
+          memory: 16G
+    environment:
+      - RPC_PORT=${ZEBRA_RPC_PORT}
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
+    #! Uncomment the `configs` mapping below to use the `zebrad.toml` config file from the host machine
+    #! NOTE: This will override the zebrad.toml in the image and make some variables irrelevant
+    # configs:
+    #   - source: zebra_config
+    #     target: /etc/zebrad/zebrad.toml
+    #     uid: '2001' # Rust's container default user uid
+    #     gid: '2001' # Rust's container default group gid
+    volumes:
+      - zebrad-cache:/var/cache/zebrad-cache
+    ports:
+      # Zebra uses the following default inbound and outbound TCP ports
+      - "127.0.0.1:8233:8233" # Mainnet Network (for peer connections)
+      - "127.0.0.1:8232:8232" # Opens an RPC endpoint (for wallet storing and mining)
+      # - "127.0.0.1:18233:18233" # Testnet Network
+      # - "127.0.0.1:9999:9999" # Metrics
+      # - "127.0.0.1:3000:3000" # Tracing
+    healthcheck:
+      start_period: 1m
+      interval: 15s
+      timeout: 10s
+      retries: 3
+      test: ["CMD-SHELL", "curl --data-binary '{\"jsonrpc\":\"2.0\",\"id\":\"curltest\",\"method\":\"getinfo\",\"params\":[]}' -H 'Content-Type: application/json' http://127.0.0.1:8232 || exit 1"]
+
+configs:
+  zebra_config:
+    # Change the following line to point to a zebrad.toml on your host machine
+    file: ./docker/zebrad.toml
+  lwd_config:
+    # Change the following line to point to a zcash.conf on your host machine
+    file: ./docker/zebra.conf
+
+volumes:
+  litewalletd-data:
+    driver: local
+  zebrad-cache:
+    driver: local
