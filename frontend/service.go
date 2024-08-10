@@ -142,6 +142,7 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
+		// see https://github.com/zcash/lightwalletd/pull/309
 		return nil, errors.New("gRPC GetBlock by Hash is not yet implemented")
 	}
 	cBlock, err := common.GetBlock(s.cache, int(id.Height))
@@ -162,6 +163,7 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
+		// see https://github.com/zcash/lightwalletd/pull/309
 		return nil, errors.New("gRPC GetBlock by Hash is not yet implemented")
 	}
 	cBlock, err := common.GetBlock(s.cache, int(id.Height))
@@ -286,7 +288,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		params[0] = hashJSON
 	}
 	if gettreestateReply.Sapling.Commitments.FinalState == "" {
-		return nil, errors.New("zcashd did not return treestate")
+		return nil, errors.New(common.NodeName + " did not return treestate")
 	}
 	return &walletrpc.TreeState{
 		Network:     s.chainName,
