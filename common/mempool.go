@@ -124,6 +124,12 @@ func refreshMempoolTxns() error {
 			return err
 		}
 
+		// Skip any transaction that has been mined since the list of txids
+		// was retrieved.
+		if (rawtx.Height != 0) {
+			continue;
+		}
+
 		g_txList = append(g_txList, rawtx)
 	}
 	return nil
