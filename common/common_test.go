@@ -605,7 +605,7 @@ func mempoolStub(method string, params []json.RawMessage) (json.RawMessage, erro
 		if txid != "mempooltxid-1" {
 			testT.Fatal("unexpected txid")
 		}
-		r, _ := json.Marshal("aabb")
+		r, _ := json.Marshal(map[string]string{"hex":"aabb"})
 		return r, nil
 	case 5:
 		// Simulate that still no new block has arrived ...
@@ -637,7 +637,7 @@ func mempoolStub(method string, params []json.RawMessage) (json.RawMessage, erro
 		if txid != "mempooltxid-2" {
 			testT.Fatal("unexpected txid")
 		}
-		r, _ := json.Marshal("ccdd")
+		r, _ := json.Marshal(map[string]string{"hex":"ccdd"})
 		return r, nil
 	case 8:
 		// A new block arrives, this will cause these two tx to be returned
@@ -669,7 +669,7 @@ func TestMempoolStream(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("GetMempool failed")
+		t.Errorf("GetMempool failed: %v", err)
 	}
 
 	// This should return two transactions.
@@ -678,7 +678,7 @@ func TestMempoolStream(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("GetMempool failed")
+		t.Errorf("GetMempool failed: %v", err)
 	}
 	if len(replies) != 2 {
 		t.Fatal("unexpected number of tx")
@@ -688,13 +688,13 @@ func TestMempoolStream(t *testing.T) {
 	if !bytes.Equal([]byte(replies[0].GetData()), []byte{0xaa, 0xbb}) {
 		t.Fatal("unexpected tx contents")
 	}
-	if replies[0].GetHeight() != 200 {
+	if replies[0].GetHeight() != 0 {
 		t.Fatal("unexpected tx height")
 	}
 	if !bytes.Equal([]byte(replies[1].GetData()), []byte{0xcc, 0xdd}) {
 		t.Fatal("unexpected tx contents")
 	}
-	if replies[1].GetHeight() != 200 {
+	if replies[1].GetHeight() != 0 {
 		t.Fatal("unexpected tx height")
 	}
 

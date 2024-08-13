@@ -7,6 +7,14 @@ and this library adheres to Rust's notion of
 
 ## [Unreleased]
 
+### Changed
+
+- The `RawTransaction` values returned from a call to `GetMempoolStream`
+  now report a `Height` value of `0`, in order to be consistent with
+  the results of calls to `GetTransaction`. See the documentation of
+  `RawTransaction` in `walletrpc/service.proto` for more details on
+  the semantics of this field.
+
 ### Fixed
 
 - Parsing of `getrawtransaction` results is now platform-independent.
