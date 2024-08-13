@@ -710,3 +710,33 @@ func TestMempoolStream(t *testing.T) {
 	sleepCount = 0
 	sleepDuration = 0
 }
+
+func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
+		var txinfo0 ZcashdRpcReplyGetrawtransaction
+		err0 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\", \"height\": 123456}"), &txinfo0)
+		if err0 != nil {
+			t.Fatal("Failed to unmarshal tx with known height.")
+		}
+		if txinfo0.Height != 123456 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: 123456.", txinfo0.Height)
+		}
+
+		var txinfo1 ZcashdRpcReplyGetrawtransaction
+		err1 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\", \"height\": -1}"), &txinfo1)
+		if err1 != nil {
+			t.Fatal("failed to unmarshal tx not in main chain")
+		}
+		if txinfo1.Height != -1 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: -1.", txinfo1.Height)
+		}
+
+		var txinfo2 ZcashdRpcReplyGetrawtransaction
+		err2 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\"}"), &txinfo2)
+		if err2 != nil {
+			t.Fatal("failed to unmarshal reply lacking height data")
+		}
+		if txinfo2.Height != 0 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: 0.", txinfo2.Height)
+		}
+}
+
