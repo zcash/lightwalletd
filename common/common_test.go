@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -740,3 +741,31 @@ func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
 		}
 }
 
+func TestParseRawTransaction(t *testing.T) {
+		rt0, err0 := ParseRawTransaction([]byte("{\"hex\": \"deadbeef\", \"height\": 123456}"))
+		if err0 != nil {
+			t.Fatal("Failed to parse raw transaction response with known height.")
+		}
+		if rt0.Height != 123456 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, expected: 123456.", rt0.Height)
+		}
+
+		rt1, err1 := ParseRawTransaction([]byte("{\"hex\": \"deadbeef\", \"height\": -1}"))
+		if err1 != nil {
+			t.Fatal("Failed to parse raw transaction response for a known tx not in the main chain.")
+		}
+		// We expect the int64 value `-1` to have been reinterpreted as a uint64 value in order
+		// to be representable as a uint64 in `RawTransaction`. The conversion from the twos-complement
+		// signed representation should map `-1` to `math.MaxUint64`.
+		if rt1.Height != math.MaxUint64 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: 0x%X.", rt1.Height, uint64(math.MaxUint64))
+		}
+
+		rt2, err2 := ParseRawTransaction([]byte("{\"hex\": \"deadbeef\"}"))
+		if err2 != nil {
+			t.Fatal("Failed to parse raw transaction response for a tx in the mempool.")
+		}
+		if rt2.Height != 0 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, expected: 0.", rt2.Height)
+		}
+}

@@ -127,7 +127,7 @@ type (
 	// many more fields but these are the only ones we current need.
 	ZcashdRpcReplyGetrawtransaction struct {
 		Hex    string
-		Height int
+		Height int64
 	}
 
 	// zcashd rpc "getaddressbalance"
@@ -520,6 +520,43 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 		blockOut <- block
 	}
 	errOut <- nil
+}
+
+// ParseRawTransaction converts between the JSON result of a `zcashd`
+// `getrawtransaction` call and the `RawTransaction` protobuf type.
+//
+// Due to an error in the original protobuf definition, it is necessary to
+// reinterpret the result of the `getrawtransaction` RPC call. Zcashd will
+// return the int64 value `-1` for the height of transactions that appear in
+// the block index, but which are not mined in the main chain. `service.proto`
+// defines the height field of `RawTransaction` to be a `uint64`, and as such
+// we must map the response from the zcashd RPC API to be representable within
+// this space. Additionally, the `height` field will be absent for transactions
+// in the mempool, resulting in the default value of `0` being set. Therefore,
+// the meanings of the `Height` field of the `RawTransaction` type are as
+// follows:
+//
+// * height 0: the transaction is in the mempool
+// * height 0xffffffffffffffff: the transaction has been mined on a fork that
+//   is not currently the main chain
+// * any other height: the transaction has been mined in the main chain at the
+//   given height
+func ParseRawTransaction(message json.RawMessage) (*walletrpc.RawTransaction, error) {
+		// Many other fields are returned, but we need only these two.
+		var txinfo ZcashdRpcReplyGetrawtransaction
+		err := json.Unmarshal(message, &txinfo)
+		if err != nil {
+			return nil, err
+		}
+		txBytes, err := hex.DecodeString(txinfo.Hex)
+		if err != nil {
+			return nil, err
+		}
+
+		return &walletrpc.RawTransaction{
+			Data:   txBytes,
+			Height: uint64(txinfo.Height),
+		}, nil
 }
 
 func displayHash(hash []byte) string {
