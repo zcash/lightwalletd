@@ -87,20 +87,21 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	if addressBlockFilter.Range.Start == nil {
 		return errors.New("must specify a start block height")
 	}
-	if addressBlockFilter.Range.End == nil {
-		return errors.New("must specify an end block height")
-	}
-	params := make([]json.RawMessage, 1)
+
 	request := &common.ZcashdRpcRequestGetaddresstxids{
 		Addresses: []string{addressBlockFilter.Address},
 		Start:     addressBlockFilter.Range.Start.Height,
-		End:       addressBlockFilter.Range.End.Height,
 	}
+	if addressBlockFilter.Range.End != nil {
+		request.End = addressBlockFilter.Range.End.Height
+	}
+
 	param, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
-	params[0] = param
+	params := []json.RawMessage{param}
+
 	result, rpcErr := common.RawRequest("getaddresstxids", params)
 
 	// For some reason, the error responses are not JSON
