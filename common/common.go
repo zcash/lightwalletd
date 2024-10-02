@@ -102,7 +102,7 @@ type (
 	ZcashdRpcRequestGetaddresstxids struct {
 		Addresses []string `json:"addresses"`
 		Start     uint64   `json:"start"`
-		End       uint64   `json:"end"`
+		End       uint64   `json:"end,omitempty"`
 	}
 
 	// zcashd rpc "z_gettreestate"
