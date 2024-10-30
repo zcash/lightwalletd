@@ -16,6 +16,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // 'make build' will overwrite this string with the output of git-describe (tag)
@@ -94,6 +96,7 @@ type (
 	}
 
 	// zcashd rpc "getinfo"
+	// Note, this rpc should not be depended on in the future (being deprecated).
 	ZcashdRpcReplyGetinfo struct {
 		Build      string
 		Subversion string
@@ -313,15 +316,13 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	if err != nil {
 		Log.Fatal("getBlockFromRPC bad height argument", height, err)
 	}
-	params := make([]json.RawMessage, 2)
-	params[0] = heightJSON
 	// Fetch the block using the verbose option ("1") because it provides
 	// both the list of txids, which we're not yet able to compute for
 	// Orchard (V5) transactions, and the block hash (block ID), which
 	// we need to fetch the raw data format of the same block. Don't fetch
 	// by height in case a reorg occurs between the two getblock calls;
 	// using block hash ensures that we're fetching the same block.
-	params[1] = json.RawMessage("1")
+	params := []json.RawMessage{heightJSON, json.RawMessage("1")}
 	result, rpcErr := RawRequest("getblock", params)
 	if rpcErr != nil {
 		// Check to see if we are requesting a height the zcashd doesn't have yet
@@ -333,14 +334,14 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	var block1 ZcashRpcReplyGetblock1
 	err = json.Unmarshal(result, &block1)
 	if err != nil {
-		return nil, err
+		Log.Fatal("getBlockFromRPC: Can't unmarshal block:", err)
 	}
 	blockHash, err := json.Marshal(block1.Hash)
 	if err != nil {
 		Log.Fatal("getBlockFromRPC bad block hash", block1.Hash)
 	}
-	params[0] = blockHash
-	params[1] = json.RawMessage("0") // non-verbose (raw hex)
+	// non-verbose (raw hex) version of block
+	params = []json.RawMessage{blockHash, json.RawMessage("0")}
 	result, rpcErr = RawRequest("getblock", params)
 
 	// For some reason, the error responses are not JSON
@@ -478,6 +479,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 // GetBlock returns the compact block at the requested height, first by querying
 // the cache, then, if not found, will request the block from zcashd. It returns
 // nil if no block exists at this height.
+// This returns gRPC-compatible errors.
 func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	// First, check the cache to see if we have the block
 	var block *walletrpc.CompactBlock
@@ -491,11 +493,13 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	// Not in the cache
 	block, err := getBlockFromRPC(height)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument,
+			"GetBlock: getblock failed, error: %s", err.Error())
 	}
 	if block == nil {
 		// Block height is too large
-		return nil, errors.New("block requested is newer than latest block")
+		return nil, status.Errorf(codes.OutOfRange,
+			"GetBlock: block %d is newer than the latest block", height)
 	}
 	return block, nil
 }
@@ -539,27 +543,27 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 // the meanings of the `Height` field of the `RawTransaction` type are as
 // follows:
 //
-// * height 0: the transaction is in the mempool
-// * height 0xffffffffffffffff: the transaction has been mined on a fork that
-//   is not currently the main chain
-// * any other height: the transaction has been mined in the main chain at the
-//   given height
+//   - height 0: the transaction is in the mempool
+//   - height 0xffffffffffffffff: the transaction has been mined on a fork that
+//     is not currently the main chain
+//   - any other height: the transaction has been mined in the main chain at the
+//     given height
 func ParseRawTransaction(message json.RawMessage) (*walletrpc.RawTransaction, error) {
-		// Many other fields are returned, but we need only these two.
-		var txinfo ZcashdRpcReplyGetrawtransaction
-		err := json.Unmarshal(message, &txinfo)
-		if err != nil {
-			return nil, err
-		}
-		txBytes, err := hex.DecodeString(txinfo.Hex)
-		if err != nil {
-			return nil, err
-		}
+	// Many other fields are returned, but we need only these two.
+	var txinfo ZcashdRpcReplyGetrawtransaction
+	err := json.Unmarshal(message, &txinfo)
+	if err != nil {
+		return nil, err
+	}
+	txBytes, err := hex.DecodeString(txinfo.Hex)
+	if err != nil {
+		return nil, err
+	}
 
-		return &walletrpc.RawTransaction{
-			Data:   txBytes,
-			Height: uint64(txinfo.Height),
-		}, nil
+	return &walletrpc.RawTransaction{
+		Data:   txBytes,
+		Height: uint64(txinfo.Height),
+	}, nil
 }
 
 func displayHash(hash []byte) string {
