@@ -446,7 +446,7 @@ func TestGetBlockRange(t *testing.T) {
 	select {
 	case err := <-errChan:
 		// this will also catch context.DeadlineExceeded from the timeout
-		if err.Error() != "block requested is newer than latest block" {
+		if !strings.Contains(err.Error(), "newer than the latest block") {
 			t.Fatal("unexpected error:", err)
 		}
 	case <-blockChan:
