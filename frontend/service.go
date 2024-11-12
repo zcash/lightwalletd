@@ -87,20 +87,21 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	if addressBlockFilter.Range.Start == nil {
 		return errors.New("must specify a start block height")
 	}
-	if addressBlockFilter.Range.End == nil {
-		return errors.New("must specify an end block height")
-	}
-	params := make([]json.RawMessage, 1)
+
 	request := &common.ZcashdRpcRequestGetaddresstxids{
 		Addresses: []string{addressBlockFilter.Address},
 		Start:     addressBlockFilter.Range.Start.Height,
-		End:       addressBlockFilter.Range.End.Height,
 	}
+	if addressBlockFilter.Range.End != nil {
+		request.End = addressBlockFilter.Range.End.Height
+	}
+
 	param, err := json.Marshal(request)
 	if err != nil {
 		return err
 	}
-	params[0] = param
+	params := []json.RawMessage{param}
+
 	result, rpcErr := common.RawRequest("getaddresstxids", params)
 
 	// For some reason, the error responses are not JSON
@@ -142,6 +143,7 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
+		// see https://github.com/zcash/lightwalletd/pull/309
 		return nil, errors.New("gRPC GetBlock by Hash is not yet implemented")
 	}
 	cBlock, err := common.GetBlock(s.cache, int(id.Height))
@@ -162,6 +164,7 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 	// Precedence: a hash is more specific than a height. If we have it, use it first.
 	if id.Hash != nil {
 		// TODO: Get block by hash
+		// see https://github.com/zcash/lightwalletd/pull/309
 		return nil, errors.New("gRPC GetBlock by Hash is not yet implemented")
 	}
 	cBlock, err := common.GetBlock(s.cache, int(id.Height))
@@ -286,7 +289,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		params[0] = hashJSON
 	}
 	if gettreestateReply.Sapling.Commitments.FinalState == "" {
-		return nil, errors.New("zcashd did not return treestate")
+		return nil, errors.New(common.NodeName + " did not return treestate")
 	}
 	return &walletrpc.TreeState{
 		Network:     s.chainName,
@@ -314,34 +317,19 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		if len(txf.Hash) != 32 {
 			return nil, errors.New("transaction ID has invalid length")
 		}
-		leHashStringJSON, err := json.Marshal(hex.EncodeToString(parser.Reverse(txf.Hash)))
+		txidJSON, err := json.Marshal(hex.EncodeToString(parser.Reverse(txf.Hash)))
 		if err != nil {
 			return nil, err
 		}
-		params := []json.RawMessage{
-			leHashStringJSON,
-			json.RawMessage("1"),
-		}
-		result, rpcErr := common.RawRequest("getrawtransaction", params)
 
-		// For some reason, the error responses are not JSON
+		params := []json.RawMessage{txidJSON, json.RawMessage("1")}
+		result, rpcErr := common.RawRequest("getrawtransaction", params)
 		if rpcErr != nil {
+			// For some reason, the error responses are not JSON
 			return nil, rpcErr
 		}
-		// Many other fields are returned, but we need only these two.
-		var txinfo common.ZcashdRpcReplyGetrawtransaction
-		err = json.Unmarshal(result, &txinfo)
-		if err != nil {
-			return nil, err
-		}
-		txBytes, err := hex.DecodeString(txinfo.Hex)
-		if err != nil {
-			return nil, err
-		}
-		return &walletrpc.RawTransaction{
-			Data:   txBytes,
-			Height: uint64(txinfo.Height),
-		}, nil
+
+		return common.ParseRawTransaction(result)
 	}
 
 	if txf.Block != nil && txf.Block.Hash != nil {

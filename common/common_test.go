@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"testing"
@@ -604,7 +605,7 @@ func mempoolStub(method string, params []json.RawMessage) (json.RawMessage, erro
 		if txid != "mempooltxid-1" {
 			testT.Fatal("unexpected txid")
 		}
-		r, _ := json.Marshal("aabb")
+		r, _ := json.Marshal(map[string]string{"hex":"aabb"})
 		return r, nil
 	case 5:
 		// Simulate that still no new block has arrived ...
@@ -636,7 +637,7 @@ func mempoolStub(method string, params []json.RawMessage) (json.RawMessage, erro
 		if txid != "mempooltxid-2" {
 			testT.Fatal("unexpected txid")
 		}
-		r, _ := json.Marshal("ccdd")
+		r, _ := json.Marshal(map[string]string{"hex":"ccdd"})
 		return r, nil
 	case 8:
 		// A new block arrives, this will cause these two tx to be returned
@@ -668,7 +669,7 @@ func TestMempoolStream(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("GetMempool failed")
+		t.Errorf("GetMempool failed: %v", err)
 	}
 
 	// This should return two transactions.
@@ -677,7 +678,7 @@ func TestMempoolStream(t *testing.T) {
 		return nil
 	})
 	if err != nil {
-		t.Fatal("GetMempool failed")
+		t.Errorf("GetMempool failed: %v", err)
 	}
 	if len(replies) != 2 {
 		t.Fatal("unexpected number of tx")
@@ -687,13 +688,13 @@ func TestMempoolStream(t *testing.T) {
 	if !bytes.Equal([]byte(replies[0].GetData()), []byte{0xaa, 0xbb}) {
 		t.Fatal("unexpected tx contents")
 	}
-	if replies[0].GetHeight() != 200 {
+	if replies[0].GetHeight() != 0 {
 		t.Fatal("unexpected tx height")
 	}
 	if !bytes.Equal([]byte(replies[1].GetData()), []byte{0xcc, 0xdd}) {
 		t.Fatal("unexpected tx contents")
 	}
-	if replies[1].GetHeight() != 200 {
+	if replies[1].GetHeight() != 0 {
 		t.Fatal("unexpected tx height")
 	}
 
@@ -703,10 +704,68 @@ func TestMempoolStream(t *testing.T) {
 		t.Fatal("unexpected end time")
 	}
 	if step != 8 {
-		t.Fatal("unexpected number of zcashd RPCs")
+		t.Fatal("unexpected number of zebrad RPCs")
 	}
 
 	step = 0
 	sleepCount = 0
 	sleepDuration = 0
+}
+
+func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
+		var txinfo0 ZcashdRpcReplyGetrawtransaction
+		err0 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\", \"height\": 123456}"), &txinfo0)
+		if err0 != nil {
+			t.Fatal("Failed to unmarshal tx with known height.")
+		}
+		if txinfo0.Height != 123456 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: 123456.", txinfo0.Height)
+		}
+
+		var txinfo1 ZcashdRpcReplyGetrawtransaction
+		err1 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\", \"height\": -1}"), &txinfo1)
+		if err1 != nil {
+			t.Fatal("failed to unmarshal tx not in main chain")
+		}
+		if txinfo1.Height != -1 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: -1.", txinfo1.Height)
+		}
+
+		var txinfo2 ZcashdRpcReplyGetrawtransaction
+		err2 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\"}"), &txinfo2)
+		if err2 != nil {
+			t.Fatal("failed to unmarshal reply lacking height data")
+		}
+		if txinfo2.Height != 0 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: 0.", txinfo2.Height)
+		}
+}
+
+func TestParseRawTransaction(t *testing.T) {
+		rt0, err0 := ParseRawTransaction([]byte("{\"hex\": \"deadbeef\", \"height\": 123456}"))
+		if err0 != nil {
+			t.Fatal("Failed to parse raw transaction response with known height.")
+		}
+		if rt0.Height != 123456 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, expected: 123456.", rt0.Height)
+		}
+
+		rt1, err1 := ParseRawTransaction([]byte("{\"hex\": \"deadbeef\", \"height\": -1}"))
+		if err1 != nil {
+			t.Fatal("Failed to parse raw transaction response for a known tx not in the main chain.")
+		}
+		// We expect the int64 value `-1` to have been reinterpreted as a uint64 value in order
+		// to be representable as a uint64 in `RawTransaction`. The conversion from the twos-complement
+		// signed representation should map `-1` to `math.MaxUint64`.
+		if rt1.Height != math.MaxUint64 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, want: 0x%X.", rt1.Height, uint64(math.MaxUint64))
+		}
+
+		rt2, err2 := ParseRawTransaction([]byte("{\"hex\": \"deadbeef\"}"))
+		if err2 != nil {
+			t.Fatal("Failed to parse raw transaction response for a tx in the mempool.")
+		}
+		if rt2.Height != 0 {
+			t.Errorf("Unmarshalled incorrect height: got: %d, expected: 0.", rt2.Height)
+		}
 }

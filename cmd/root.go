@@ -55,6 +55,7 @@ var rootCmd = &cobra.Command{
 			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
 			DataDir:             viper.GetString("data-dir"),
 			Redownload:          viper.GetBool("redownload"),
+			NoCache:             viper.GetBool("nocache"),
 			SyncFromHeight:      viper.GetInt("sync-from-height"),
 			PingEnable:          viper.GetBool("ping-very-insecure"),
 			Darkside:            viper.GetBool("darkside-very-insecure"),
@@ -118,13 +119,13 @@ func startServer(opts *common.Options) error {
 
 	logger.SetLevel(logrus.Level(opts.LogLevel))
 
+	logging.LogToStderr = opts.GRPCLogging
+
 	common.Log.WithFields(logrus.Fields{
 		"gitCommit": common.GitCommit,
 		"buildDate": common.BuildDate,
 		"buildUser": common.BuildUser,
-	}).Infof("Starting gRPC server version %s on %s", common.Version, opts.GRPCBindAddr)
-
-	logging.LogToStderr = opts.GRPCLogging
+	}).Infof("Starting lightwalletd process version %s", common.Version)
 
 	// gRPC initialization
 	var server *grpc.Server
@@ -197,7 +198,7 @@ func startServer(opts *common.Options) error {
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("setting up RPC connection to zcashd")
+			}).Fatal("setting up RPC connection to zebrad or zcashd")
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
 		common.RawRequest = rpcClient.RawRequest
@@ -209,7 +210,7 @@ func startServer(opts *common.Options) error {
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("getting initial information from zcashd")
+			}).Fatal("getting initial information from zebrad or zcashd")
 		}
 		common.Log.Info("Got sapling height ", getLightdInfo.SaplingActivationHeight,
 			" block height ", getLightdInfo.BlockHeight,
@@ -217,6 +218,10 @@ func startServer(opts *common.Options) error {
 			" branchID ", getLightdInfo.ConsensusBranchId)
 		saplingHeight = int(getLightdInfo.SaplingActivationHeight)
 		chainName = getLightdInfo.ChainName
+		if strings.Contains(getLightdInfo.ZcashdSubversion, "MagicBean") {
+			// The default is zebrad
+			common.NodeName = "zcashd"
+		}
 	}
 
 	dbPath := filepath.Join(opts.DataDir, "db")
@@ -240,13 +245,22 @@ func startServer(opts *common.Options) error {
 		os.Stderr.WriteString(fmt.Sprintf("\n  ** Can't create db directory: %s\n\n", dbPath))
 		os.Exit(1)
 	}
-	syncFromHeight := opts.SyncFromHeight
-	if opts.Redownload {
-		syncFromHeight = 0
+	var cache *common.BlockCache
+	if opts.NoCache {
+		lengthsName, blocksName := common.DbFileNames(dbPath, chainName)
+		os.Remove(lengthsName)
+		os.Remove(blocksName)
+	} else {
+		syncFromHeight := opts.SyncFromHeight
+		if opts.Redownload {
+			syncFromHeight = 0
+		}
+		cache = common.NewBlockCache(dbPath, chainName, saplingHeight, syncFromHeight)
 	}
-	cache := common.NewBlockCache(dbPath, chainName, saplingHeight, syncFromHeight)
 	if !opts.Darkside {
-		go common.BlockIngestor(cache, 0 /*loop forever*/)
+		if !opts.NoCache {
+			go common.BlockIngestor(cache, 0 /*loop forever*/)
+		}
 	} else {
 		// Darkside wants to control starting the block ingestor.
 		common.DarksideInit(cache, int(opts.DarksideTimeout))
@@ -271,6 +285,8 @@ func startServer(opts *common.Options) error {
 		}
 		walletrpc.RegisterDarksideStreamerServer(server, service)
 	}
+
+	common.Log.Infof("Starting gRPC server on %s", opts.GRPCBindAddr)
 
 	// Start listening
 	listener, err := net.Listen("tcp", opts.GRPCBindAddr)
@@ -329,11 +345,12 @@ func init() {
 	rootCmd.Flags().String("rpcport", "", "RPC host port")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
-	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zcashd; reinitialize local cache files")
-	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zcashd start at this height")
+	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zebrad or zcashd; reinitialize local cache files")
+	rootCmd.Flags().Bool("nocache", false, "don't maintain a compact blocks disk cache (to reduce storage)")
+	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zebrad or zcashd, starting at this height")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
-	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zcashd for integration testing (shuts down after 30 minutes)")
+	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zebrad for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
@@ -362,6 +379,8 @@ func init() {
 	viper.SetDefault("gen-cert-very-insecure", false)
 	viper.BindPFlag("redownload", rootCmd.Flags().Lookup("redownload"))
 	viper.SetDefault("redownload", false)
+	viper.BindPFlag("nocache", rootCmd.Flags().Lookup("nocache"))
+	viper.SetDefault("nocache", false)
 	viper.BindPFlag("sync-from-height", rootCmd.Flags().Lookup("sync-from-height"))
 	viper.SetDefault("sync-from-height", -1)
 	viper.BindPFlag("data-dir", rootCmd.Flags().Lookup("data-dir"))

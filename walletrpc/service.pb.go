@@ -250,16 +250,35 @@ func (x *TxFilter) GetHash() []byte {
 	return nil
 }
 
-// RawTransaction contains the complete transaction data. It also optionally includes
-// the block height in which the transaction was included, or, when returned
-// by GetMempoolStream(), the latest block height.
+// RawTransaction contains the complete transaction data. It also includes the
+// height for the block in which the transaction was included in the main
+// chain, if any (as detailed below).
 type RawTransaction struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Data   []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`      // exact data returned by Zcash 'getrawtransaction'
-	Height uint64 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"` // height that the transaction was mined (or -1)
+	// The serialized representation of the Zcash transaction.
+	Data []byte `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	// The height at which the transaction is mined, or a sentinel value.
+	//
+	// Due to an error in the original protobuf definition, it is necessary to
+	// reinterpret the result of the `getrawtransaction` RPC call. Zcashd will
+	// return the int64 value `-1` for the height of transactions that appear
+	// in the block index, but which are not mined in the main chain. Here, the
+	// height field of `RawTransaction` was erroneously created as a `uint64`,
+	// and as such we must map the response from the zcashd RPC API to be
+	// representable within this space. Additionally, the `height` field will
+	// be absent for transactions in the mempool, resulting in the default
+	// value of `0` being set. Therefore, the meanings of the `height` field of
+	// the `RawTransaction` type are as follows:
+	//
+	//   - height 0: the transaction is in the mempool
+	//   - height 0xffffffffffffffff: the transaction has been mined on a fork that
+	//     is not currently the main chain
+	//   - any other height: the transaction has been mined in the main chain at the
+	//     given height
+	Height uint64 `protobuf:"varint,2,opt,name=height,proto3" json:"height,omitempty"`
 }
 
 func (x *RawTransaction) Reset() {

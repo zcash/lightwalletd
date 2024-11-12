@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"sync"
 	"time"
@@ -105,35 +104,33 @@ func refreshMempoolTxns() error {
 			// We've already fetched this transaction
 			continue
 		}
-		g_txidSeen[txid(txidstr)] = struct{}{}
+
 		// We haven't fetched this transaction already.
+		g_txidSeen[txid(txidstr)] = struct{}{}
 		txidJSON, err := json.Marshal(txidstr)
 		if err != nil {
 			return err
 		}
-		// The "0" is because we only need the raw hex, which is returned as
-		// just a hex string, and not even a json string (with quotes).
-		params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+
+		params := []json.RawMessage{txidJSON, json.RawMessage("1")}
 		result, rpcErr := RawRequest("getrawtransaction", params)
 		if rpcErr != nil {
 			// Not an error; mempool transactions can disappear
 			continue
 		}
-		// strip the quotes
-		var txStr string
-		err = json.Unmarshal(result, &txStr)
+
+		rawtx, err := ParseRawTransaction(result)
 		if err != nil {
 			return err
 		}
-		txBytes, err := hex.DecodeString(txStr)
-		if err != nil {
-			return err
+
+		// Skip any transaction that has been mined since the list of txids
+		// was retrieved.
+		if (rawtx.Height != 0) {
+			continue;
 		}
-		newRtx := &walletrpc.RawTransaction{
-			Data:   txBytes,
-			Height: uint64(g_lastBlockChainInfo.Blocks),
-		}
-		g_txList = append(g_txList, newRtx)
+
+		g_txList = append(g_txList, rawtx)
 	}
 	return nil
 }

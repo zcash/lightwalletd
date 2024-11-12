@@ -25,6 +25,7 @@ var (
 	Branch    = ""
 	BuildDate = ""
 	BuildUser = ""
+	NodeName  = "zebrad"
 )
 
 type Options struct {
@@ -43,6 +44,7 @@ type Options struct {
 	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`
+	NoCache             bool   `json:"nocache"`
 	SyncFromHeight      int    `json:"sync_from_height"`
 	DataDir             string `json:"data_dir"`
 	PingEnable          bool   `json:"ping_enable"`
@@ -100,7 +102,7 @@ type (
 	ZcashdRpcRequestGetaddresstxids struct {
 		Addresses []string `json:"addresses"`
 		Start     uint64   `json:"start"`
-		End       uint64   `json:"end"`
+		End       uint64   `json:"end,omitempty"`
 	}
 
 	// zcashd rpc "z_gettreestate"
@@ -126,7 +128,7 @@ type (
 	// many more fields but these are the only ones we current need.
 	ZcashdRpcReplyGetrawtransaction struct {
 		Hex    string
-		Height int
+		Height int64
 	}
 
 	// zcashd rpc "getaddressbalance"
@@ -224,7 +226,7 @@ func FirstRPC() {
 		if retryCount > 10 {
 			Log.WithFields(logrus.Fields{
 				"timeouts": retryCount,
-			}).Fatal("unable to issue getblockchaininfo RPC call to zcashd node")
+			}).Fatal("unable to issue getblockchaininfo RPC call to zebrad or zcashd node")
 		}
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
@@ -417,7 +419,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("error zcashd getbestblockhash rpc")
+			}).Fatal("error " + NodeName + " getbestblockhash rpc")
 		}
 		var hashHex string
 		err = json.Unmarshal(result, &hashHex)
@@ -461,10 +463,10 @@ func BlockIngestor(c *BlockCache, rep int) {
 		}
 		if height == c.GetFirstHeight() {
 			c.Sync()
-			Log.Info("Waiting for zcashd height to reach Sapling activation height ",
+			Log.Info("Waiting for "+NodeName+" height to reach Sapling activation height ",
 				"(", c.GetFirstHeight(), ")...")
-			Time.Sleep(20 * time.Second)
-			return
+			Time.Sleep(120 * time.Second)
+			continue
 		}
 		Log.Info("REORG: dropping block ", height-1, " ", displayHash(c.GetLatestHash()))
 		c.Reorg(height - 1)
@@ -476,9 +478,12 @@ func BlockIngestor(c *BlockCache, rep int) {
 // nil if no block exists at this height.
 func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	// First, check the cache to see if we have the block
-	block := cache.Get(height)
-	if block != nil {
-		return block, nil
+	var block *walletrpc.CompactBlock
+	if cache != nil {
+		block := cache.Get(height)
+		if block != nil {
+			return block, nil
+		}
 	}
 
 	// Not in the cache
@@ -516,6 +521,43 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 		blockOut <- block
 	}
 	errOut <- nil
+}
+
+// ParseRawTransaction converts between the JSON result of a `zcashd`
+// `getrawtransaction` call and the `RawTransaction` protobuf type.
+//
+// Due to an error in the original protobuf definition, it is necessary to
+// reinterpret the result of the `getrawtransaction` RPC call. Zcashd will
+// return the int64 value `-1` for the height of transactions that appear in
+// the block index, but which are not mined in the main chain. `service.proto`
+// defines the height field of `RawTransaction` to be a `uint64`, and as such
+// we must map the response from the zcashd RPC API to be representable within
+// this space. Additionally, the `height` field will be absent for transactions
+// in the mempool, resulting in the default value of `0` being set. Therefore,
+// the meanings of the `Height` field of the `RawTransaction` type are as
+// follows:
+//
+// * height 0: the transaction is in the mempool
+// * height 0xffffffffffffffff: the transaction has been mined on a fork that
+//   is not currently the main chain
+// * any other height: the transaction has been mined in the main chain at the
+//   given height
+func ParseRawTransaction(message json.RawMessage) (*walletrpc.RawTransaction, error) {
+		// Many other fields are returned, but we need only these two.
+		var txinfo ZcashdRpcReplyGetrawtransaction
+		err := json.Unmarshal(message, &txinfo)
+		if err != nil {
+			return nil, err
+		}
+		txBytes, err := hex.DecodeString(txinfo.Hex)
+		if err != nil {
+			return nil, err
+		}
+
+		return &walletrpc.RawTransaction{
+			Data:   txBytes,
+			Height: uint64(txinfo.Height),
+		}, nil
 }
 
 func displayHash(hash []byte) string {

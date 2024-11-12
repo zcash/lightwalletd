@@ -7,6 +7,7 @@ ARG ZCASHD_CONF_PATH=$APP_HOME/zcash.conf
 # Create layer in case you want to modify local lightwalletd code
 FROM golang:1.22 AS build
 
+
 # Create and change to the app directory.
 WORKDIR /app
 
