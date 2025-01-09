@@ -212,6 +212,11 @@ func startServer(opts *common.Options) error {
 				"error": err,
 			}).Fatal("getting initial information from zebrad or zcashd")
 		}
+		// Zebrad always supports lightwalletd (no special configuration needed);
+		// zcashd needs the lightwalletd=1 configuration option, so check that here.
+		if getLightdInfo.LightwalletdDisabled && !strings.Contains(getLightdInfo.ZcashdSubversion, "Zebra") {
+			common.Log.Fatal("zcashd is not configured as a lightwalletd server")
+		}
 		common.Log.Info("Got sapling height ", getLightdInfo.SaplingActivationHeight,
 			" block height ", getLightdInfo.BlockHeight,
 			" chain ", getLightdInfo.ChainName,
