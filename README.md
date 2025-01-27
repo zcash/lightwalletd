@@ -64,7 +64,7 @@ Lightwalletd uses the following `zcashd` RPCs:
 
 ## Lightwalletd
 
-First, install [Go](https://golang.org/dl/#stable) version 1.17 or later. You can see your current version by running `go version`.
+First, install [Go](https://golang.org/dl/#stable) version 1.18 or later. You can see your current version by running `go version`.
 
 Clone the [current repository](https://github.com/zcash/lightwalletd) into a local directory that is _not_ within any component of
 your `$GOPATH` (`$HOME/go` by default), then build the lightwalletd server binary by running `make`.
@@ -81,7 +81,7 @@ Type `./lightwalletd help` to see the full list of options and arguments.
 # Production Usage
 
 Run a local instance of `zcashd` (see above), except do _not_ specify `--no-tls-very-insecure`.
-Ensure [Go](https://golang.org/dl/#stable) version 1.17 or later is installed.
+Ensure [Go](https://golang.org/dl/#stable) version 1.18 or later is installed.
 
 **x509 Certificates**
 You will need to supply an x509 certificate that connecting clients will have good reason to trust (hint: do not use a self-signed one, our SDK will reject those unless you distribute them to the client out-of-band). We suggest that you be sure to buy a reputable one from a supplier that uses a modern hashing algorithm (NOT md5 or sha1) and that uses Certificate Transparency (OID 1.3.6.1.4.1.11129.2.4.2 will be present in the certificate).
