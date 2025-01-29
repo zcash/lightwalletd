@@ -80,6 +80,9 @@ type CompactTxStreamerClient interface {
 	// more bandwidth-efficient; if two or more transactions in the mempool
 	// match a shortened txid, they are all sent (none is excluded). Transactions
 	// in the exclude list that don't exist in the mempool are ignored.
+	//
+	// The a shortened transaction ID is the prefix in big-endian (hex) format
+	// (then converted to binary). See smoke-test.bash for examples.
 	GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error)
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
@@ -533,6 +536,9 @@ type CompactTxStreamerServer interface {
 	// more bandwidth-efficient; if two or more transactions in the mempool
 	// match a shortened txid, they are all sent (none is excluded). Transactions
 	// in the exclude list that don't exist in the mempool are ignored.
+	//
+	// The a shortened transaction ID is the prefix in big-endian (hex) format
+	// (then converted to binary). See smoke-test.bash for examples.
 	GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.

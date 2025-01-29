@@ -2,7 +2,6 @@ package common
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -15,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -118,7 +118,7 @@ func darksideSetTxID(tx *parser.Transaction) {
 	// detected). This will be fixed when lightwalletd calculates txids correctly .
 	digest := sha256.Sum256(tx.Bytes())
 	digest = sha256.Sum256(digest[:])
-	tx.SetTxID(digest[:])
+	tx.SetTxID(hash32.T(digest))
 }
 
 func darksideSetBlockTxID(block *parser.Block) {
@@ -226,7 +226,7 @@ func addBlockActive(blockBytes []byte) error {
 
 // Set missing prev hashes of the blocks in the active chain
 func setPrevhash() {
-	var prevhash []byte
+	prevhash := hash32.Nil
 	for _, activeBlock := range state.activeBlocks {
 		// Set this block's prevhash.
 		block := parser.NewBlock()
@@ -237,12 +237,12 @@ func setPrevhash() {
 		if len(rest) != 0 {
 			Log.Fatal(errors.New("block is too long"))
 		}
-		if prevhash != nil {
-			copy(activeBlock.bytes[4:4+32], prevhash)
+		if prevhash != hash32.Nil {
+			copy(activeBlock.bytes[4:4+32], prevhash[:])
 		}
 		prevhash = block.GetEncodableHash()
 		Log.Info("Darkside active block height ", block.GetHeight(), " hash ",
-			hex.EncodeToString(block.GetDisplayHash()),
+			block.GetDisplayHashString(),
 			" txcount ", block.GetTxCount())
 	}
 }
@@ -455,14 +455,14 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 		hashOfTxnsAndHeight := sha256.Sum256([]byte(string(nonce) + "#" + string(height)))
 		blockHeader := &parser.BlockHeader{
 			RawBlockHeader: &parser.RawBlockHeader{
-				Version:              4,                      // start: 0
-				HashPrevBlock:        make([]byte, 32),       // start: 4
-				HashMerkleRoot:       hashOfTxnsAndHeight[:], // start: 36
-				HashFinalSaplingRoot: make([]byte, 32),       // start: 68
-				Time:                 1,                      // start: 100
-				NBitsBytes:           make([]byte, 4),        // start: 104
-				Nonce:                make([]byte, 32),       // start: 108
-				Solution:             make([]byte, 1344),     // starts: 140, 143
+				Version:              4,                   // start: 0
+				HashPrevBlock:        hash32.Nil,          // start: 4
+				HashMerkleRoot:       hashOfTxnsAndHeight, // start: 36
+				HashFinalSaplingRoot: hash32.Nil,          // start: 68
+				Time:                 1,                   // start: 100
+				NBitsBytes:           [4]byte{},           // start: 104
+				Nonce:                hash32.Nil,          // start: 108
+				Solution:             [1344]byte{},        // starts: 140, 143
 			}, // length: 1487
 		}
 
@@ -502,7 +502,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		index := state.latestHeight - state.startHeight
 		block := parser.NewBlock()
 		block.ParseFromSlice(state.activeBlocks[index].bytes)
-		hash := hex.EncodeToString(block.GetDisplayHash())
+		hash := block.GetDisplayHashString()
 		blockchaininfo := &ZcashdRpcReplyGetblockchaininfo{
 			Chain: state.chainName,
 			Upgrades: map[string]Upgradeinfo{
@@ -560,7 +560,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 				for blockIndex, b = range state.activeBlocks {
 					block := parser.NewBlock()
 					block.ParseFromSlice(b.bytes)
-					if heightOrHashStr == hex.EncodeToString(block.GetDisplayHash()) {
+					if heightOrHashStr == block.GetDisplayHashString() {
 						break
 					}
 				}
@@ -589,9 +589,9 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			}
 			r.Tx = make([]string, 0)
 			for _, tx := range block.Transactions() {
-				r.Tx = append(r.Tx, hex.EncodeToString(tx.GetDisplayHash()))
+				r.Tx = append(r.Tx, tx.GetDisplayHashString())
 			}
-			r.Hash = hex.EncodeToString(block.GetDisplayHash())
+			r.Hash = block.GetDisplayHashString()
 			r.Trees.Sapling.Size = state.activeBlocks[blockIndex].saplingTreeSize
 			r.Trees.Orchard.Size = state.activeBlocks[blockIndex].orchardTreeSize
 			state.cacheBlockHash = r.Hash
@@ -607,8 +607,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		index := state.latestHeight - state.startHeight
 		block := parser.NewBlock()
 		block.ParseFromSlice(state.activeBlocks[index].bytes)
-		hash := hex.EncodeToString(block.GetDisplayHash())
-		return json.Marshal(hash)
+		return json.Marshal(block.GetDisplayHashString())
 
 	case "getaddresstxids":
 		// Not required for minimal reorg testing.
@@ -639,7 +638,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		darksideSetTxID(tx)
 		state.incomingTransactions = append(state.incomingTransactions, txBytes)
 
-		return []byte(hex.EncodeToString(tx.GetDisplayHash())), nil
+		return []byte(tx.GetDisplayHashString()), nil
 
 	case "getrawmempool":
 		reply := make([]string, 0)
@@ -647,7 +646,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			ctx := parser.NewTransaction()
 			ctx.ParseFromSlice(txBytes)
 			darksideSetTxID(ctx)
-			reply = append(reply, hex.EncodeToString(ctx.GetDisplayHash()))
+			reply = append(reply, ctx.GetDisplayHashString())
 		}
 		for _, blockBytes := range state.stagedBlocks {
 			block := parser.NewBlock()
@@ -753,14 +752,10 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 	if !state.resetted {
 		return nil, errors.New("please call Reset first")
 	}
-	var rawtx string
-	err := json.Unmarshal(params[0], &rawtx)
+	var txidBigEndian string
+	err := json.Unmarshal(params[0], &txidBigEndian)
 	if err != nil {
 		return nil, errors.New("failed to parse getrawtransaction JSON")
-	}
-	txidBigEndian, err := hex.DecodeString(rawtx)
-	if err != nil {
-		return nil, errors.New("-9: " + err.Error())
 	}
 	marshalReply := func(tx *parser.Transaction, height int) []byte {
 		switch string(params[1]) {
@@ -788,7 +783,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 		_, _ = block.ParseFromSlice(b)
 		darksideSetBlockTxID(block)
 		for _, tx := range block.Transactions() {
-			if bytes.Equal(tx.GetDisplayHash(), txidBigEndian) {
+			if tx.GetDisplayHashString() == txidBigEndian {
 				return marshalReply(tx, block.GetHeight())
 			}
 		}
@@ -825,7 +820,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 		tx := parser.NewTransaction()
 		_, _ = tx.ParseFromSlice(stx.bytes)
 		darksideSetTxID(tx)
-		if bytes.Equal(tx.GetDisplayHash(), txidBigEndian) {
+		if tx.GetDisplayHashString() == txidBigEndian {
 			return marshalReply(tx, 0), nil
 		}
 	}

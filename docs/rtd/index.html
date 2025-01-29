@@ -1242,7 +1242,7 @@ replacing any existing entries</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.Exclude">Exclude</h3>
-        <p></p>
+        <p>The a shortened transaction ID is the prefix in big-endian (hex) format</p><p>(then converted to binary).</p>
 
         
           <table class="field-table">
@@ -1950,7 +1950,10 @@ already has (from an earlier call to this rpc). The transaction IDs in the
 Exclude list can be shortened to any number of bytes to make the request
 more bandwidth-efficient; if two or more transactions in the mempool
 match a shortened txid, they are all sent (none is excluded). Transactions
-in the exclude list that don&#39;t exist in the mempool are ignored.</p></td>
+in the exclude list that don&#39;t exist in the mempool are ignored.
+
+The a shortened transaction ID is the prefix in big-endian (hex) format
+(then converted to binary). See smoke-test.bash for examples.</p></td>
               </tr>
             
               <tr>

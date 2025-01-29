@@ -6,9 +6,11 @@
 package parser
 
 import (
+	"encoding/hex"
+	"errors"
 	"fmt"
-    "errors"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -43,20 +45,29 @@ func (b *Block) Transactions() []*Transaction {
 }
 
 // GetDisplayHash returns the block hash in big-endian display order.
-func (b *Block) GetDisplayHash() []byte {
+func (b *Block) GetDisplayHash() hash32.T {
 	return b.hdr.GetDisplayHash()
+}
+
+func (b *Block) GetDisplayHashString() string {
+	h := b.GetDisplayHash()
+	return hex.EncodeToString(h[:])
 }
 
 // TODO: encode hash endianness in a type?
 
 // GetEncodableHash returns the block hash in little-endian wire order.
-func (b *Block) GetEncodableHash() []byte {
+func (b *Block) GetEncodableHash() hash32.T {
 	return b.hdr.GetEncodableHash()
 }
 
 // GetDisplayPrevHash returns the block's previous hash in big-endian format.
-func (b *Block) GetDisplayPrevHash() []byte {
+func (b *Block) GetDisplayPrevHash() hash32.T {
 	return b.hdr.GetDisplayPrevHash()
+}
+
+func (b *Block) GetDisplayPrevHashString() string {
+	return hash32.Encode(hash32.Reverse(b.hdr.RawBlockHeader.HashPrevBlock))
 }
 
 // HasSaplingTransactions indicates if the block contains any Sapling tx.
@@ -101,7 +112,7 @@ func (b *Block) GetHeight() int {
 }
 
 // GetPrevHash returns the hash of the block's previous block (little-endian).
-func (b *Block) GetPrevHash() []byte {
+func (b *Block) GetPrevHash() hash32.T {
 	return b.hdr.HashPrevBlock
 }
 
@@ -110,8 +121,8 @@ func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	compactBlock := &walletrpc.CompactBlock{
 		//TODO ProtoVersion: 1,
 		Height:        uint64(b.GetHeight()),
-		PrevHash:      b.hdr.HashPrevBlock,
-		Hash:          b.GetEncodableHash(),
+		PrevHash:      hash32.ToSlice(b.hdr.HashPrevBlock),
+		Hash:          hash32.ToSlice(b.GetEncodableHash()),
 		Time:          b.hdr.Time,
 		ChainMetadata: &walletrpc.ChainMetadata{},
 	}

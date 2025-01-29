@@ -9,9 +9,11 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"math/big"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 )
 
@@ -31,18 +33,18 @@ type RawBlockHeader struct {
 	// A SHA-256d hash in internal byte order of the previous block's header. This
 	// ensures no previous block can be changed without also changing this block's
 	// header.
-	HashPrevBlock []byte
+	HashPrevBlock hash32.T
 
 	// A SHA-256d hash in internal byte order. The merkle root is derived from
 	// the hashes of all transactions included in this block, ensuring that
 	// none of those transactions can be modified without modifying the header.
-	HashMerkleRoot []byte
+	HashMerkleRoot hash32.T
 
 	// [Pre-Sapling] A reserved field which should be ignored.
 	// [Sapling onward] The root LEBS2OSP_256(rt) of the Sapling note
 	// commitment tree corresponding to the final Sapling treestate of this
 	// block.
-	HashFinalSaplingRoot []byte
+	HashFinalSaplingRoot hash32.T
 
 	// The block time is a Unix epoch time (UTC) when the miner started hashing
 	// the header (according to the miner).
@@ -50,21 +52,21 @@ type RawBlockHeader struct {
 
 	// An encoded version of the target threshold this block's header hash must
 	// be less than or equal to, in the same nBits format used by Bitcoin.
-	NBitsBytes []byte
+	NBitsBytes [4]byte
 
 	// An arbitrary field that miners can change to modify the header hash in
 	// order to produce a hash less than or equal to the target threshold.
-	Nonce []byte
+	Nonce [32]byte
 
 	// The Equihash solution. In the wire format, this is a
 	// CompactSize-prefixed value.
-	Solution []byte
+	Solution [1344]byte
 }
 
 // BlockHeader extends RawBlockHeader by adding a cache for the block hash.
 type BlockHeader struct {
 	*RawBlockHeader
-	cachedHash []byte
+	cachedHash hash32.T
 }
 
 // CompactLengthPrefixedLen calculates the total number of bytes needed to
@@ -118,7 +120,8 @@ func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
 	binary.Write(buf, binary.LittleEndian, hdr.Time)
 	binary.Write(buf, binary.LittleEndian, hdr.NBitsBytes)
 	binary.Write(buf, binary.LittleEndian, hdr.Nonce)
-	writeCompactLengthPrefixed(buf, hdr.Solution)
+	WriteCompactLengthPrefixedLen(buf, 1344)
+	binary.Write(buf, binary.LittleEndian, hdr.Solution)
 	return backing[:headerSize], nil
 }
 
@@ -141,32 +144,50 @@ func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 		return in, errors.New("could not read header version")
 	}
 
-	if !s.ReadBytes(&hdr.HashPrevBlock, 32) {
+	b32 := make([]byte, 32)
+	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read HashPrevBlock")
 	}
+	hdr.HashPrevBlock = hash32.T(b32)
 
-	if !s.ReadBytes(&hdr.HashMerkleRoot, 32) {
+	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read HashMerkleRoot")
 	}
+	hdr.HashMerkleRoot = hash32.T(b32)
 
-	if !s.ReadBytes(&hdr.HashFinalSaplingRoot, 32) {
+	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read HashFinalSaplingRoot")
 	}
+	hdr.HashFinalSaplingRoot = hash32.T(b32)
 
 	if !s.ReadUint32(&hdr.Time) {
 		return in, errors.New("could not read timestamp")
 	}
 
-	if !s.ReadBytes(&hdr.NBitsBytes, 4) {
+	b4 := make([]byte, 4)
+	if !s.ReadBytes(&b4, 4) {
 		return in, errors.New("could not read NBits bytes")
 	}
+	hdr.NBitsBytes = [4]byte(b4)
 
-	if !s.ReadBytes(&hdr.Nonce, 32) {
+	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read Nonce bytes")
 	}
+	hdr.Nonce = hash32.T(b32)
 
-	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&hdr.Solution)) {
-		return in, errors.New("could not read CompactSize-prefixed Equihash solution")
+	{
+		var length int
+		if !s.ReadCompactSize(&length) {
+			return in, errors.New("could not read compact size of solution")
+		}
+		if length != 1344 {
+			return in, errors.New("solution length is not 1344 as expected")
+		}
+		b1344 := make([]byte, 1344)
+		if !s.ReadBytes(&b1344, 1344) {
+			return in, errors.New("could not read CompactSize-prefixed Equihash solution")
+		}
+		hdr.Solution = [1344]byte(b1344)
 	}
 
 	// TODO: interpret the bytes
@@ -195,14 +216,14 @@ func parseNBits(b []byte) *big.Int {
 }
 
 // GetDisplayHash returns the bytes of a block hash in big-endian order.
-func (hdr *BlockHeader) GetDisplayHash() []byte {
-	if hdr.cachedHash != nil {
+func (hdr *BlockHeader) GetDisplayHash() hash32.T {
+	if hdr.cachedHash != hash32.Nil {
 		return hdr.cachedHash
 	}
 
 	serializedHeader, err := hdr.MarshalBinary()
 	if err != nil {
-		return nil
+		return hash32.Nil
 	}
 
 	// SHA256d
@@ -210,26 +231,31 @@ func (hdr *BlockHeader) GetDisplayHash() []byte {
 	digest = sha256.Sum256(digest[:])
 
 	// Convert to big-endian
-	hdr.cachedHash = Reverse(digest[:])
+	hdr.cachedHash = hash32.Reverse(digest)
 	return hdr.cachedHash
 }
 
+func (hdr *BlockHeader) GetDisplayHashString() string {
+	h := hdr.GetDisplayHash()
+	return hex.EncodeToString(h[:])
+}
+
 // GetEncodableHash returns the bytes of a block hash in little-endian wire order.
-func (hdr *BlockHeader) GetEncodableHash() []byte {
+func (hdr *BlockHeader) GetEncodableHash() hash32.T {
 	serializedHeader, err := hdr.MarshalBinary()
 
 	if err != nil {
-		return nil
+		return hash32.Nil
 	}
 
 	// SHA256d
 	digest := sha256.Sum256(serializedHeader)
 	digest = sha256.Sum256(digest[:])
 
-	return digest[:]
+	return digest
 }
 
 // GetDisplayPrevHash returns the block hash in big-endian order.
-func (hdr *BlockHeader) GetDisplayPrevHash() []byte {
-	return Reverse(hdr.HashPrevBlock)
+func (hdr *BlockHeader) GetDisplayPrevHash() hash32.T {
+	return hash32.Reverse(hdr.HashPrevBlock)
 }

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser/internal/bytestring"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -339,21 +340,25 @@ func (p *action) ToCompact() *walletrpc.CompactOrchardAction {
 type Transaction struct {
 	*rawTransaction
 	rawBytes []byte
-	txID     []byte // from getblock verbose=1
+	txID     hash32.T // from getblock verbose=1
 }
 
-func (tx *Transaction) SetTxID(txid []byte) {
+func (tx *Transaction) SetTxID(txid hash32.T) {
 	tx.txID = txid
 }
 
 // GetDisplayHash returns the transaction hash in big-endian display order.
-func (tx *Transaction) GetDisplayHash() []byte {
+func (tx *Transaction) GetDisplayHash() hash32.T {
 	// Convert to big-endian
-	return Reverse(tx.txID[:])
+	return hash32.Reverse(tx.txID)
+}
+
+func (tx *Transaction) GetDisplayHashString() string {
+	return hash32.Encode(tx.GetDisplayHash())
 }
 
 // GetEncodableHash returns the transaction hash in little-endian wire format order.
-func (tx *Transaction) GetEncodableHash() []byte {
+func (tx *Transaction) GetEncodableHash() hash32.T {
 	return tx.txID
 }
 
@@ -383,7 +388,7 @@ func (tx *Transaction) OrchardActionsCount() int {
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
-		Hash:  tx.GetEncodableHash(),
+		Hash:  hash32.ToSlice(tx.GetEncodableHash()),
 		//Fee:     0, // TODO: calculate fees
 		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),
@@ -406,7 +411,7 @@ func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 	var err error
 	if tx.nVersionGroupID != 0x892F2085 {
-		return nil, errors.New(fmt.Sprintf("version group ID %x must be 0x892F2085", tx.nVersionGroupID))
+		return nil, fmt.Errorf("version group ID %x must be 0x892F2085", tx.nVersionGroupID)
 	}
 	s, err = tx.ParseTransparent([]byte(s))
 	if err != nil {

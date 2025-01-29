@@ -9,6 +9,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -84,7 +85,7 @@ func TestCache(t *testing.T) {
 
 	// Reorg to before the first block moves back to only the first block
 	cache.Reorg(289459)
-	if cache.latestHash != nil {
+	if cache.latestHash != hash32.Nil {
 		t.Fatal("unexpected latestHash, should be nil")
 	}
 	if cache.nextBlock != 289460 {
