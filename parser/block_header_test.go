@@ -10,6 +10,8 @@ import (
 	"math/big"
 	"os"
 	"testing"
+
+	"github.com/zcash/lightwalletd/hash32"
 )
 
 // https://bitcoin.org/en/developer-reference#target-nbits
@@ -67,7 +69,7 @@ func TestBlockHeader(t *testing.T) {
 	lastBlockTime := uint32(0)
 
 	scan := bufio.NewScanner(testBlocks)
-	var prevHash []byte
+	var prevHash hash32.T
 	for scan.Scan() {
 		blockDataHex := scan.Text()
 		blockData, err := hex.DecodeString(blockDataHex)
@@ -129,7 +131,7 @@ func TestBlockHeader(t *testing.T) {
 
 		hash := blockHeader.GetDisplayHash()
 		// test caching
-		if !bytes.Equal(hash, blockHeader.GetDisplayHash()) {
+		if hash != blockHeader.GetDisplayHash() {
 			t.Error("caching is broken")
 		}
 
@@ -139,7 +141,7 @@ func TestBlockHeader(t *testing.T) {
 				t.Errorf("Hash lacked leading zeros: %x", hash)
 			}
 		}
-		if prevHash != nil && !bytes.Equal(blockHeader.GetDisplayPrevHash(), prevHash) {
+		if prevHash != hash32.Nil && blockHeader.GetDisplayPrevHash() != prevHash {
 			t.Errorf("Previous hash mismatch")
 		}
 		prevHash = hash

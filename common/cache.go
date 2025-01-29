@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/walletrpc"
 	"google.golang.org/protobuf/proto"
 )
@@ -22,10 +23,10 @@ import (
 type BlockCache struct {
 	lengthsName, blocksName string // pathnames
 	lengthsFile, blocksFile *os.File
-	starts                  []int64 // Starting offset of each block within blocksFile
-	firstBlock              int     // height of the first block in the cache (usually Sapling activation)
-	nextBlock               int     // height of the first block not in the cache
-	latestHash              []byte  // hash of the most recent (highest height) block, for detecting reorgs.
+	starts                  []int64  // Starting offset of each block within blocksFile
+	firstBlock              int      // height of the first block in the cache (usually Sapling activation)
+	nextBlock               int      // height of the first block not in the cache
+	latestHash              hash32.T // hash of the most recent (highest height) block, for detecting reorgs.
 	mutex                   sync.RWMutex
 }
 
@@ -44,7 +45,7 @@ func (c *BlockCache) GetFirstHeight() int {
 }
 
 // GetLatestHash returns the hash (block ID) of the most recent (highest) known block.
-func (c *BlockCache) GetLatestHash() []byte {
+func (c *BlockCache) GetLatestHash() hash32.T {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	return c.latestHash
@@ -52,10 +53,10 @@ func (c *BlockCache) GetLatestHash() []byte {
 
 // HashMatch indicates if the given prev-hash matches the most recent block's hash
 // so reorgs can be detected.
-func (c *BlockCache) HashMatch(prevhash []byte) bool {
+func (c *BlockCache) HashMatch(prevhash hash32.T) bool {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.latestHash == nil || bytes.Equal(c.latestHash, prevhash)
+	return c.latestHash == hash32.Nil || c.latestHash == prevhash
 }
 
 // Make the block at the given height the lowest height that we don't have.
@@ -167,7 +168,7 @@ func (c *BlockCache) readBlock(height int) *walletrpc.CompactBlock {
 
 // Caller should hold c.mutex.Lock().
 func (c *BlockCache) setLatestHash() {
-	c.latestHash = nil
+	c.latestHash = hash32.Nil
 	// There is at least one block; get the last block's hash
 	if c.nextBlock > c.firstBlock {
 		// At least one block remains; get the last block's hash
@@ -176,8 +177,7 @@ func (c *BlockCache) setLatestHash() {
 			c.recoverFromCorruption(c.nextBlock - 10000)
 			return
 		}
-		c.latestHash = make([]byte, len(block.Hash))
-		copy(c.latestHash, block.Hash)
+		c.latestHash = hash32.T(block.Hash)
 	}
 }
 
@@ -312,10 +312,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	offset := c.starts[len(c.starts)-1]
 	c.starts = append(c.starts, offset+int64(len(data)+8))
 
-	if c.latestHash == nil {
-		c.latestHash = make([]byte, len(block.Hash))
-	}
-	copy(c.latestHash, block.Hash)
+	c.latestHash = hash32.T(block.Hash)
 	c.nextBlock++
 	// Invariant: m[firstBlock..nextBlock) are valid.
 	return nil

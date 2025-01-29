@@ -53,10 +53,9 @@ type -p jq >/dev/null || {
 
 kill_background_server() {
   echo -n Stopping darkside server ...
-  grpcurl -plaintext localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Stop
+  grpcurl -plaintext localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Stop &>/dev/null
 }
 
-# Trap the EXIT signal and call the kill function
 if $start_server
 then
   trap kill_background_server EXIT
@@ -139,8 +138,8 @@ echo Getblock 663190 ...
 actual=$(gp GetBlock '{"height":663190}')
 expected='{
   "height": "663190",
-  "hash": "Ax/AHLeTfnDuXWX3ZiYo+nWvh24lyMjvR0e2CAfqEok=",
-  "prevHash": "m5/epQ9d3wl4Z8bctOB/ZCuSl8Uko4DeIpKtKZayK4U=",
+  "hash": "rnAgBry+ZWhKw+LSrWfMDFuLalVQVq7u/QyJAPFae1Y=",
+  "prevHash": "xOcqS6kNnE4yHGnLcvi1LMOqh9iY3ynEGpUTraSKpvQ=",
   "time": 1,
   "vtx": [
     {
@@ -224,8 +223,8 @@ echo GetBlock 663190 - transaction should no longer exist ...
 actual=$(gp GetBlock '{"height":663190}')
 expected='{
   "height": "663190",
-  "hash": "btosPfiJBX9m3nNSCP+vjAxWpEDS7Kfut9H7FY+mSYo=",
-  "prevHash": "m5/epQ9d3wl4Z8bctOB/ZCuSl8Uko4DeIpKtKZayK4U=",
+  "hash": "BaN41+Qi/8MY9vrJxDD1gPde1uGt4d3FTeXwhJaqea8=",
+  "prevHash": "xOcqS6kNnE4yHGnLcvi1LMOqh9iY3ynEGpUTraSKpvQ=",
   "time": 1,
   "chainMetadata": {}
 }'
@@ -235,8 +234,8 @@ echo GetBlock 663195 - transaction has moved to this block ...
 actual=$(gp GetBlock '{"height":663195}')
 expected='{
   "height": "663195",
-  "hash": "CmcEQ/NZ9nSk+VdNfCEHvKu9MTNeWKoF1dZ7cWUTnCc=",
-  "prevHash": "04i1neRIgx7vgtDkrydYJu3KWjbY5g7QvUygNBfu6ug=",
+  "hash": "l5Lmrtysk2AXXLlM3BO5+hkTDPRA6jFUCc8P2FLZKNE=",
+  "prevHash": "gJUabqKu3i1XfWeKHRveM8eyNYXB9e/W6ndgi3d9ntA=",
   "time": 1,
   "vtx": [
     {
@@ -271,7 +270,7 @@ echo GetLatestBlock - height should be 663210 ...
 actual=$(gp GetLatestBlock)
 expected='{
   "height": "663210",
-  "hash": "rcrjphYBgZSKouKURhz2/WggeXz1/XCOuytDnBhXhsQ="
+  "hash": "2PP5ywTsJmEu5Uf4wR2f8cPiZOcq7bATKGkEW2oP43Y="
 }'
 compare "$expected" "$actual"
 
@@ -283,7 +282,7 @@ echo GetLatestBlock - height should be 663220 ...
 actual=$(gp GetLatestBlock)
 expected='{
   "height": "663220",
-  "hash": "agUdXrK4bcC1+xRyi9kGR2cOt59TiRxDTI9sgw5TILs="
+  "hash": "y4EFJMCjxlTT76DhwRrqqsL6+l0aYXyg0nIUr2/q0x4="
 }'
 compare "$expected" "$actual"
 
@@ -321,8 +320,8 @@ expected='{
 }
 {
   "height": "663154",
-  "hash": "MJmT360oQJ7IfD5xprEuqmzFu2oROyFRe7eGcejz/bQ=",
-  "prevHash": "BQpVcT2DPoC71Oo1DyL4arAeXWFEMDsOQfwsObbKY4s=",
+  "hash": "5KcOajo6RLRL8ZKgdALls72ByFgTKE4zJ9kbzBh/k1I=",
+  "prevHash": "EneA7vMz88tX2BvMT6UhNd+DMOSVWNVurPyEJZO/IkU=",
   "time": 1,
   "chainMetadata": {}
 }'

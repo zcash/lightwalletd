@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 	"google.golang.org/grpc/codes"
@@ -76,14 +77,16 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 		return nil, status.Errorf(codes.Unavailable,
 			"GetLatestBlock: GetBlockChainInfo failed: %s", err.Error())
 	}
-	bestBlockHashBigEndian, err := hex.DecodeString(blockChainInfo.BestBlockHash)
+	bestBlockHashBigEndian, err := hash32.Decode(blockChainInfo.BestBlockHash)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"GetLatestBlock: decode block hash %s failed: %s", blockChainInfo.BestBlockHash, err.Error())
 	}
 	// Binary block hash should always be in little-endian format
-	bestBlockHash := parser.Reverse(bestBlockHashBigEndian)
-	r := &walletrpc.BlockID{Height: uint64(blockChainInfo.Blocks), Hash: bestBlockHash}
+	bestBlockHash := hash32.Reverse(bestBlockHashBigEndian)
+	r := &walletrpc.BlockID{
+		Height: uint64(blockChainInfo.Blocks),
+		Hash:   hash32.ToSlice(bestBlockHash)}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
 }
@@ -142,7 +145,8 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 		txidBigEndian, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
-		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txidBigEndian)})
+		txHash := hash32.ReverseSlice(txidBigEndian)
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txHash})
 		if err != nil {
 			return err
 		}
@@ -373,11 +377,12 @@ func (s *lwdStreamer) GetLatestTreeState(ctx context.Context, in *walletrpc.Empt
 func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	common.Log.Debugf("gRPC GetTransaction(%+v)\n", txf)
 	if txf.Hash != nil {
-		txidHex := hex.EncodeToString(parser.Reverse(txf.Hash))
 		if len(txf.Hash) != 32 {
 			return nil, status.Errorf(codes.InvalidArgument,
-				"GetTransaction: transaction ID %s has invalid length: %d", txidHex, len(txidHex))
+				"GetTransaction: transaction ID has invalid length: %d", len(txf.Hash))
 		}
+		// Convert from little endian to big endian.
+		txidHex := hash32.Encode(hash32.Reverse(hash32.T(txf.Hash)))
 		txidJSON, err := json.Marshal(txidHex)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument,
@@ -555,6 +560,8 @@ func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.C
 
 // Key is 32-byte txid (as a 64-character string), data is pointer to compact tx.
 var mempoolMap *map[string]*walletrpc.CompactTx
+
+// Txids in big-endian hex (from the backend)
 var mempoolList []string
 
 // Last time we pulled a copy of the mempool from zcashd.
@@ -562,6 +569,11 @@ var lastMempool time.Time
 
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
 	common.Log.Debugf("gRPC GetMempoolTx(%+v)\n", exclude)
+	for i := 0; i < len(exclude.Txid); i++ {
+		if len(exclude.Txid[i]) > 32 {
+			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
+		}
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -633,22 +645,27 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 						"GetMempoolTx: failed decode txid, error: %s", err.Error())
 				}
 				// convert from big endian bytes to little endian and set as the txid
-				tx.SetTxID(parser.Reverse(txidBigEndian))
+				tx.SetTxID(hash32.Reverse(hash32.T(txidBigEndian)))
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}
 		mempoolMap = &newmempoolMap
 	}
 	excludeHex := make([]string, len(exclude.Txid))
-	for i := 0; i < len(exclude.Txid); i++ {
-		excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
+	for i := range exclude.Txid {
+		rev := make([]byte, len(exclude.Txid[i]))
+		for j := range rev {
+			rev[j] = exclude.Txid[i][len(exclude.Txid[i])-j-1]
+		}
+		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		tx := (*mempoolMap)[txid]
-		if len(tx.Hash) > 0 {
-			err := resp.Send(tx)
-			if err != nil {
-				return err
+		if tx, ok := (*mempoolMap)[txid]; ok {
+			if len(tx.Hash) > 0 {
+				err := resp.Send(tx)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -749,7 +766,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 		// When expressed as bytes, a txid must be little-endian.
 		err = f(&walletrpc.GetAddressUtxosReply{
 			Address:  utxo.Address,
-			Txid:     parser.Reverse(txidBigEndian),
+			Txid:     hash32.ReverseSlice(txidBigEndian),
 			Index:    int32(utxo.OutputIndex),
 			Script:   scriptBytes,
 			ValueZat: int64(utxo.Satoshis),
@@ -836,7 +853,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 		}
 		r := walletrpc.SubtreeRoot{
 			RootHash:              roothash,
-			CompletingBlockHash:   parser.Reverse(block.Hash),
+			CompletingBlockHash:   hash32.ReverseSlice(block.Hash),
 			CompletingBlockHeight: block.Height,
 		}
 		err = resp.Send(&r)
@@ -1007,7 +1024,7 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
 	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
 		Address:     arg.Address,
-		Txid:        hex.EncodeToString(parser.Reverse(arg.Txid)),
+		Txid:        hash32.Encode(hash32.Reverse(hash32.T(arg.Txid))),
 		OutputIndex: int64(arg.Index),
 		Script:      hex.EncodeToString(arg.Script),
 		Satoshis:    uint64(arg.ValueZat),

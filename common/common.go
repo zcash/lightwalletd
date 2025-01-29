@@ -5,7 +5,6 @@
 package common
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 	"google.golang.org/grpc/codes"
@@ -373,12 +373,12 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		return nil, errors.New("received unexpected height block")
 	}
 	for i, t := range block.Transactions() {
-		txidBigEndian, err := hex.DecodeString(block1.Tx[i])
+		txidBigEndian, err := hash32.Decode(block1.Tx[i])
 		if err != nil {
 			return nil, fmt.Errorf("error decoding getblock txid: %w", err)
 		}
 		// convert from big-endian
-		t.SetTxID(parser.Reverse(txidBigEndian))
+		t.SetTxID(hash32.Reverse(txidBigEndian))
 	}
 	r := block.ToCompact()
 	r.ChainMetadata.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
@@ -430,13 +430,13 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.Fatal("bad getbestblockhash return:", err, result)
 		}
-		lastBestBlockHashBE, err := hex.DecodeString(hashHex)
+		lastBestBlockHashBE, err := hash32.Decode(hashHex)
 		if err != nil {
 			Log.Fatal("error decoding getbestblockhash", err, hashHex)
 		}
 
 		height := c.GetNextHeight()
-		if bytes.Equal(lastBestBlockHashBE, parser.Reverse(c.GetLatestHash())) {
+		if lastBestBlockHashBE == hash32.Reverse(c.GetLatestHash()) {
 			// Synced
 			c.Sync()
 			if lastHeightLogged != height-1 {
@@ -454,14 +454,14 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Time.Sleep(8 * time.Second)
 			continue
 		}
-		if block != nil && c.HashMatch(block.PrevHash) {
+		if block != nil && c.HashMatch(hash32.T(block.PrevHash)) {
 			if err = c.Add(height, block); err != nil {
 				Log.Fatal("Cache add failed:", err)
 			}
 			// Don't log these too often.
 			if DarksideEnabled || Time.Now().Sub(lastLog).Seconds() >= 4 {
 				lastLog = Time.Now()
-				Log.Info("Adding block to cache ", height, " ", displayHash(block.Hash))
+				Log.Info("Adding block to cache ", height, " ", displayHash(hash32.T(block.Hash)))
 			}
 			continue
 		}
@@ -567,6 +567,6 @@ func ParseRawTransaction(message json.RawMessage) (*walletrpc.RawTransaction, er
 	}, nil
 }
 
-func displayHash(hash []byte) string {
-	return hex.EncodeToString(parser.Reverse(hash))
+func displayHash(hash hash32.T) string {
+	return hash32.Encode(hash32.Reverse(hash))
 }

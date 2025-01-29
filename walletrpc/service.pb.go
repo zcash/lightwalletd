@@ -930,6 +930,8 @@ func (x *Balance) GetValueZat() int64 {
 	return 0
 }
 
+// The a shortened transaction ID is the prefix in big-endian (hex) format
+// (then converted to binary).
 type Exclude struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
