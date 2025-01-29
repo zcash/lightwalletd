@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -369,12 +370,12 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		return nil, errors.New("received unexpected height block")
 	}
 	for i, t := range block.Transactions() {
-		txid, err := hex.DecodeString(block1.Tx[i])
+		txid, err := hash32.Decode(block1.Tx[i])
 		if err != nil {
 			return nil, fmt.Errorf("error decoding getblock txid: %w", err)
 		}
 		// convert from big-endian
-		t.SetTxID(parser.Reverse(txid))
+		t.SetTxID(hash32.Reverse(txid))
 	}
 	r := block.ToCompact()
 	r.ChainMetadata.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
@@ -426,13 +427,13 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.Fatal("bad getbestblockhash return:", err, result)
 		}
-		lastBestBlockHash, err := hex.DecodeString(hashHex)
+		lastBestBlockHash, err := hash32.Decode(hashHex)
 		if err != nil {
 			Log.Fatal("error decoding getbestblockhash", err, hashHex)
 		}
 
 		height := c.GetNextHeight()
-		if string(lastBestBlockHash) == string(parser.Reverse(c.GetLatestHash())) {
+		if lastBestBlockHash == hash32.Reverse(c.GetLatestHash()) {
 			// Synced
 			c.Sync()
 			if lastHeightLogged != height-1 {
@@ -450,14 +451,14 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Time.Sleep(8 * time.Second)
 			continue
 		}
-		if block != nil && c.HashMatch(block.PrevHash) {
+		if block != nil && c.HashMatch(hash32.T(block.PrevHash)) {
 			if err = c.Add(height, block); err != nil {
 				Log.Fatal("Cache add failed:", err)
 			}
 			// Don't log these too often.
 			if DarksideEnabled || Time.Now().Sub(lastLog).Seconds() >= 4 {
 				lastLog = Time.Now()
-				Log.Info("Adding block to cache ", height, " ", displayHash(block.Hash))
+				Log.Info("Adding block to cache ", height, " ", displayHash(hash32.T(block.Hash)))
 			}
 			continue
 		}
@@ -537,29 +538,29 @@ func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, e
 // the meanings of the `Height` field of the `RawTransaction` type are as
 // follows:
 //
-// * height 0: the transaction is in the mempool
-// * height 0xffffffffffffffff: the transaction has been mined on a fork that
-//   is not currently the main chain
-// * any other height: the transaction has been mined in the main chain at the
-//   given height
+//   - height 0: the transaction is in the mempool
+//   - height 0xffffffffffffffff: the transaction has been mined on a fork that
+//     is not currently the main chain
+//   - any other height: the transaction has been mined in the main chain at the
+//     given height
 func ParseRawTransaction(message json.RawMessage) (*walletrpc.RawTransaction, error) {
-		// Many other fields are returned, but we need only these two.
-		var txinfo ZcashdRpcReplyGetrawtransaction
-		err := json.Unmarshal(message, &txinfo)
-		if err != nil {
-			return nil, err
-		}
-		txBytes, err := hex.DecodeString(txinfo.Hex)
-		if err != nil {
-			return nil, err
-		}
+	// Many other fields are returned, but we need only these two.
+	var txinfo ZcashdRpcReplyGetrawtransaction
+	err := json.Unmarshal(message, &txinfo)
+	if err != nil {
+		return nil, err
+	}
+	txBytes, err := hex.DecodeString(txinfo.Hex)
+	if err != nil {
+		return nil, err
+	}
 
-		return &walletrpc.RawTransaction{
-			Data:   txBytes,
-			Height: uint64(txinfo.Height),
-		}, nil
+	return &walletrpc.RawTransaction{
+		Data:   txBytes,
+		Height: uint64(txinfo.Height),
+	}, nil
 }
 
-func displayHash(hash []byte) string {
-	return hex.EncodeToString(parser.Reverse(hash))
+func displayHash(hash hash32.T) string {
+	return hash32.Encode(hash32.Reverse(hash))
 }
