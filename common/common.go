@@ -20,12 +20,13 @@ import (
 
 // 'make build' will overwrite this string with the output of git-describe (tag)
 var (
-	Version   = "v0.0.0.0-dev"
-	GitCommit = ""
-	Branch    = ""
-	BuildDate = ""
-	BuildUser = ""
-	NodeName  = "zebrad"
+	Version         = "v0.0.0.0-dev"
+	GitCommit       = ""
+	Branch          = ""
+	BuildDate       = ""
+	BuildUser       = ""
+	NodeName        = "zebrad"
+	DonationAddress = ""
 )
 
 type Options struct {
@@ -294,6 +295,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		EstimatedHeight:         uint64(getblockchaininfoReply.EstimatedHeight),
 		ZcashdBuild:             getinfoReply.Build,
 		ZcashdSubversion:        getinfoReply.Subversion,
+		DonationAddress:         DonationAddress,
 	}, nil
 }
 
