@@ -352,6 +352,7 @@ func init() {
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
 	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zebrad for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
+	rootCmd.Flags().String("donation-address", "", "Zcash UA address to accept donations for operating this server")
 
 	viper.BindPFlag("grpc-bind-addr", rootCmd.Flags().Lookup("grpc-bind-addr"))
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
@@ -391,6 +392,7 @@ func init() {
 	viper.SetDefault("darkside-very-insecure", false)
 	viper.BindPFlag("darkside-timeout", rootCmd.Flags().Lookup("darkside-timeout"))
 	viper.SetDefault("darkside-timeout", 30)
+	viper.BindPFlag("donation-address", rootCmd.Flags().Lookup("donation-address"))
 
 	logger.SetFormatter(&logrus.TextFormatter{
 		//DisableColors:          true,
@@ -436,6 +438,17 @@ func initConfig() {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())
 	}
 
+	common.DonationAddress = viper.GetString("donation-address")
+
+	if common.DonationAddress != "" {
+		if !strings.HasPrefix(common.DonationAddress, "u") {
+			common.Log.Fatal("donation-address must be a Zcash UA address, generate it with a recent wallet")
+		}
+		if len(common.DonationAddress) > 255 {
+			common.Log.Fatal("donation-address must be less than 256 characters")
+		}
+		common.Log.Info("Instance donation address: ", common.DonationAddress)
+	}
 }
 
 func startHTTPServer(opts *common.Options) {
