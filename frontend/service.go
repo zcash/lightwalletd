@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -777,6 +778,17 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 	}
 	mempoolMap = nil
 	mempoolList = nil
+	return &walletrpc.Empty{}, nil
+}
+
+func (s *DarksideStreamer) Stop(ctx context.Context, _ *walletrpc.Empty) (*walletrpc.Empty, error) {
+	common.Log.Info("Stopping by gRPC request")
+	go func() {
+		// minor improvement: let the successful reply gets back to the client
+		// (otherwise it looks like the Stop request failed when it didn't)
+		common.Time.Sleep(1 * time.Second)
+		os.Exit(0)
+	}()
 	return &walletrpc.Empty{}, nil
 }
 
