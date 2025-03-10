@@ -34,6 +34,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 )
 
@@ -48,7 +49,7 @@ func main() {
 	flag.StringVar(&opts.blocksDir, "blocks-dir", "./blocks", "directory containing <N>.txt for each block height <N>, with one hex-encoded transaction per line")
 	flag.Parse()
 
-	prevhash := make([]byte, 32)
+	prevhash := hash32.Nil
 	curHeight := opts.startHeight
 
 	// Keep opening <curHeight>.txt and incrementing until the file doesn't exist.
@@ -97,12 +98,12 @@ func main() {
 			RawBlockHeader: &parser.RawBlockHeader{
 				Version:              4,
 				HashPrevBlock:        prevhash,
-				HashMerkleRoot:       hashOfTxnsAndHeight[:],
-				HashFinalSaplingRoot: make([]byte, 32),
+				HashMerkleRoot:       hashOfTxnsAndHeight,
+				HashFinalSaplingRoot: hash32.Nil,
 				Time:                 1,
-				NBitsBytes:           make([]byte, 4),
-				Nonce:                make([]byte, 32),
-				Solution:             make([]byte, 1344),
+				NBitsBytes:           [4]byte{},
+				Nonce:                [32]byte{},
+				Solution:             [1344]byte{},
 			},
 		}
 
