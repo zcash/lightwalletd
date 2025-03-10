@@ -142,4 +142,7 @@ service DarksideStreamer {
     // Sets the subtree roots cache (for GetSubtreeRoots),
     // replacing any existing entries
     rpc SetSubtreeRoots(DarksideSubtreeRoots) returns (Empty) {}
+
+    // Stop causes the server to shut down cleanly.
+    rpc Stop(Empty) returns (Empty) {}
 }
