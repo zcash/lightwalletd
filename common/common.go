@@ -53,7 +53,7 @@ type Options struct {
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
 }
 
-// RawRequest points to the function to send a an RPC request to zcashd;
+// RawRequest points to the function to send an RPC request to zcashd;
 // in production, it points to btcsuite/btcd/rpcclient/rawrequest.go:RawRequest();
 // in unit tests it points to a function to mock RPCs to zcashd.
 var RawRequest func(method string, params []json.RawMessage) (json.RawMessage, error)
