@@ -1,6 +1,8 @@
 module github.com/zcash/lightwalletd
 
-go 1.17
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/BurntSushi/toml v0.3.1
