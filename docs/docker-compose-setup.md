@@ -25,7 +25,7 @@ Copy `.env.example` to `.env` and change any required parameters.
 |`ZCASHD_GEN`| should zcashd mine? `0` or `1`
 |`LWD_PORT`| port for lightwalletd to bind to|
 |`ZCASHD_CONF_PATH`| path for lightwalletd to pick up configuration|
-
+|`ZEBRA_RPC_PORT`| RPC port for Zebra|
 
 ## Populate secret env vars with random values
 
@@ -136,3 +136,27 @@ Edit `docker-compose.yml` to look like
 ```
 
 When you edit these lines in `docker-compose.yml`, stopping/starting the individual `lightwalletd` container doesn't actually make the changes happen—you have to stop/start the whole `docker-compose` ensemble of containers because the ports/network config stuff lives at that level and doesn't seem to be affected by individual container stop/starts. Also if you want to expose `lightwalletd` to the whole internet, you don't need to specify an IP address, `0.0.0.0` works as it should.
+
+## Running lightwalletd with Zebra
+
+### Using the docker-compose.zebra.yml
+
+You can start the `lightwalletd` with `zebra` by using the `docker-compose.zebra.yml` file.
+
+```bash
+docker-compose -f docker-compose.zebra.yml up -d
+```
+
+If you'd like to build the lightwalletd image before starting the containers, you can do so with the following command:
+
+```bash
+docker-compose -f docker-compose.zebra.yml up --build -d
+```
+
+Inside the `.env.template` there's a variable `ZEBRA_RPC_PORT`, defaulting to `8232`, which is the port that `zebra` will be listening on for RPC requests. This port is exposed to the host machine and can be accessed by the `lightwalletd` container.
+
+If you'd like to confirm if the RPC port is exposed and working as expected, you can run the following command:
+
+```bash
+curl --data-binary '{"jsonrpc":"2.0","id":"curltest","method":"getinfo","params":[]}' -H 'Content-Type: application/json' http://127.0.0.1:8232
+```
