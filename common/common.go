@@ -258,7 +258,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	var getinfoReply ZcashdRpcReplyGetinfo
 	err := json.Unmarshal(result, &getinfoReply)
 	if err != nil {
-		return nil, rpcErr
+		return nil, err
 	}
 
 	result, rpcErr = RawRequest("getblockchaininfo", []json.RawMessage{})
@@ -268,7 +268,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	var getblockchaininfoReply ZcashdRpcReplyGetblockchaininfo
 	err = json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
-		return nil, rpcErr
+		return nil, err
 	}
 	// If the sapling consensus branch doesn't exist, it must be regtest
 	var saplingHeight int
