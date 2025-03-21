@@ -32,6 +32,8 @@ var (
 const (
 	unitTestPath  = "unittestcache"
 	unitTestChain = "unittestnet"
+	testTxid      = "1234000000000000000000000000000000000000000000000000000000000000"
+	testBlockid   = "0000000000000000000000000000000000000000000000000000000000380640"
 )
 
 func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
@@ -153,7 +155,7 @@ func getLatestBlockStub(method string, params []json.RawMessage) (json.RawMessag
 			testT.Fatal("unexpected getblock height", arg)
 		}
 		// verbose mode (getblock height 1), return transaction list
-		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
+		return []byte("{\"Tx\": [\"" + testTxid + "\"], \"Hash\": \"" + testBlockid + "\"}"), nil
 	case 2:
 		if method != "getblock" {
 			testT.Fatal("unexpected method:", method)
@@ -163,7 +165,7 @@ func getLatestBlockStub(method string, params []json.RawMessage) (json.RawMessag
 		if err != nil {
 			testT.Fatal("could not unmarshal height")
 		}
-		if arg != "0000380640" {
+		if arg != testBlockid {
 			testT.Fatal("unexpected getblock hash", arg)
 		}
 		return blocks[0], nil
@@ -378,9 +380,9 @@ func getblockStub(method string, params []json.RawMessage) (json.RawMessage, err
 			testT.Fatal("unexpected getblock height", arg)
 		}
 		// verbose mode (getblock height 1), return transaction list
-		return []byte("{\"Tx\": [\"00\"], \"Hash\": \"0000380640\"}"), nil
+		return []byte("{\"Tx\": [\"" + testTxid + "\"], \"Hash\": \"" + testBlockid + "\"}"), nil
 	case 2:
-		if arg != "0000380640" {
+		if arg != testBlockid {
 			testT.Fatal("unexpected getblock height", arg)
 		}
 		return blocks[0], nil

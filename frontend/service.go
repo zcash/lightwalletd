@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/zcash/lightwalletd/common"
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 )
@@ -127,7 +128,8 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		txid, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
-		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txid)})
+		txHash := hash32.ReverseSlice(txid)
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txHash})
 		if err != nil {
 			return err
 		}
@@ -339,7 +341,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		if len(txf.Hash) != 32 {
 			return nil, errors.New("transaction ID has invalid length")
 		}
-		txidJSON, err := json.Marshal(hex.EncodeToString(parser.Reverse(txf.Hash)))
+		txidJSON, err := json.Marshal(hash32.Encode(hash32.Reverse(hash32.T(txf.Hash))))
 		if err != nil {
 			return nil, err
 		}
@@ -566,7 +568,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 				if err != nil {
 					return err
 				}
-				tx.SetTxID(txidBytes)
+				tx.SetTxID(hash32.T(txidBytes))
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}
@@ -574,7 +576,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 	}
 	excludeHex := make([]string, len(exclude.Txid))
 	for i := 0; i < len(exclude.Txid); i++ {
-		excludeHex[i] = hex.EncodeToString(parser.Reverse(exclude.Txid[i]))
+		excludeHex[i] = hash32.Encode(hash32.Reverse(hash32.T(exclude.Txid[i])))
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
 		tx := (*mempoolMap)[txid]
@@ -677,7 +679,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 		}
 		err = f(&walletrpc.GetAddressUtxosReply{
 			Address:  utxo.Address,
-			Txid:     parser.Reverse(txidBytes),
+			Txid:     hash32.ReverseSlice(txidBytes),
 			Index:    int32(utxo.OutputIndex),
 			Script:   scriptBytes,
 			ValueZat: int64(utxo.Satoshis),
@@ -758,7 +760,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 		}
 		r := walletrpc.SubtreeRoot{
 			RootHash:              roothash,
-			CompletingBlockHash:   parser.Reverse(block.Hash),
+			CompletingBlockHash:   hash32.ReverseSlice(block.Hash),
 			CompletingBlockHeight: block.Height,
 		}
 		err = resp.Send(&r)
@@ -922,7 +924,7 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
 	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
 		Address:     arg.Address,
-		Txid:        hex.EncodeToString(parser.Reverse(arg.Txid)),
+		Txid:        hash32.Encode(hash32.Reverse(hash32.T(arg.Txid))),
 		OutputIndex: int64(arg.Index),
 		Script:      hex.EncodeToString(arg.Script),
 		Satoshis:    uint64(arg.ValueZat),
