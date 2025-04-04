@@ -68,11 +68,13 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	if err != nil {
 		return nil, err
 	}
-	bestBlockHash, err := hex.DecodeString(blockChainInfo.BestBlockHash)
+	bestBlockHashBigEndian, err := hex.DecodeString(blockChainInfo.BestBlockHash)
 	if err != nil {
 		return nil, err
 	}
-	r := &walletrpc.BlockID{Height: uint64(blockChainInfo.Blocks), Hash: []byte(bestBlockHash)}
+	// Binary block hash should always be in little-endian format
+	bestBlockHash := parser.Reverse(bestBlockHashBigEndian)
+	r := &walletrpc.BlockID{Height: uint64(blockChainInfo.Blocks), Hash: bestBlockHash}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
 }
