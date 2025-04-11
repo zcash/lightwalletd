@@ -116,7 +116,7 @@ func TestGetTransaction(t *testing.T) {
 	if err == nil {
 		testT.Fatal("GetTransaction unexpectedly succeeded")
 	}
-	if err.Error() != "please call GetTransaction with txid" {
+	if !strings.Contains(err.Error(), "GetTransaction: specify a txid") {
 		testT.Fatal("GetTransaction unexpected error message")
 	}
 	if rawtx != nil {
@@ -128,7 +128,7 @@ func TestGetTransaction(t *testing.T) {
 	if err == nil {
 		testT.Fatal("GetTransaction unexpectedly succeeded")
 	}
-	if err.Error() != "can't GetTransaction with a blockhash+num, please call GetTransaction with txid" {
+	if !strings.Contains(err.Error(), "GetTransaction: specify a txid, not a blockhash+num") {
 		testT.Fatal("GetTransaction unexpected error message")
 	}
 	if rawtx != nil {
@@ -303,7 +303,7 @@ func TestGetTaddressTxids(t *testing.T) {
 		if err == nil {
 			t.Fatal("GetTaddressTxids should have failed on bad address, case", i)
 		}
-		if err.Error() != "invalid address" {
+		if !strings.Contains(err.Error(), "invalid characters") {
 			t.Fatal("GetTaddressTxids incorrect error on bad address, case", i)
 		}
 	}
@@ -409,7 +409,7 @@ func TestGetBlock(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetBlock should have failed")
 	}
-	if err.Error() != "gRPC GetBlock by Hash is not yet implemented" {
+	if !strings.Contains(err.Error(), "GetBlock: Block hash specifier is not yet implemented") {
 		t.Fatal("GetBlock hash unimplemented error message failed")
 	}
 
