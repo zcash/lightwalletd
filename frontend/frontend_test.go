@@ -34,6 +34,7 @@ const (
 	unitTestChain = "unittestnet"
 )
 
+// block 380640 used here is a real block from testnet
 func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
 	os.RemoveAll(unitTestPath)
 	cache := common.NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
@@ -173,7 +174,7 @@ func getLatestBlockStub(method string, params []json.RawMessage) (json.RawMessag
 		}
 		return []byte("{\"Blocks\": 380640, " +
 			"\"BestBlockHash\": " +
-			"\"913b07faeb835a29bd3a1727876fe1c65aaeb10c7cde36ccd038b2b3445e0a00\"}"), nil
+			"\"000a5e44b3b238d0cc36de7c0cb1ae5ac6e16f8727173abd295a83ebfa073b91\"}"), nil
 
 	case 4:
 		return nil, errors.New("getblock test error, too many requests")
