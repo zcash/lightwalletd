@@ -10,6 +10,33 @@
 
 set -e
 
+# Default flag values
+help=false
+start_server=true
+
+# Parse flags
+while getopts "hn" flag; do
+  case "$flag" in
+    h) help=true ;;
+    n) start_server=false ;;
+    \?) echo "Invalid option: -$OPTARG" >&2; exit 1 ;;
+  esac
+done
+
+# Shift past the options to process positional arguments
+shift $((OPTIND-1))
+
+# allow the user to just type smoke-test.bash help
+test "$1" = help && help=true
+
+# Handle flags
+if $help; then
+  echo "Usage: $0 [-v] [-h] [-n]"
+  echo "  -h  Show this help message"
+  echo "  -n  Don't start lightwalletd server (so it can be run from a debugger)"
+  exit 0
+fi
+
 type -p grpcurl >/dev/null || {
   echo "grpcurl not found"
   echo "you may install grpcurl by running:"
@@ -30,7 +57,12 @@ kill_background_server() {
 }
 
 # Trap the EXIT signal and call the kill function
-trap kill_background_server EXIT
+if $start_server
+then
+  trap kill_background_server EXIT
+else
+  echo not starting server, expecting it to already be running
+fi
 
 # grpc production
 function gp {
@@ -78,8 +110,12 @@ function compare {
   fi
 }
 
-go run main.go --donation-address udonationaddr --zcash-conf-path ~/.zcash/zcash.conf --no-tls-very-insecure --darkside-timeout 999999 --darkside-very-insecure &
-sleep 4
+if $start_server
+then
+  echo starting the server, this takes a few seconds ...
+  go run main.go --donation-address udonationaddr --zcash-conf-path ~/.zcash/zcash.conf --no-tls-very-insecure --darkside-timeout 999999 --darkside-very-insecure &
+  sleep 8
+fi
 
 # Most of this test comes from docs/darksidewalletd.md "Simulating a reorg that moves a transaction"
 echo -n test: Reset ...
