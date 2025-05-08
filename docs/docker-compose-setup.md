@@ -120,7 +120,7 @@ Loki as a rich query syntax to help with log in many ways, for example combine 2
 
 ![grafana-explore4](./images/grafana-explore-4.png)
 
-See more here: https://github.com/grafana/loki/blob/master/docs/logql.md
+See more here: https://github.com/grafana/loki/blob/master/docs/sources/query/_index.md#logql-log-query-language
 
 
 # Exposing `lightwalletd` to the network
