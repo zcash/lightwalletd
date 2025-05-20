@@ -139,10 +139,10 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	defer cancel()
 
 	for _, txidstr := range txids {
-		txid, _ := hex.DecodeString(txidstr)
+		txidBigEndian, _ := hex.DecodeString(txidstr)
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
-		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txid)})
+		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: parser.Reverse(txidBigEndian)})
 		if err != nil {
 			return err
 		}
@@ -627,12 +627,13 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 			}
 			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
 			if tx.HasShieldedElements() {
-				txidBytes, err := hex.DecodeString(txidstr)
+				txidBigEndian, err := hex.DecodeString(txidstr)
 				if err != nil {
 					return status.Errorf(codes.Internal,
 						"GetMempoolTx: failed decode txid, error: %s", err.Error())
 				}
-				tx.SetTxID(txidBytes)
+				// convert from big endian bytes to little endian and set as the txid
+				tx.SetTxID(parser.Reverse(txidBigEndian))
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}
@@ -742,7 +743,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 		if arg.MaxEntries > 0 && uint32(n) > arg.MaxEntries {
 			break
 		}
-		txidBytes, err := hex.DecodeString(utxo.Txid)
+		txidBigEndian, err := hex.DecodeString(utxo.Txid)
 		if err != nil {
 			return status.Errorf(codes.Internal,
 				"getAddressUtxos: failed decode txid, error: %s", err.Error())
@@ -752,9 +753,10 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 			return status.Errorf(codes.Internal,
 				"getAddressUtxos: failed decode utxo script, error: %s", err.Error())
 		}
+		// When expressed as bytes, a txid must be little-endian.
 		err = f(&walletrpc.GetAddressUtxosReply{
 			Address:  utxo.Address,
-			Txid:     parser.Reverse(txidBytes),
+			Txid:     parser.Reverse(txidBigEndian),
 			Index:    int32(utxo.OutputIndex),
 			Script:   scriptBytes,
 			ValueZat: int64(utxo.Satoshis),

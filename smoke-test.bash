@@ -178,7 +178,7 @@ gt StageTransactions '{"height":663195,"url":"https://raw.githubusercontent.com/
 echo GetMempoolTx ...
 actual=$(gp GetMempoolTx '{"txid":""}')
 expected='{
-  "hash": "CCGom+fy/BMReSw/od0hcajN+y7/2YWQy9Xrzc/PSR8=",
+  "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
   "spends": [
     {
       "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
