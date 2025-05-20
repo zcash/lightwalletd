@@ -254,7 +254,7 @@ echo GetLatestBlock - height should be 663210 ...
 actual=$(gp GetLatestBlock)
 expected='{
   "height": "663210",
-  "hash": "xIZXGJxDK7uOcP31fHkgaP32HEaU4qKKlIEBFqbjyq0="
+  "hash": "rcrjphYBgZSKouKURhz2/WggeXz1/XCOuytDnBhXhsQ="
 }'
 compare "$expected" "$actual"
 
@@ -266,7 +266,7 @@ echo GetLatestBlock - height should be 663220 ...
 actual=$(gp GetLatestBlock)
 expected='{
   "height": "663220",
-  "hash": "uyBTDoNsj0xDHIlTn7cOZ0cG2YtyFPu1wG24sl4dBWo="
+  "hash": "agUdXrK4bcC1+xRyi9kGR2cOt59TiRxDTI9sgw5TILs="
 }'
 compare "$expected" "$actual"
 
