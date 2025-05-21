@@ -91,18 +91,18 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 // GetTaddressTxids is a streaming RPC that returns transactions that have
 // the given transparent address (taddr) as either an input or output.
 // NB, this method is misnamed, it does not return txids.
-func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTxidsServer) error {
-	common.Log.Debugf("gRPC GetTaddressTxids(%+v)\n", addressBlockFilter)
+func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTransactionsServer) error {
+	common.Log.Debugf("gRPC GetTaddressTransactions(%+v)\n", addressBlockFilter)
 	if err := checkTaddress(addressBlockFilter.Address); err != nil {
 		// This returns a gRPC-compatible error.
 		return err
 	}
 
 	if addressBlockFilter.Range == nil {
-		return status.Error(codes.InvalidArgument, "GetTaddressTxids: must specify block range")
+		return status.Error(codes.InvalidArgument, "GetTaddressTransactions: must specify block range")
 	}
 	if addressBlockFilter.Range.Start == nil {
-		return status.Error(codes.InvalidArgument, "GetTaddressTxids: must specify a start block height")
+		return status.Error(codes.InvalidArgument, "GetTaddressTransactions: must specify a start block height")
 	}
 
 	request := &common.ZcashdRpcRequestGetaddresstxids{
@@ -116,7 +116,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	param, err := json.Marshal(request)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument,
-			"GetTaddressTxids: error marshalling request: %s", err.Error())
+			"GetTaddressTransactions: error marshalling request: %s", err.Error())
 	}
 	params := []json.RawMessage{param}
 
@@ -125,7 +125,7 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
 		return status.Errorf(codes.InvalidArgument,
-			"GetTaddressTxids: getaddresstxids failed, error: %s", rpcErr.Error())
+			"GetTaddressTransactions: getaddresstxids failed, error: %s", rpcErr.Error())
 	}
 
 	var txids []string
@@ -151,6 +151,14 @@ func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.Transparent
 		}
 	}
 	return nil
+}
+
+// This method is deprecated; use GetTaddressTransactions instead. The two functions have the
+// same functionality, but the name GetTaddressTxids is misleading, because the method returns
+// transactions, not transaction IDs (txids). See https://github.com/zcash/lightwalletd/issues/426
+func (s *lwdStreamer) GetTaddressTxids(addressBlockFilter *walletrpc.TransparentAddressBlockFilter, resp walletrpc.CompactTxStreamer_GetTaddressTxidsServer) error {
+	common.Log.Debugf("gRPC GetTaddressTxids, deprecated, calling GetTaddressTransactions...\n")
+	return s.GetTaddressTransactions(addressBlockFilter, resp)
 }
 
 // GetBlock returns the compact block at the requested height. Requesting a
