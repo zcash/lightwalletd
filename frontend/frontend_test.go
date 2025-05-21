@@ -108,7 +108,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetTransaction(t *testing.T) {
-	// GetTransaction() will mostly be tested below via TestGetTaddressTxids
+	// GetTransaction() will mostly be tested below via TestGetTaddressTransactions
 	lwd, _ := testsetup()
 
 	rawtx, err := lwd.GetTransaction(context.Background(),
@@ -267,7 +267,7 @@ func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, er
 }
 
 type testgettx struct {
-	walletrpc.CompactTxStreamer_GetTaddressTxidsServer
+	walletrpc.CompactTxStreamer_GetTaddressTransactionsServer
 }
 
 func (tg *testgettx) Context() context.Context {
@@ -284,7 +284,7 @@ func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
 	return nil
 }
 
-func TestGetTaddressTxids(t *testing.T) {
+func TestGetTaddressTransactions(t *testing.T) {
 	testT = t
 	common.RawRequest = zcashdrpcStub
 	lwd, _ := testsetup()
@@ -299,38 +299,38 @@ func TestGetTaddressTxids(t *testing.T) {
 	// Ensure that a bad address is detected
 	for i, addressTest := range addressTests {
 		addressBlockFilter.Address = addressTest
-		err := lwd.GetTaddressTxids(addressBlockFilter, &testgettx{})
+		err := lwd.GetTaddressTransactions(addressBlockFilter, &testgettx{})
 		if err == nil {
-			t.Fatal("GetTaddressTxids should have failed on bad address, case", i)
+			t.Fatal("GetTaddressTransactions should have failed on bad address, case", i)
 		}
 		if !strings.Contains(err.Error(), "invalid characters") {
-			t.Fatal("GetTaddressTxids incorrect error on bad address, case", i)
+			t.Fatal("GetTaddressTransactions incorrect error on bad address, case", i)
 		}
 	}
 
 	// valid address
 	addressBlockFilter.Address = "t1234567890123456789012345678901234"
-	err := lwd.GetTaddressTxids(addressBlockFilter, &testgettx{})
+	err := lwd.GetTaddressTransactions(addressBlockFilter, &testgettx{})
 	if err != nil {
-		t.Fatal("GetTaddressTxids failed", err)
+		t.Fatal("GetTaddressTransactions failed", err)
 	}
 
 	// this time GetTransaction() will return an error
-	err = lwd.GetTaddressTxids(addressBlockFilter, &testgettx{})
+	err = lwd.GetTaddressTransactions(addressBlockFilter, &testgettx{})
 	if err == nil {
-		t.Fatal("GetTaddressTxids succeeded")
+		t.Fatal("GetTaddressTransactions succeeded")
 	}
 	step = 0
 }
 
-func TestGetTaddressTxidsNilArgs(t *testing.T) {
+func TestGetTaddressTransactionsNilArgs(t *testing.T) {
 	lwd, _ := testsetup()
 
 	{
 		noRange := &walletrpc.TransparentAddressBlockFilter{
 			Range: nil,
 		}
-		err := lwd.GetTaddressTxids(noRange, &testgettx{})
+		err := lwd.GetTaddressTransactions(noRange, &testgettx{})
 		if err == nil {
 			t.Fatal("GetBlockRange nil range argument should fail")
 		}
@@ -342,7 +342,7 @@ func TestGetTaddressTxidsNilArgs(t *testing.T) {
 				End:   &walletrpc.BlockID{Height: 20},
 			},
 		}
-		err := lwd.GetTaddressTxids(noStart, &testgettx{})
+		err := lwd.GetTaddressTransactions(noStart, &testgettx{})
 		if err == nil {
 			t.Fatal("GetBlockRange nil range argument should fail")
 		}
@@ -354,7 +354,7 @@ func TestGetTaddressTxidsNilArgs(t *testing.T) {
 				End:   nil,
 			},
 		}
-		err := lwd.GetTaddressTxids(noEnd, &testgettx{})
+		err := lwd.GetTaddressTransactions(noEnd, &testgettx{})
 		if err == nil {
 			t.Fatal("GetBlockRange nil range argument should fail")
 		}

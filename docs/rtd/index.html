@@ -1913,7 +1913,15 @@ the `RawTransaction` type are as follows:
                 <td><a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
                 <td><p>Return the transactions corresponding to the given t-address within the given block range
-NB - this method is misnamed, it returns transactions, not transaction IDs.</p></td>
+NB - this method is misnamed, it returns transactions, not transaction IDs.
+NOTE: this method is deprecated, please use GetTaddressTransactions instead.</p></td>
+              </tr>
+            
+              <tr>
+                <td>GetTaddressTransactions</td>
+                <td><a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
+                <td><p>Return the transactions corresponding to the given t-address within the given block range</p></td>
               </tr>
             
               <tr>

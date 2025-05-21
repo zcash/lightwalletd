@@ -31,6 +31,7 @@ const (
 	CompactTxStreamer_GetTransaction_FullMethodName           = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTransaction"
 	CompactTxStreamer_SendTransaction_FullMethodName          = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/SendTransaction"
 	CompactTxStreamer_GetTaddressTxids_FullMethodName         = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressTxids"
+	CompactTxStreamer_GetTaddressTransactions_FullMethodName  = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressTransactions"
 	CompactTxStreamer_GetTaddressBalance_FullMethodName       = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalance"
 	CompactTxStreamer_GetTaddressBalanceStream_FullMethodName = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetTaddressBalanceStream"
 	CompactTxStreamer_GetMempoolTx_FullMethodName             = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetMempoolTx"
@@ -64,7 +65,10 @@ type CompactTxStreamerClient interface {
 	SendTransaction(ctx context.Context, in *RawTransaction, opts ...grpc.CallOption) (*SendResponse, error)
 	// Return the transactions corresponding to the given t-address within the given block range
 	// NB - this method is misnamed, it returns transactions, not transaction IDs.
+	// NOTE: this method is deprecated, please use GetTaddressTransactions instead.
 	GetTaddressTxids(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTxidsClient, error)
+	// Return the transactions corresponding to the given t-address within the given block range
+	GetTaddressTransactions(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTransactionsClient, error)
 	GetTaddressBalance(ctx context.Context, in *AddressList, opts ...grpc.CallOption) (*Balance, error)
 	GetTaddressBalanceStream(ctx context.Context, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressBalanceStreamClient, error)
 	// Return the compact transactions currently in the mempool; the results
@@ -246,6 +250,38 @@ func (x *compactTxStreamerGetTaddressTxidsClient) Recv() (*RawTransaction, error
 	return m, nil
 }
 
+func (c *compactTxStreamerClient) GetTaddressTransactions(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTransactionsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], CompactTxStreamer_GetTaddressTransactions_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &compactTxStreamerGetTaddressTransactionsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type CompactTxStreamer_GetTaddressTransactionsClient interface {
+	Recv() (*RawTransaction, error)
+	grpc.ClientStream
+}
+
+type compactTxStreamerGetTaddressTransactionsClient struct {
+	grpc.ClientStream
+}
+
+func (x *compactTxStreamerGetTaddressTransactionsClient) Recv() (*RawTransaction, error) {
+	m := new(RawTransaction)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *compactTxStreamerClient) GetTaddressBalance(ctx context.Context, in *AddressList, opts ...grpc.CallOption) (*Balance, error) {
 	out := new(Balance)
 	err := c.cc.Invoke(ctx, CompactTxStreamer_GetTaddressBalance_FullMethodName, in, out, opts...)
@@ -256,7 +292,7 @@ func (c *compactTxStreamerClient) GetTaddressBalance(ctx context.Context, in *Ad
 }
 
 func (c *compactTxStreamerClient) GetTaddressBalanceStream(ctx context.Context, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressBalanceStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[3], CompactTxStreamer_GetTaddressBalanceStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], CompactTxStreamer_GetTaddressBalanceStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +326,7 @@ func (x *compactTxStreamerGetTaddressBalanceStreamClient) CloseAndRecv() (*Balan
 }
 
 func (c *compactTxStreamerClient) GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[4], CompactTxStreamer_GetMempoolTx_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], CompactTxStreamer_GetMempoolTx_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +358,7 @@ func (x *compactTxStreamerGetMempoolTxClient) Recv() (*CompactTx, error) {
 }
 
 func (c *compactTxStreamerClient) GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], CompactTxStreamer_GetMempoolStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[6], CompactTxStreamer_GetMempoolStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +408,7 @@ func (c *compactTxStreamerClient) GetLatestTreeState(ctx context.Context, in *Em
 }
 
 func (c *compactTxStreamerClient) GetSubtreeRoots(ctx context.Context, in *GetSubtreeRootsArg, opts ...grpc.CallOption) (CompactTxStreamer_GetSubtreeRootsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[6], CompactTxStreamer_GetSubtreeRoots_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[7], CompactTxStreamer_GetSubtreeRoots_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -413,7 +449,7 @@ func (c *compactTxStreamerClient) GetAddressUtxos(ctx context.Context, in *GetAd
 }
 
 func (c *compactTxStreamerClient) GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (CompactTxStreamer_GetAddressUtxosStreamClient, error) {
-	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[7], CompactTxStreamer_GetAddressUtxosStream_FullMethodName, opts...)
+	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[8], CompactTxStreamer_GetAddressUtxosStream_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -482,7 +518,10 @@ type CompactTxStreamerServer interface {
 	SendTransaction(context.Context, *RawTransaction) (*SendResponse, error)
 	// Return the transactions corresponding to the given t-address within the given block range
 	// NB - this method is misnamed, it returns transactions, not transaction IDs.
+	// NOTE: this method is deprecated, please use GetTaddressTransactions instead.
 	GetTaddressTxids(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTxidsServer) error
+	// Return the transactions corresponding to the given t-address within the given block range
+	GetTaddressTransactions(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTransactionsServer) error
 	GetTaddressBalance(context.Context, *AddressList) (*Balance, error)
 	GetTaddressBalanceStream(CompactTxStreamer_GetTaddressBalanceStreamServer) error
 	// Return the compact transactions currently in the mempool; the results
@@ -543,6 +582,9 @@ func (UnimplementedCompactTxStreamerServer) SendTransaction(context.Context, *Ra
 }
 func (UnimplementedCompactTxStreamerServer) GetTaddressTxids(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTxidsServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetTaddressTxids not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetTaddressTransactions(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTransactionsServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetTaddressTransactions not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetTaddressBalance(context.Context, *AddressList) (*Balance, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTaddressBalance not implemented")
@@ -740,6 +782,27 @@ type compactTxStreamerGetTaddressTxidsServer struct {
 }
 
 func (x *compactTxStreamerGetTaddressTxidsServer) Send(m *RawTransaction) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _CompactTxStreamer_GetTaddressTransactions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(TransparentAddressBlockFilter)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(CompactTxStreamerServer).GetTaddressTransactions(m, &compactTxStreamerGetTaddressTransactionsServer{stream})
+}
+
+type CompactTxStreamer_GetTaddressTransactionsServer interface {
+	Send(*RawTransaction) error
+	grpc.ServerStream
+}
+
+type compactTxStreamerGetTaddressTransactionsServer struct {
+	grpc.ServerStream
+}
+
+func (x *compactTxStreamerGetTaddressTransactionsServer) Send(m *RawTransaction) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -1027,6 +1090,11 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "GetTaddressTxids",
 			Handler:       _CompactTxStreamer_GetTaddressTxids_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "GetTaddressTransactions",
+			Handler:       _CompactTxStreamer_GetTaddressTransactions_Handler,
 			ServerStreams: true,
 		},
 		{

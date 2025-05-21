@@ -192,7 +192,12 @@ service CompactTxStreamer {
 
     // Return the transactions corresponding to the given t-address within the given block range
     // NB - this method is misnamed, it returns transactions, not transaction IDs.
+    // NOTE: this method is deprecated, please use GetTaddressTransactions instead.
     rpc GetTaddressTxids(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
+
+    // Return the transactions corresponding to the given t-address within the given block range
+    rpc GetTaddressTransactions(TransparentAddressBlockFilter) returns (stream RawTransaction) {}
+
     rpc GetTaddressBalance(AddressList) returns (Balance) {}
     rpc GetTaddressBalanceStream(stream Address) returns (Balance) {}
 
