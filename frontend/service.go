@@ -627,12 +627,13 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 			}
 			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
 			if tx.HasShieldedElements() {
-				txidBytes, err := hex.DecodeString(txidstr)
+				txidBigEndian, err := hex.DecodeString(txidstr)
 				if err != nil {
 					return status.Errorf(codes.Internal,
 						"GetMempoolTx: failed decode txid, error: %s", err.Error())
 				}
-				tx.SetTxID(txidBytes)
+				// convert from big endian bytes to little endian and set as the txid
+				tx.SetTxID(parser.Reverse(txidBigEndian))
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}
