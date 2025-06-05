@@ -13,7 +13,7 @@ import (
 	"io"
 	"os"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -658,20 +658,13 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 // if more than one item matches an exclude entry, return
 // all those items.
 func MempoolFilter(items, exclude []string) []string {
-	sort.Slice(items, func(i, j int) bool {
-		return items[i] < items[j]
-	})
-	sort.Slice(exclude, func(i, j int) bool {
-		return exclude[i] < exclude[j]
-	})
+	slices.Sort(items)
+	slices.Sort(exclude)
 	// Determine how many items match each exclude item.
 	nmatches := make([]int, len(exclude))
 	// is the exclude string less than the item string?
 	lessthan := func(e, i string) bool {
-		l := len(e)
-		if l > len(i) {
-			l = len(i)
-		}
+		l := min(len(e), len(i))
 		return e < i[0:l]
 	}
 	ei := 0
