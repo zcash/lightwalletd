@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -668,11 +669,8 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		}
 		utxosReply := make([]ZcashdRpcReplyGetaddressutxos, 0)
 		for _, utxo := range state.getAddressUtxos {
-			for _, a := range req.Addresses {
-				if a == utxo.Address {
-					utxosReply = append(utxosReply, utxo)
-					break
-				}
+			if slices.Contains(req.Addresses, utxo.Address) {
+				utxosReply = append(utxosReply, utxo)
 			}
 		}
 		return json.Marshal(utxosReply)
