@@ -758,7 +758,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 	if err != nil {
 		return nil, errors.New("failed to parse getrawtransaction JSON")
 	}
-	txid, err := hex.DecodeString(rawtx)
+	txidBigEndian, err := hex.DecodeString(rawtx)
 	if err != nil {
 		return nil, errors.New("-9: " + err.Error())
 	}
@@ -788,7 +788,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 		_, _ = block.ParseFromSlice(b)
 		darksideSetBlockTxID(block)
 		for _, tx := range block.Transactions() {
-			if bytes.Equal(tx.GetDisplayHash(), txid) {
+			if bytes.Equal(tx.GetDisplayHash(), txidBigEndian) {
 				return marshalReply(tx, block.GetHeight())
 			}
 		}
@@ -825,7 +825,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 		tx := parser.NewTransaction()
 		_, _ = tx.ParseFromSlice(stx.bytes)
 		darksideSetTxID(tx)
-		if bytes.Equal(tx.GetDisplayHash(), txid) {
+		if bytes.Equal(tx.GetDisplayHash(), txidBigEndian) {
 			return marshalReply(tx, 0), nil
 		}
 	}

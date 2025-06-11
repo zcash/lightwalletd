@@ -5,6 +5,7 @@
 package common
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -372,12 +373,12 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 		return nil, errors.New("received unexpected height block")
 	}
 	for i, t := range block.Transactions() {
-		txid, err := hex.DecodeString(block1.Tx[i])
+		txidBigEndian, err := hex.DecodeString(block1.Tx[i])
 		if err != nil {
 			return nil, fmt.Errorf("error decoding getblock txid: %w", err)
 		}
 		// convert from big-endian
-		t.SetTxID(parser.Reverse(txid))
+		t.SetTxID(parser.Reverse(txidBigEndian))
 	}
 	r := block.ToCompact()
 	r.ChainMetadata.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
@@ -429,13 +430,13 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.Fatal("bad getbestblockhash return:", err, result)
 		}
-		lastBestBlockHash, err := hex.DecodeString(hashHex)
+		lastBestBlockHashBE, err := hex.DecodeString(hashHex)
 		if err != nil {
 			Log.Fatal("error decoding getbestblockhash", err, hashHex)
 		}
 
 		height := c.GetNextHeight()
-		if string(lastBestBlockHash) == string(parser.Reverse(c.GetLatestHash())) {
+		if bytes.Equal(lastBestBlockHashBE, parser.Reverse(c.GetLatestHash())) {
 			// Synced
 			c.Sync()
 			if lastHeightLogged != height-1 {
