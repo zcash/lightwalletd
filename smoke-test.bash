@@ -133,6 +133,8 @@ gt ApplyStaged '{"height":663210}'
 # the block ingestor needs time to receive the block from the (fake) zcashd
 wait_height 663190
 
+# The transaction in this block is on mainnet, but in block 663229.
+# Its txid is 0821a89be7f2fc1311792c3fa1dd2171a8cdfb2effd98590cbd5ebcdcfcf491f
 echo Getblock 663190 ...
 actual=$(gp GetBlock '{"height":663190}')
 expected='{
@@ -175,8 +177,23 @@ gt StageBlocksCreate '{"height":663180,"count":100}'
 echo -n test: StageTransactions block 663195 ...
 gt StageTransactions '{"height":663195,"url":"https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/transactions/recv/0821a89be7f2fc1311792c3fa1dd2171a8cdfb2effd98590cbd5ebcdcfcf491f.txt"}'
 
-echo GetMempoolTx ...
-actual=$(gp GetMempoolTx '{"txid":""}')
+# The first two bytes of 0821...cf491f (big-endian, see above) are 08 and 21; specifying
+# 0821 as the exclude filter should cause the transaction with that txid to NOT be returned.
+# 0821 converted to base64 (which grpcurl expects for binary data), is IQg=
+echo GetMempoolTx with 2-byte matching filter ...
+actual=$(gp GetMempoolTx '{"txid":"IQg="}')
+expected=''
+compare "$expected" "$actual"
+
+# Should also work with a 3-byte filter, 0821a8. Convert to base64 for the argument.
+echo GetMempoolTx with 3-byte matching filter ...
+actual=$(gp GetMempoolTx '{"txid":"qCEI"}')
+expected=''
+compare "$expected" "$actual"
+
+# Any other filter should cause the entry to be returned (no exclude match).
+echo GetMempoolTx with unmatched filter...
+actual=$(gp GetMempoolTx '{"txid":"SR8="}')
 expected='{
   "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
   "spends": [
