@@ -124,6 +124,8 @@ message Balance {
     int64 valueZat = 1;
 }
 
+// The a shortened transaction ID is the prefix in big-endian (hex) format
+// (then converted to binary).
 message Exclude {
     repeated bytes txid = 1;
 }
@@ -210,6 +212,9 @@ service CompactTxStreamer {
     // more bandwidth-efficient; if two or more transactions in the mempool
     // match a shortened txid, they are all sent (none is excluded). Transactions
     // in the exclude list that don't exist in the mempool are ignored.
+    //
+    // The a shortened transaction ID is the prefix in big-endian (hex) format
+    // (then converted to binary). See smoke-test.bash for examples.
     rpc GetMempoolTx(Exclude) returns (stream CompactTx) {}
 
     // Return a stream of current Mempool transactions. This will keep the output stream open while
