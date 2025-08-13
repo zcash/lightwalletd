@@ -24,6 +24,9 @@ const (
 
 // RawBlockHeader implements the block header as defined in version
 // 2018.0-beta-29 of the Zcash Protocol Spec.
+// Note that this struct differs from the wire-encoded block header, in that
+// the latter includes 3 bytes of compact length encoding of the size of
+// the Solution. This size is always 1344 (encoded as 0xfd4005).
 type RawBlockHeader struct {
 	// The block version number indicates which set of block validation rules
 	// to follow. The current and only defined block version number for Zcash

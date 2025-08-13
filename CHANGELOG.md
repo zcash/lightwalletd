@@ -10,6 +10,16 @@ The most recent changes are listed first.
 
 ### Added
 
+- Add block header to GetBlock and GetBlockRange result (#527)
+
+### Changed
+
+- Change the `--nocache` argument default to true (#527)
+
+## [0.4.18 - 2025-06-01]
+
+### Added
+
 - Add debug logging to gRPC entry and exit points.
 
 - Add smoke test
