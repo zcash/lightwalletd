@@ -29,11 +29,11 @@ LDFLAGS :=-ldflags "$(LDFLAGSSTRING)"
 
 # There are some files that are generated but are also in source control
 # (so that the average clone - build doesn't need the required tools)
-GENERATED_FILES := docs/rtd/index.html walletrpc/compact_formats.pb.go walletrpc/service.pb.go walletrpc/darkside.pb.go
+GENERATED_FILES := walletrpc/compact_formats.pb.go walletrpc/service.pb.go walletrpc/darkside.pb.go
 
 PWD := $(shell pwd)
 
-.PHONY: all dep build clean test coverage lint doc simpledoc proto
+.PHONY: all dep build clean test coverage lint proto
 
 all: first-make-timestamp build $(GENERATED_FILES)
 
