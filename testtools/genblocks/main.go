@@ -103,7 +103,7 @@ func main() {
 				Time:                 1,
 				NBitsBytes:           [4]byte{},
 				Nonce:                [32]byte{},
-				Solution:             [1344]byte{},
+				Solution:             make([]byte, 1344),
 			},
 		}
 
