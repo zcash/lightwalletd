@@ -462,7 +462,7 @@ func DarksideStageBlocksCreate(height int32, nonce int32, count int32) error {
 				Time:                 1,                   // start: 100
 				NBitsBytes:           [4]byte{},           // start: 104
 				Nonce:                hash32.Nil,          // start: 108
-				Solution:             [1344]byte{},        // starts: 140, 143
+				Solution:             make([]byte, 1344),  // starts: 140, 143
 			}, // length: 1487
 		}
 
