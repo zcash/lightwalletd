@@ -1,3 +1,6 @@
+// Copyright (c) 2019-present The Zcash developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
 package cmd
 
 import (
@@ -183,7 +186,6 @@ func startServer(opts *common.Options) error {
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
-	var saplingHeight int
 	var chainName string
 	var rpcClient *rpcclient.Client
 	var err error
@@ -216,7 +218,6 @@ func startServer(opts *common.Options) error {
 			" block height ", getLightdInfo.BlockHeight,
 			" chain ", getLightdInfo.ChainName,
 			" branchID ", getLightdInfo.ConsensusBranchId)
-		saplingHeight = int(getLightdInfo.SaplingActivationHeight)
 		chainName = getLightdInfo.ChainName
 		if strings.Contains(getLightdInfo.ZcashdSubversion, "MagicBean") {
 			// The default is zebrad
@@ -255,7 +256,9 @@ func startServer(opts *common.Options) error {
 		if opts.Redownload {
 			syncFromHeight = 0
 		}
-		cache = common.NewBlockCache(dbPath, chainName, saplingHeight, syncFromHeight)
+		// Previously, we started the cache at the Sapling activation height,
+		// because earlier blocks weren't relevant; now we start at height 0.
+		cache = common.NewBlockCache(dbPath, chainName, 0, syncFromHeight)
 	}
 	if !opts.Darkside {
 		if !opts.NoCache {
