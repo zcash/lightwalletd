@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-present The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -228,7 +228,7 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	c.starts = nil
 	c.starts = append(c.starts, 0)
 	nBlocks := len(lengths) / 4
-	Log.Info("Reading ", nBlocks, " blocks (since Sapling activation) from disk cache ...")
+	Log.Info("Reading ", nBlocks, " blocks from the cache ...")
 	for i := 0; i < nBlocks; i++ {
 		if len(lengths[:4]) < 4 {
 			Log.Warning("lengths file has a partial entry")
