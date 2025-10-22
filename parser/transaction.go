@@ -403,6 +403,11 @@ func (tx *Transaction) OrchardActionsCount() int {
 
 // ToCompact converts the given (full) transaction to compact format.
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
+	// we don't need to store the vin (transparent inputs) of a coinbase tx
+	var vinLen int
+	if index > 0 {
+		vinLen = len(tx.transparentInputs)
+	}
 	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
 		Txid:  hash32.ToSlice(tx.GetEncodableHash()),
@@ -410,7 +415,7 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),
 		Actions: make([]*walletrpc.CompactOrchardAction, len(tx.orchardActions)),
-		Vin:     make([]*walletrpc.CompactTxIn, len(tx.transparentInputs)),
+		Vin:     make([]*walletrpc.CompactTxIn, vinLen),
 		Vout:    make([]*walletrpc.TxOut, len(tx.transparentOutputs)),
 	}
 	for i, spend := range tx.shieldedSpends {
@@ -422,8 +427,10 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	for i, a := range tx.orchardActions {
 		ctx.Actions[i] = a.ToCompact()
 	}
-	for i, tinput := range tx.transparentInputs {
-		ctx.Vin[i] = tinput.ToCompact()
+	if vinLen > 0 {
+		for i, tinput := range tx.transparentInputs {
+			ctx.Vin[i] = tinput.ToCompact()
+		}
 	}
 	for i, toutput := range tx.transparentOutputs {
 		ctx.Vout[i] = toutput.ToCompact()

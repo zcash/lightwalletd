@@ -145,12 +145,6 @@ expected='{
   "vtx": [
     {
       "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo=",
-      "vin": [
-        {
-          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-          "prevoutIndex": 4294967295
-        }
-      ],
       "vout": [
         {
           "value": "500100000",
@@ -249,12 +243,6 @@ expected='{
   "vtx": [
     {
       "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo=",
-      "vin": [
-        {
-          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-          "prevoutIndex": 4294967295
-        }
-      ],
       "vout": [
         {
           "value": "500100000",
@@ -281,12 +269,6 @@ expected='{
   "vtx": [
     {
       "txid": "k6QFCtomiH4+XGaUhij/QXwGM5/k0KgvEZbwa/oJ5VI=",
-      "vin": [
-        {
-          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-          "prevoutIndex": 4294967295
-        }
-      ],
       "vout": [
         {
           "value": "500100000",
@@ -372,12 +354,6 @@ expected='{
   "vtx": [
     {
       "txid": "+qNwLv47uukw7U1Ge1x7p1Ym2SrQ67z5SgahxefXxIs=",
-      "vin": [
-        {
-          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-          "prevoutIndex": 4294967295
-        }
-      ],
       "vout": [
         {
           "value": "500100000",
@@ -400,12 +376,6 @@ expected='{
   "vtx": [
     {
       "txid": "v8CDZ8SiXuyV60eFHNGqnEwQhsR1761v3djLh5MaRBg=",
-      "vin": [
-        {
-          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-          "prevoutIndex": 4294967295
-        }
-      ],
       "vout": [
         {
           "value": "500100000",
@@ -428,12 +398,6 @@ expected='{
   "vtx": [
     {
       "txid": "P4MhIyT2ziuCKfejzrBlWwl/wegqR763c4vzqxqZlWQ=",
-      "vin": [
-        {
-          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-          "prevoutIndex": 4294967295
-        }
-      ],
       "vout": [
         {
           "value": "500100000",
