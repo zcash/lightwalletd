@@ -466,14 +466,14 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Time.Sleep(8 * time.Second)
 			continue
 		}
-		if block != nil && c.HashMatch(hash32.T(block.PrevHash)) {
+		if block != nil && c.HashMatch(hash32.FromSlice(block.PrevHash)) {
 			if err = c.Add(height, block); err != nil {
 				Log.Fatal("Cache add failed:", err)
 			}
 			// Don't log these too often.
 			if DarksideEnabled || Time.Now().Sub(lastLog).Seconds() >= 4 {
 				lastLog = Time.Now()
-				Log.Info("Adding block to cache ", height, " ", displayHash(hash32.T(block.Hash)))
+				Log.Info("Adding block to cache ", height, " ", displayHash(hash32.FromSlice(block.Hash)))
 			}
 			continue
 		}

@@ -380,7 +380,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 				"GetTransaction: transaction ID has invalid length: %d", len(txf.Hash))
 		}
 		// Convert from little endian to big endian.
-		txidHex := hash32.Encode(hash32.Reverse(hash32.T(txf.Hash)))
+		txidHex := hash32.Encode(hash32.Reverse(hash32.FromSlice(txf.Hash)))
 		txidJSON, err := json.Marshal(txidHex)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument,
@@ -645,7 +645,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 						"GetMempoolTx: failed decode txid, error: %s", err.Error())
 				}
 				// convert from big endian bytes to little endian and set as the txid
-				tx.SetTxID(hash32.Reverse(hash32.T(txidBigEndian)))
+				tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
 				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 			}
 		}
@@ -1027,7 +1027,7 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
 	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
 		Address:     arg.Address,
-		Txid:        hash32.Encode(hash32.Reverse(hash32.T(arg.Txid))),
+		Txid:        hash32.Encode(hash32.Reverse(hash32.FromSlice(arg.Txid))),
 		OutputIndex: int64(arg.Index),
 		Script:      hex.EncodeToString(arg.Script),
 		Satoshis:    uint64(arg.ValueZat),

@@ -53,7 +53,7 @@ func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 	if !s.ReadBytes(&b32, 32) {
 		return nil, errors.New("could not read HashPrevBlock")
 	}
-	tx.PrevTxHash = hash32.T(b32)
+	tx.PrevTxHash = hash32.FromSlice(b32)
 
 	if !s.ReadUint32(&tx.PrevTxOutIndex) {
 		return nil, errors.New("could not read PrevTxOutIndex")

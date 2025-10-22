@@ -177,7 +177,7 @@ func (c *BlockCache) setLatestHash() {
 			c.recoverFromCorruption(c.nextBlock - 10000)
 			return
 		}
-		c.latestHash = hash32.T(block.Hash)
+		c.latestHash = hash32.FromSlice(block.Hash)
 	}
 }
 
@@ -312,7 +312,7 @@ func (c *BlockCache) Add(height int, block *walletrpc.CompactBlock) error {
 	offset := c.starts[len(c.starts)-1]
 	c.starts = append(c.starts, offset+int64(len(data)+8))
 
-	c.latestHash = hash32.T(block.Hash)
+	c.latestHash = hash32.FromSlice(block.Hash)
 	c.nextBlock++
 	// Invariant: m[firstBlock..nextBlock) are valid.
 	return nil
