@@ -28,6 +28,10 @@ The most recent changes are listed first.
   `RawTransaction` in `walletrpc/service.proto` for more details on
   the semantics of this field.
 
+- If corruption is detected in the cache file, the cache is rebuilt
+  completely (instead of attempting an incremental correction). The
+  `lightwalletd` service remains available during the rebuild.
+
 ### Fixed
 
 - GetLatestBlock should report latest block hash in little-endian

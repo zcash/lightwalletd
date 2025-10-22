@@ -127,14 +127,11 @@ func (b *Block) ToCompact() *walletrpc.CompactBlock {
 		ChainMetadata: &walletrpc.ChainMetadata{},
 	}
 
-	// Only Sapling transactions have a meaningful compact encoding
-	saplingTxns := make([]*walletrpc.CompactTx, 0, len(b.vtx))
+	// Compact representations of all transactions are now included.
+	compactBlock.Vtx = make([]*walletrpc.CompactTx, len(b.vtx))
 	for idx, tx := range b.vtx {
-		if tx.HasShieldedElements() {
-			saplingTxns = append(saplingTxns, tx.ToCompact(idx))
-		}
+		compactBlock.Vtx[idx] = tx.ToCompact(idx)
 	}
-	compactBlock.Vtx = saplingTxns
 	return compactBlock
 }
 

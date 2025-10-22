@@ -54,6 +54,7 @@ type -p jq >/dev/null || {
 kill_background_server() {
   echo -n Stopping darkside server ...
   grpcurl -plaintext localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Stop &>/dev/null
+  echo ''
 }
 
 if $start_server
@@ -143,6 +144,25 @@ expected='{
   "time": 1,
   "vtx": [
     {
+      "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo=",
+      "vin": [
+        {
+          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "prevoutIndex": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    },
+    {
       "index": "1",
       "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
       "spends": [
@@ -226,6 +246,27 @@ expected='{
   "hash": "BaN41+Qi/8MY9vrJxDD1gPde1uGt4d3FTeXwhJaqea8=",
   "prevHash": "xOcqS6kNnE4yHGnLcvi1LMOqh9iY3ynEGpUTraSKpvQ=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo=",
+      "vin": [
+        {
+          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "prevoutIndex": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }'
 compare "$expected" "$actual"
@@ -238,6 +279,25 @@ expected='{
   "prevHash": "gJUabqKu3i1XfWeKHRveM8eyNYXB9e/W6ndgi3d9ntA=",
   "time": 1,
   "vtx": [
+    {
+      "txid": "k6QFCtomiH4+XGaUhij/QXwGM5/k0KgvEZbwa/oJ5VI=",
+      "vin": [
+        {
+          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "prevoutIndex": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    },
     {
       "index": "1",
       "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
@@ -309,6 +369,27 @@ expected='{
   "hash": "uzuBbqy3JKKpssnPJHLXLq+nv1eTHsuyQAkYiR84y7M=",
   "prevHash": "oh3nSTQCTZgnRGBgS8rEZt/cyjjxMI78X49lkTXJyBc=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "+qNwLv47uukw7U1Ge1x7p1Ym2SrQ67z5SgahxefXxIs=",
+      "vin": [
+        {
+          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "prevoutIndex": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }
 {
@@ -316,6 +397,27 @@ expected='{
   "hash": "BQpVcT2DPoC71Oo1DyL4arAeXWFEMDsOQfwsObbKY4s=",
   "prevHash": "uzuBbqy3JKKpssnPJHLXLq+nv1eTHsuyQAkYiR84y7M=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "v8CDZ8SiXuyV60eFHNGqnEwQhsR1761v3djLh5MaRBg=",
+      "vin": [
+        {
+          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "prevoutIndex": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }
 {
@@ -323,6 +425,27 @@ expected='{
   "hash": "5KcOajo6RLRL8ZKgdALls72ByFgTKE4zJ9kbzBh/k1I=",
   "prevHash": "EneA7vMz88tX2BvMT6UhNd+DMOSVWNVurPyEJZO/IkU=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "P4MhIyT2ziuCKfejzrBlWwl/wegqR763c4vzqxqZlWQ=",
+      "vin": [
+        {
+          "prevoutTxid": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          "prevoutIndex": 4294967295
+        }
+      ],
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }'
 compare "$expected" "$actual"
