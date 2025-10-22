@@ -40,11 +40,9 @@ type rawTransaction struct {
 // Txin format as described in https://en.bitcoin.it/wiki/Transaction
 type txIn struct {
 	// SHA256d of a previous (to-be-used) transaction
-	//PrevTxHash []byte
-
+	PrevTxHash hash32.T
 	// Index of the to-be-used output in the previous tx
-	//PrevTxOutIndex uint32
-
+	PrevTxOutIndex uint32
 	// CompactSize-prefixed, could be a pubkey or a script
 	ScriptSig []byte
 
@@ -55,12 +53,14 @@ type txIn struct {
 func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if !s.Skip(32) {
-		return nil, errors.New("could not skip PrevTxHash")
+	b32 := make([]byte, 32)
+	if !s.ReadBytes(&b32, 32) {
+		return nil, errors.New("could not read HashPrevBlock")
 	}
+	tx.PrevTxHash = hash32.T(b32)
 
-	if !s.Skip(4) {
-		return nil, errors.New("could not skip PrevTxOutIndex")
+	if !s.ReadUint32(&tx.PrevTxOutIndex) {
+		return nil, errors.New("could not read PrevTxOutIndex")
 	}
 
 	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.ScriptSig)) {
@@ -74,27 +74,41 @@ func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
+func (tinput *txIn) ToCompact() *walletrpc.CompactTxIn {
+	return &walletrpc.CompactTxIn{
+		PrevoutTxid:  hash32.ToSlice(tinput.PrevTxHash),
+		PrevoutIndex: tinput.PrevTxOutIndex,
+	}
+}
+
 // Txout format as described in https://en.bitcoin.it/wiki/Transaction
 type txOut struct {
 	// Non-negative int giving the number of zatoshis to be transferred
 	Value uint64
 
 	// Script. CompactSize-prefixed.
-	//Script []byte
+	Script []byte
 }
 
 func (tx *txOut) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if !s.Skip(8) {
-		return nil, errors.New("could not skip txOut value")
+	if !s.ReadUint64(&tx.Value) {
+		return nil, errors.New("could not read txOut value")
 	}
 
-	if !s.SkipCompactLengthPrefixed() {
-		return nil, errors.New("could not skip txOut script")
+	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.Script)) {
+		return nil, errors.New("could not read txOut script")
 	}
 
 	return []byte(s), nil
+}
+
+func (toutput *txOut) ToCompact() *walletrpc.TxOut {
+	return &walletrpc.TxOut{
+		Value:        toutput.Value,
+		ScriptPubKey: toutput.Script,
+	}
 }
 
 // parse the transparent parts of the transaction
@@ -405,6 +419,8 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),
 		Actions: make([]*walletrpc.CompactOrchardAction, len(tx.orchardActions)),
+		Vin:     make([]*walletrpc.CompactTxIn, len(tx.transparentInputs)),
+		Vout:    make([]*walletrpc.TxOut, len(tx.transparentOutputs)),
 	}
 	for i, spend := range tx.shieldedSpends {
 		ctx.Spends[i] = spend.ToCompact()
@@ -414,6 +430,12 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	}
 	for i, a := range tx.orchardActions {
 		ctx.Actions[i] = a.ToCompact()
+	}
+	for i, tinput := range tx.transparentInputs {
+		ctx.Vin[i] = tinput.ToCompact()
+	}
+	for i, toutput := range tx.transparentOutputs {
+		ctx.Vout[i] = toutput.ToCompact()
 	}
 	return ctx
 }

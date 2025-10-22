@@ -69,7 +69,6 @@ func TestCompactBlocks(t *testing.T) {
 		encodedCompact := hex.EncodeToString(marshaled)
 		if encodedCompact != test.Compact {
 			t.Errorf("wrong data for compact testnet block %d\nhave: %s\nwant: %s\n", test.BlockHeight, encodedCompact, test.Compact)
-			break
 		}
 	}
 
