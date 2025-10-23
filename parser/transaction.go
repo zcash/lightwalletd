@@ -384,13 +384,6 @@ func (tx *Transaction) Bytes() []byte {
 	return tx.rawBytes
 }
 
-// HasShieldedElements indicates whether a transaction has
-// at least one shielded input or output.
-func (tx *Transaction) HasShieldedElements() bool {
-	nshielded := len(tx.shieldedSpends) + len(tx.shieldedOutputs) + len(tx.orchardActions)
-	return tx.version >= 4 && nshielded > 0
-}
-
 // SaplingOutputsCount returns the number of Sapling outputs in the transaction.
 func (tx *Transaction) SaplingOutputsCount() int {
 	return len(tx.shieldedOutputs)

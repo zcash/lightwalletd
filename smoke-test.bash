@@ -194,39 +194,23 @@ gt StageTransactions '{"height":663195,"url":"https://raw.githubusercontent.com/
 # 0821 as the exclude filter should cause the transaction with that txid to NOT be returned.
 # 0821 converted to base64 (which grpcurl expects for binary data), is IQg=
 echo GetMempoolTx with 2-byte matching filter ...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"IQg="}')
-expected=''
+# This returns all of the transparent transactions in the mempool; to avoid having to list
+# them all here, just make sure there are the correct number of them.
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"IQg="}' | jq -s '.|length')
+expected='100'
 compare "$expected" "$actual"
 
 # Should also work with a 3-byte filter, 0821a8. Convert to base64 for the argument.
 echo GetMempoolTx with 3-byte matching filter ...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"qCEI"}')
-expected=''
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"qCEI"}' | jq -s '.|length')
+expected='100'
 compare "$expected" "$actual"
 
 # Any other filter should cause the entry to be returned (no exclude match).
+# So the shielded transaction should be return (one more tx than above).
 echo GetMempoolTx with unmatched filter...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"SR8="}')
-expected='{
-  "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
-  "spends": [
-    {
-      "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
-    }
-  ],
-  "outputs": [
-    {
-      "cmu": "pe/G9q13FyE6vAhrTPzIGpU5Dht5DvJTuc9zmTEx0gU=",
-      "ephemeralKey": "qw5MPsRoe8aOnvZ/VB3r1Ja/WkHb52TVU1vyHjGEOqc=",
-      "ciphertext": "R2uN3CHagj7Oo+6O9VeBrE6x4dQ07Jl18rVM27vGhl1Io75lFYCHA1SrV72Zu+bgwMilTA=="
-    },
-    {
-      "cmu": "3rQ9DMmk7RaWGf9q0uOYQ7FieHL/TE8Z+QCcS/IJfkA=",
-      "ephemeralKey": "U1NCOlTzIF1qlprAjuGUUj591GpO5Vs5WTsmCW35Pio=",
-      "ciphertext": "2MbBHjPbkDT/GVsXgDHhihFQizxvizHINXKVbXKnv3Ih1P4c1f3By+TLH2g1yAG3lSARuQ=="
-    }
-  ]
-}'
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"SR8="}' | jq -s '.|length')
+expected='101'
 compare "$expected" "$actual"
 
 echo -n test: ApplyStaged to block 663210 ...
@@ -345,7 +329,7 @@ expected='{
 compare "$expected" "$actual"
 
 echo GetBlockRange 663152 to 663154 ...
-actual=$(gp GetBlockRange '{"start":{"height":663152},"end":{"height":663154}}')
+actual=$(gp GetBlockRange '{"poolTypes": ["TRANSPARENT"], "start":{"height":663152},"end":{"height":663154}}')
 expected='{
   "height": "663152",
   "hash": "uzuBbqy3JKKpssnPJHLXLq+nv1eTHsuyQAkYiR84y7M=",
