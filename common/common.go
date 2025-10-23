@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -506,26 +507,72 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	return block, nil
 }
 
+// filterBlock takes a slice of transactions and a filter (BlockRange PoolType),
+// removes the transaction components that are not present in the filter, and
+// returns subset of the transactions that have one or more components (that is,
+// don't bother to return empty transactions).
+func filterBlock(vtx []*walletrpc.CompactTx, poolTypes []walletrpc.PoolType) []*walletrpc.CompactTx {
+	if len(poolTypes) == 0 {
+		// legacy behavior: return only blocks containing sheilded components.
+		poolTypes = []walletrpc.PoolType{
+			walletrpc.PoolType_SAPLING,
+			walletrpc.PoolType_ORCHARD,
+		}
+	}
+	trimmedVtx := []*walletrpc.CompactTx{}
+	for _, tx := range vtx {
+		if !slices.Contains(poolTypes, walletrpc.PoolType_TRANSPARENT) {
+			// remove all the transparent items
+			tx.Vin = nil
+			tx.Vout = nil
+		}
+		if !slices.Contains(poolTypes, walletrpc.PoolType_SAPLING) {
+			tx.Spends = nil
+			tx.Outputs = nil
+		}
+		if !slices.Contains(poolTypes, walletrpc.PoolType_ORCHARD) {
+			tx.Actions = nil
+		}
+		if len(tx.Vin) > 0 ||
+			len(tx.Vout) > 0 ||
+			len(tx.Spends) > 0 ||
+			len(tx.Outputs) > 0 ||
+			len(tx.Actions) > 0 {
+			trimmedVtx = append(trimmedVtx, tx)
+		}
+	}
+	return trimmedVtx
+}
+
 // GetBlockRange returns a sequence of consecutive blocks in the given range.
-func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, start, end int) {
+func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, span *walletrpc.BlockRange) {
+	if slices.Contains(span.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
+		errOut <- fmt.Errorf("GetBlockRange: invalid pool type requested")
+		return
+	}
 	// Go over [start, end] inclusive
-	low := start
-	high := end
-	if start > end {
+	low := int(span.Start.Height)
+	high := int(span.End.Height)
+	if low > high {
 		// reverse the order
-		low, high = end, start
+		low, high = high, low
 	}
 	for i := low; i <= high; i++ {
 		j := i
-		if start > end {
+		if span.Start.Height > span.End.Height {
 			// reverse the order
 			j = high - (i - low)
 		}
+
 		block, err := GetBlock(cache, j)
 		if err != nil {
 			errOut <- err
 			return
 		}
+		block.Vtx = filterBlock(block.Vtx, span.PoolTypes)
+
+		// Note that we do want to return blocks that have had all of its transactions filtered,
+		// as we have done in the past.
 		blockOut <- block
 	}
 	errOut <- nil
