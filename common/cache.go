@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"hash/fnv"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -59,64 +58,25 @@ func (c *BlockCache) HashMatch(prevhash hash32.T) bool {
 	return c.latestHash == hash32.Nil || c.latestHash == prevhash
 }
 
-// Make the block at the given height the lowest height that we don't have.
-// In other words, wipe out this height and beyond.
-// This should never increase the size of the cache, only decrease.
+// Reset the database files to the empty state.
 // Caller should hold c.mutex.Lock().
-func (c *BlockCache) setDbFiles(height int) {
-	if height <= c.nextBlock {
-		if height < c.firstBlock {
-			height = c.firstBlock
-		}
-		index := height - c.firstBlock
-		if err := c.lengthsFile.Truncate(int64(index * 4)); err != nil {
-			Log.Fatal("truncate lengths file failed: ", err)
-		}
-		if err := c.blocksFile.Truncate(c.starts[index]); err != nil {
-			Log.Fatal("truncate blocks file failed: ", err)
-		}
-		c.Sync()
-		c.starts = c.starts[:index+1]
-		c.nextBlock = height
-		c.setLatestHash()
+func (c *BlockCache) clearDbFiles() {
+	if err := c.lengthsFile.Truncate(0); err != nil {
+		Log.Fatal("truncate lengths file failed: ", err)
 	}
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
+	if err := c.blocksFile.Truncate(0); err != nil {
+		Log.Fatal("truncate blocks file failed: ", err)
 	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	if err != nil {
-		return err
-	}
-	return out.Close()
+	c.Sync()
+	c.starts = c.starts[:1]
+	c.nextBlock = 0
+	c.latestHash = hash32.Nil
 }
 
 // Caller should hold c.mutex.Lock().
-func (c *BlockCache) recoverFromCorruption(height int) {
-	Log.Warning("CORRUPTION detected in db blocks-cache files, height ", height, " redownloading")
-
-	// Save the corrupted files for post-mortem analysis.
-	save := c.lengthsName + "-corrupted"
-	if err := copyFile(c.lengthsName, save); err != nil {
-		Log.Warning("Could not copy db lengths file: ", err)
-	}
-	save = c.blocksName + "-corrupted"
-	if err := copyFile(c.blocksName, save); err != nil {
-		Log.Warning("Could not copy db lengths file: ", err)
-	}
-
-	c.setDbFiles(height)
+func (c *BlockCache) recoverFromCorruption() {
+	Log.Warning("CORRUPTION detected in db blocks-cache files, redownloading")
+	c.clearDbFiles()
 }
 
 // not including the checksum
@@ -174,7 +134,7 @@ func (c *BlockCache) setLatestHash() {
 		// At least one block remains; get the last block's hash
 		block := c.readBlock(c.nextBlock - 1)
 		if block == nil {
-			c.recoverFromCorruption(c.nextBlock - 10000)
+			c.recoverFromCorruption()
 			return
 		}
 		c.latestHash = hash32.FromSlice(block.Hash)
@@ -183,7 +143,7 @@ func (c *BlockCache) setLatestHash() {
 
 // Reset is used only for darkside testing.
 func (c *BlockCache) Reset(startHeight int) {
-	c.setDbFiles(c.firstBlock) // empty the cache
+	c.clearDbFiles() // empty the cache
 	c.firstBlock = startHeight
 	c.nextBlock = startHeight
 }
@@ -232,20 +192,34 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	for i := 0; i < nBlocks; i++ {
 		if len(lengths[:4]) < 4 {
 			Log.Warning("lengths file has a partial entry")
-			c.recoverFromCorruption(c.nextBlock)
+			c.recoverFromCorruption()
 			break
 		}
 		length := binary.LittleEndian.Uint32(lengths[i*4 : (i+1)*4])
 		if length < 74 || length > 4*1000*1000 {
 			Log.Warning("lengths file has impossible value ", length)
-			c.recoverFromCorruption(c.nextBlock)
+			c.recoverFromCorruption()
 			break
 		}
 		offset += int64(length) + 8
 		c.starts = append(c.starts, offset)
+
+		// After the changes that store transparent transaction data, the cache
+		// starts at block height zero, not the Sapling activation height.
+		// If the first block does not deserialize (the checksum depends on height),
+		// we're probably running on an old data (cache) directory, so we must
+		// rebuild the cache.
+		if i == 0 && chainName != "unittestnet" {
+			block := c.readBlock(c.nextBlock)
+			if block == nil {
+				Log.Warning("first block is incorrect, likely upgrading, recreating the cache")
+				Log.Warning("  this will take a few hours but the server is available immediately")
+				c.clearDbFiles()
+				break
+			}
+		}
 		c.nextBlock++
 	}
-	c.setDbFiles(c.nextBlock)
 	Log.Info("Done reading ", c.nextBlock-c.firstBlock, " blocks from disk cache")
 	return c
 }
@@ -360,7 +334,7 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 		go func() {
 			// We hold only the read lock, need the exclusive lock.
 			c.mutex.Lock()
-			c.recoverFromCorruption(height - 10000)
+			c.recoverFromCorruption()
 			c.mutex.Unlock()
 		}()
 		return nil
