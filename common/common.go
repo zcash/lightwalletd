@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -518,26 +519,84 @@ func GetBlock(cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
 	return block, nil
 }
 
+// FilterTxPool returns a new transaction with only the requested by-pool components.
+// It returns nil if the transaction is empty of components.
+func FilterTxPool(tx *walletrpc.CompactTx, poolTypes []walletrpc.PoolType) *walletrpc.CompactTx {
+	// Note, we can't shallow-copy the compact transaction here, because it
+	// includes a lock field (used by gRPC) that is not allowed to be copied.
+	returnTx := walletrpc.CompactTx{Txid: tx.Txid}
+	if slices.Contains(poolTypes, walletrpc.PoolType_TRANSPARENT) {
+		// remove all the transparent items
+		returnTx.Vin = tx.Vin
+		returnTx.Vout = tx.Vout
+	}
+	if slices.Contains(poolTypes, walletrpc.PoolType_SAPLING) {
+		returnTx.Spends = tx.Spends
+		returnTx.Outputs = tx.Outputs
+	}
+	if slices.Contains(poolTypes, walletrpc.PoolType_ORCHARD) {
+		returnTx.Actions = tx.Actions
+	}
+	if len(returnTx.Vin) > 0 ||
+		len(returnTx.Vout) > 0 ||
+		len(returnTx.Spends) > 0 ||
+		len(returnTx.Outputs) > 0 ||
+		len(returnTx.Actions) > 0 {
+		return &returnTx
+	}
+	return nil
+}
+
+// filterBlockPool takes a slice of transactions and a filter (BlockRange PoolType),
+// removes the transaction components that are not present in the filter, and
+// returns subset of the transactions that have one or more components (that is,
+// don't bother to return empty transactions).
+func filterBlockPool(vtx []*walletrpc.CompactTx, poolTypes []walletrpc.PoolType) []*walletrpc.CompactTx {
+	if len(poolTypes) == 0 {
+		// legacy behavior: return only blocks containing sheilded components.
+		poolTypes = []walletrpc.PoolType{
+			walletrpc.PoolType_SAPLING,
+			walletrpc.PoolType_ORCHARD,
+		}
+	}
+	trimmedVtx := []*walletrpc.CompactTx{}
+	for _, tx := range vtx {
+		if rtx := FilterTxPool(tx, poolTypes); rtx != nil {
+			trimmedVtx = append(trimmedVtx, rtx)
+		}
+	}
+	return trimmedVtx
+}
+
 // GetBlockRange returns a sequence of consecutive blocks in the given range.
-func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, start, end int) {
+func GetBlockRange(cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, span *walletrpc.BlockRange) {
+	if slices.Contains(span.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
+		errOut <- fmt.Errorf("GetBlockRange: invalid pool type requested")
+		return
+	}
 	// Go over [start, end] inclusive
-	low := start
-	high := end
-	if start > end {
+	low := int(span.Start.Height)
+	high := int(span.End.Height)
+	if low > high {
 		// reverse the order
-		low, high = end, start
+		low, high = high, low
 	}
 	for i := low; i <= high; i++ {
 		j := i
-		if start > end {
+		if span.Start.Height > span.End.Height {
 			// reverse the order
 			j = high - (i - low)
 		}
+
 		block, err := GetBlock(cache, j)
 		if err != nil {
 			errOut <- err
 			return
 		}
+		block.Vtx = filterBlockPool(block.Vtx, span.PoolTypes)
+
+		// Note that we do want to return blocks that have had all of its transactions filtered,
+		// as we have done in the past.
 		blockOut <- block
 	}
 	errOut <- nil

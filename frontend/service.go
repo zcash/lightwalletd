@@ -235,7 +235,7 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			"GetBlockRange: must specify start and end heights")
 	}
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, span)
 
 	for {
 		select {
@@ -261,7 +261,7 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 			"GetBlockRangeNullifiers: must specify start and end heights")
 	}
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, span)
 
 	for {
 		select {
@@ -640,16 +640,14 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 					"GetMempoolTx: extra data deserializing transaction")
 			}
 			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
-			if tx.HasShieldedElements() {
-				txidBigEndian, err := hex.DecodeString(txidstr)
-				if err != nil {
-					return status.Errorf(codes.Internal,
-						"GetMempoolTx: failed decode txid, error: %s", err.Error())
-				}
-				// convert from big endian bytes to little endian and set as the txid
-				tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
-				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+			txidBigEndian, err := hex.DecodeString(txidstr)
+			if err != nil {
+				return status.Errorf(codes.Internal,
+					"GetMempoolTx: failed decode txid, error: %s", err.Error())
 			}
+			// convert from big endian bytes to little endian and set as the txid
+			tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
+			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
 		mempoolMap = &newmempoolMap
 	}
