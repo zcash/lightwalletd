@@ -80,6 +80,7 @@ type (
 	// zcashd rpc "getblockchaininfo"
 	Upgradeinfo struct {
 		// unneeded fields can be omitted
+		Name             string
 		ActivationHeight int
 		Status           string // "active"
 	}
@@ -280,6 +281,15 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		saplingHeight = saplingJSON.ActivationHeight
 	}
 
+	// Find the name and activation height of the next pending network upgrade,
+	// or "" and 0 if there is no pending upgrade.
+	var upgrade Upgradeinfo
+	for _, u := range getblockchaininfoReply.Upgrades {
+		if u.Status == "pending" && (upgrade.Status == "" || u.ActivationHeight < upgrade.ActivationHeight) {
+			upgrade = u
+		}
+	}
+
 	vendor := "ECC LightWalletD"
 	if DarksideEnabled {
 		vendor = "ECC DarksideWalletD"
@@ -300,6 +310,8 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		ZcashdBuild:             getinfoReply.Build,
 		ZcashdSubversion:        getinfoReply.Subversion,
 		DonationAddress:         DonationAddress,
+		UpgradeName:             upgrade.Name,
+		UpgradeHeight:           uint64(upgrade.ActivationHeight),
 	}, nil
 }
 

@@ -110,6 +110,23 @@ func getLightdInfoStub(method string, params []json.RawMessage) (json.RawMessage
 			Blocks:    9977,
 			Chain:     "bugsbunny",
 			Consensus: ConsensusInfo{Chaintip: "someid"},
+			Upgrades: map[string]Upgradeinfo{
+				"a": {
+					Name:             "a",
+					ActivationHeight: 5,
+					Status:           "active",
+				},
+				"b": {
+					Name:             "b",
+					ActivationHeight: 6,
+					Status:           "pending",
+				},
+				"c": {
+					Name:             "c",
+					ActivationHeight: 7,
+					Status:           "pending",
+				},
+			},
 		})
 		return r, nil
 	}
@@ -157,6 +174,14 @@ func TestGetLightdInfo(t *testing.T) {
 	}
 	if getLightdInfo.DonationAddress != "ua1234test" {
 		t.Error("unexpected DonationAddress", getLightdInfo.DonationAddress)
+	}
+	// If more than one network upgrade is pending, the closest
+	// (next) should be reported.
+	if getLightdInfo.UpgradeName != "b" {
+		t.Error("unexpected UpgradeName", getLightdInfo.UpgradeName)
+	}
+	if getLightdInfo.UpgradeHeight != 6 {
+		t.Error("unexpected UpgradeHeight", getLightdInfo.UpgradeHeight)
 	}
 
 	if sleepCount != 1 || sleepDuration != 15*time.Second {
