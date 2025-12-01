@@ -388,7 +388,7 @@ func (tx *Transaction) OrchardActionsCount() int {
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
-		Hash:  hash32.ToSlice(tx.GetEncodableHash()),
+		Txid:  hash32.ToSlice(tx.GetEncodableHash()),
 		//Fee:     0, // TODO: calculate fees
 		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),

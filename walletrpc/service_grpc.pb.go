@@ -49,41 +49,55 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CompactTxStreamerClient interface {
-	// Return the height of the tip of the best chain
+	// Return the BlockID of the block at the tip of the best chain
 	GetLatestBlock(ctx context.Context, in *ChainSpec, opts ...grpc.CallOption) (*BlockID, error)
 	// Return the compact block corresponding to the given block identifier
 	GetBlock(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*CompactBlock, error)
-	// Same as GetBlock except actions contain only nullifiers
+	// Same as GetBlock except the returned CompactBlock value contains only
+	// nullifiers.
+	//
+	// Note: this method is deprecated. Implementations should ignore any
+	// `PoolType::TRANSPARENT` member of the `poolTypes` argument.
 	GetBlockNullifiers(ctx context.Context, in *BlockID, opts ...grpc.CallOption) (*CompactBlock, error)
-	// Return a list of consecutive compact blocks
+	// Return a list of consecutive compact blocks in the specified range,
+	// which is inclusive of `range.end`.
+	//
+	// If range.start <= range.end, blocks are returned increasing height order;
+	// otherwise blocks are returned in decreasing height order.
 	GetBlockRange(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeClient, error)
-	// Same as GetBlockRange except actions contain only nullifiers
+	// Same as GetBlockRange except the returned CompactBlock values contain
+	// only nullifiers.
+	//
+	// Note: this method is deprecated. Implementations should ignore any
+	// `PoolType::TRANSPARENT` member of the `poolTypes` argument.
 	GetBlockRangeNullifiers(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (CompactTxStreamer_GetBlockRangeNullifiersClient, error)
 	// Return the requested full (not compact) transaction (as from zcashd)
 	GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*RawTransaction, error)
 	// Submit the given transaction to the Zcash network
 	SendTransaction(ctx context.Context, in *RawTransaction, opts ...grpc.CallOption) (*SendResponse, error)
-	// Return the transactions corresponding to the given t-address within the given block range
-	// NB - this method is misnamed, it returns transactions, not transaction IDs.
+	// Return RawTransactions that match the given transparent address filter.
+	//
+	// Note: This function is misnamed, it returns complete `RawTransaction` values, not TxIds.
 	// NOTE: this method is deprecated, please use GetTaddressTransactions instead.
 	GetTaddressTxids(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTxidsClient, error)
-	// Return the transactions corresponding to the given t-address within the given block range
+	// Return the transactions corresponding to the given t-address within the given block range.
+	// Mempool transactions are not included in the results.
 	GetTaddressTransactions(ctx context.Context, in *TransparentAddressBlockFilter, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressTransactionsClient, error)
 	GetTaddressBalance(ctx context.Context, in *AddressList, opts ...grpc.CallOption) (*Balance, error)
 	GetTaddressBalanceStream(ctx context.Context, opts ...grpc.CallOption) (CompactTxStreamer_GetTaddressBalanceStreamClient, error)
-	// Return the compact transactions currently in the mempool; the results
-	// can be a few seconds out of date. If the Exclude list is empty, return
-	// all transactions; otherwise return all *except* those in the Exclude list
-	// (if any); this allows the client to avoid receiving transactions that it
-	// already has (from an earlier call to this rpc). The transaction IDs in the
-	// Exclude list can be shortened to any number of bytes to make the request
-	// more bandwidth-efficient; if two or more transactions in the mempool
-	// match a shortened txid, they are all sent (none is excluded). Transactions
-	// in the exclude list that don't exist in the mempool are ignored.
-	//
-	// The a shortened transaction ID is the prefix in big-endian (hex) format
-	// (then converted to binary). See smoke-test.bash for examples.
-	GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error)
+	// Returns a stream of the compact transaction representation for transactions
+	// currently in the mempool. The results of this operation may be a few
+	// seconds out of date. If the `exclude_txid_suffixes` list is empty,
+	// return all transactions; otherwise return all *except* those in the
+	// `exclude_txid_suffixes` list (if any); this allows the client to avoid
+	// receiving transactions that it already has (from an earlier call to this
+	// RPC). The transaction IDs in the `exclude_txid_suffixes` list can be
+	// shortened to any number of bytes to make the request more
+	// bandwidth-efficient; if two or more transactions in the mempool match a
+	// txid suffix, none of the matching transactions are excluded. Txid
+	// suffixes in the exclude list that don't match any transactions in the
+	// mempool are ignored.
+	GetMempoolTx(ctx context.Context, in *GetMempoolTxRequest, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error)
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
 	GetMempoolStream(ctx context.Context, in *Empty, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolStreamClient, error)
@@ -328,7 +342,7 @@ func (x *compactTxStreamerGetTaddressBalanceStreamClient) CloseAndRecv() (*Balan
 	return m, nil
 }
 
-func (c *compactTxStreamerClient) GetMempoolTx(ctx context.Context, in *Exclude, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error) {
+func (c *compactTxStreamerClient) GetMempoolTx(ctx context.Context, in *GetMempoolTxRequest, opts ...grpc.CallOption) (CompactTxStreamer_GetMempoolTxClient, error) {
 	stream, err := c.cc.NewStream(ctx, &CompactTxStreamer_ServiceDesc.Streams[5], CompactTxStreamer_GetMempoolTx_FullMethodName, opts...)
 	if err != nil {
 		return nil, err
@@ -505,41 +519,55 @@ func (c *compactTxStreamerClient) Ping(ctx context.Context, in *Duration, opts .
 // All implementations must embed UnimplementedCompactTxStreamerServer
 // for forward compatibility
 type CompactTxStreamerServer interface {
-	// Return the height of the tip of the best chain
+	// Return the BlockID of the block at the tip of the best chain
 	GetLatestBlock(context.Context, *ChainSpec) (*BlockID, error)
 	// Return the compact block corresponding to the given block identifier
 	GetBlock(context.Context, *BlockID) (*CompactBlock, error)
-	// Same as GetBlock except actions contain only nullifiers
+	// Same as GetBlock except the returned CompactBlock value contains only
+	// nullifiers.
+	//
+	// Note: this method is deprecated. Implementations should ignore any
+	// `PoolType::TRANSPARENT` member of the `poolTypes` argument.
 	GetBlockNullifiers(context.Context, *BlockID) (*CompactBlock, error)
-	// Return a list of consecutive compact blocks
+	// Return a list of consecutive compact blocks in the specified range,
+	// which is inclusive of `range.end`.
+	//
+	// If range.start <= range.end, blocks are returned increasing height order;
+	// otherwise blocks are returned in decreasing height order.
 	GetBlockRange(*BlockRange, CompactTxStreamer_GetBlockRangeServer) error
-	// Same as GetBlockRange except actions contain only nullifiers
+	// Same as GetBlockRange except the returned CompactBlock values contain
+	// only nullifiers.
+	//
+	// Note: this method is deprecated. Implementations should ignore any
+	// `PoolType::TRANSPARENT` member of the `poolTypes` argument.
 	GetBlockRangeNullifiers(*BlockRange, CompactTxStreamer_GetBlockRangeNullifiersServer) error
 	// Return the requested full (not compact) transaction (as from zcashd)
 	GetTransaction(context.Context, *TxFilter) (*RawTransaction, error)
 	// Submit the given transaction to the Zcash network
 	SendTransaction(context.Context, *RawTransaction) (*SendResponse, error)
-	// Return the transactions corresponding to the given t-address within the given block range
-	// NB - this method is misnamed, it returns transactions, not transaction IDs.
+	// Return RawTransactions that match the given transparent address filter.
+	//
+	// Note: This function is misnamed, it returns complete `RawTransaction` values, not TxIds.
 	// NOTE: this method is deprecated, please use GetTaddressTransactions instead.
 	GetTaddressTxids(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTxidsServer) error
-	// Return the transactions corresponding to the given t-address within the given block range
+	// Return the transactions corresponding to the given t-address within the given block range.
+	// Mempool transactions are not included in the results.
 	GetTaddressTransactions(*TransparentAddressBlockFilter, CompactTxStreamer_GetTaddressTransactionsServer) error
 	GetTaddressBalance(context.Context, *AddressList) (*Balance, error)
 	GetTaddressBalanceStream(CompactTxStreamer_GetTaddressBalanceStreamServer) error
-	// Return the compact transactions currently in the mempool; the results
-	// can be a few seconds out of date. If the Exclude list is empty, return
-	// all transactions; otherwise return all *except* those in the Exclude list
-	// (if any); this allows the client to avoid receiving transactions that it
-	// already has (from an earlier call to this rpc). The transaction IDs in the
-	// Exclude list can be shortened to any number of bytes to make the request
-	// more bandwidth-efficient; if two or more transactions in the mempool
-	// match a shortened txid, they are all sent (none is excluded). Transactions
-	// in the exclude list that don't exist in the mempool are ignored.
-	//
-	// The a shortened transaction ID is the prefix in big-endian (hex) format
-	// (then converted to binary). See smoke-test.bash for examples.
-	GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error
+	// Returns a stream of the compact transaction representation for transactions
+	// currently in the mempool. The results of this operation may be a few
+	// seconds out of date. If the `exclude_txid_suffixes` list is empty,
+	// return all transactions; otherwise return all *except* those in the
+	// `exclude_txid_suffixes` list (if any); this allows the client to avoid
+	// receiving transactions that it already has (from an earlier call to this
+	// RPC). The transaction IDs in the `exclude_txid_suffixes` list can be
+	// shortened to any number of bytes to make the request more
+	// bandwidth-efficient; if two or more transactions in the mempool match a
+	// txid suffix, none of the matching transactions are excluded. Txid
+	// suffixes in the exclude list that don't match any transactions in the
+	// mempool are ignored.
+	GetMempoolTx(*GetMempoolTxRequest, CompactTxStreamer_GetMempoolTxServer) error
 	// Return a stream of current Mempool transactions. This will keep the output stream open while
 	// there are mempool transactions. It will close the returned stream when a new block is mined.
 	GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error
@@ -598,7 +626,7 @@ func (UnimplementedCompactTxStreamerServer) GetTaddressBalance(context.Context, 
 func (UnimplementedCompactTxStreamerServer) GetTaddressBalanceStream(CompactTxStreamer_GetTaddressBalanceStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetTaddressBalanceStream not implemented")
 }
-func (UnimplementedCompactTxStreamerServer) GetMempoolTx(*Exclude, CompactTxStreamer_GetMempoolTxServer) error {
+func (UnimplementedCompactTxStreamerServer) GetMempoolTx(*GetMempoolTxRequest, CompactTxStreamer_GetMempoolTxServer) error {
 	return status.Errorf(codes.Unimplemented, "method GetMempoolTx not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) GetMempoolStream(*Empty, CompactTxStreamer_GetMempoolStreamServer) error {
@@ -857,7 +885,7 @@ func (x *compactTxStreamerGetTaddressBalanceStreamServer) Recv() (*Address, erro
 }
 
 func _CompactTxStreamer_GetMempoolTx_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(Exclude)
+	m := new(GetMempoolTxRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

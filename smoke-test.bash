@@ -144,7 +144,7 @@ expected='{
   "vtx": [
     {
       "index": "1",
-      "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
+      "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
       "spends": [
         {
           "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
@@ -180,21 +180,21 @@ gt StageTransactions '{"height":663195,"url":"https://raw.githubusercontent.com/
 # 0821 as the exclude filter should cause the transaction with that txid to NOT be returned.
 # 0821 converted to base64 (which grpcurl expects for binary data), is IQg=
 echo GetMempoolTx with 2-byte matching filter ...
-actual=$(gp GetMempoolTx '{"txid":"IQg="}')
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"IQg="}')
 expected=''
 compare "$expected" "$actual"
 
 # Should also work with a 3-byte filter, 0821a8. Convert to base64 for the argument.
 echo GetMempoolTx with 3-byte matching filter ...
-actual=$(gp GetMempoolTx '{"txid":"qCEI"}')
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"qCEI"}')
 expected=''
 compare "$expected" "$actual"
 
 # Any other filter should cause the entry to be returned (no exclude match).
 echo GetMempoolTx with unmatched filter...
-actual=$(gp GetMempoolTx '{"txid":"SR8="}')
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"SR8="}')
 expected='{
-  "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
+  "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
   "spends": [
     {
       "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
@@ -240,7 +240,7 @@ expected='{
   "vtx": [
     {
       "index": "1",
-      "hash": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
+      "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
       "spends": [
         {
           "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="

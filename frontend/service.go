@@ -567,10 +567,10 @@ var mempoolList []string
 // Last time we pulled a copy of the mempool from zcashd.
 var lastMempool time.Time
 
-func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
+func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
 	common.Log.Debugf("gRPC GetMempoolTx(%+v)\n", exclude)
-	for i := 0; i < len(exclude.Txid); i++ {
-		if len(exclude.Txid[i]) > 32 {
+	for i := 0; i < len(exclude.ExcludeTxidSuffixes); i++ {
+		if len(exclude.ExcludeTxidSuffixes[i]) > 32 {
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
 		}
 	}
@@ -651,17 +651,17 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.Exclude, resp walletrpc.Co
 		}
 		mempoolMap = &newmempoolMap
 	}
-	excludeHex := make([]string, len(exclude.Txid))
-	for i := range exclude.Txid {
-		rev := make([]byte, len(exclude.Txid[i]))
+	excludeHex := make([]string, len(exclude.ExcludeTxidSuffixes))
+	for i := range exclude.ExcludeTxidSuffixes {
+		rev := make([]byte, len(exclude.ExcludeTxidSuffixes[i]))
 		for j := range rev {
-			rev[j] = exclude.Txid[i][len(exclude.Txid[i])-j-1]
+			rev[j] = exclude.ExcludeTxidSuffixes[i][len(exclude.ExcludeTxidSuffixes[i])-j-1]
 		}
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
 		if tx, ok := (*mempoolMap)[txid]; ok {
-			if len(tx.Hash) > 0 {
+			if len(tx.Txid) > 0 {
 				err := resp.Send(tx)
 				if err != nil {
 					return err
