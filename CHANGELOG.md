@@ -7,27 +7,27 @@ and this library adheres to Rust's notion of
 
 ## Unreleased
 
+## [v0.4.0] - 2025-12-03
+
 ### Added
 - `compact_formats.CompactTxIn`
 - `compact_formats.TxOut`
 - `service.PoolType`
-- `lightdinfo.upgradeName`
-- `lightdinfo.upgradeHeight`
-
-### Changed
-- The `compact_formats.CompactTx` type has added fields `vin` and `vout`,
+- `service.LightdInfo` has added fields `upgradeName`, `upgradeHeight`, and
+  `lightwalletProtocolVersion`
+- `compact_formats.CompactTx` has added fields `vin` and `vout`,
   which may be used to represent transparent transaction input and output data.
-- The `service.BlockRange` type has an added `poolTypes` field, which allows
+- `service.BlockRange` has added field `poolTypes`, which allows
   the caller of service methods that take this type as input to cause returned
   data to be filtered to include information only for the specified protocols.
   For backwards compatibility, when this field is set the default (empty) value,
   servers should return Sapling and Orchard data. This field is to be ignored
   when the type is used as part of a `service.TransparentAddressBlockFilter`.
+
+### Changed
 - The `hash` field of `compact_formats.CompactTx` has been renamed to `txid`.
   This is a serialization-compatible clarification, as the index of this field
   in the .proto type does not change.
-- The `GetLightdInfo` RPC is modified to return the name and height of the
-  next pending protocol upgrade, if there is one.
 - `service.Exclude` has been renamed to `service.GetMempoolTxRequest` and has
   an added `poolTypes` field, which allows the caller of this method to specify
   which pools the resulting `CompactTx` values should contain data for.
