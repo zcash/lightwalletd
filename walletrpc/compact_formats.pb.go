@@ -24,7 +24,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// ChainMetadata represents information about the state of the chain as of a given block.
+// Information about the state of the chain as of a given block.
 type ChainMetadata struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -80,10 +80,13 @@ func (x *ChainMetadata) GetOrchardCommitmentTreeSize() uint32 {
 	return 0
 }
 
+// A compact representation of a Zcash block.
+//
 // CompactBlock is a packaging of ONLY the data from a block that's needed to:
-//  1. Detect a payment to your shielded Sapling address
-//  2. Detect a spend of your shielded Sapling notes
-//  3. Update your witnesses to generate new Sapling spend proofs.
+//  1. Detect a payment to your Shielded address
+//  2. Detect a spend of your Shielded notes
+//  3. Update your witnesses to generate new spend proofs.
+//  4. Spend UTXOs associated to t-addresses of your wallet.
 type CompactBlock struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -94,7 +97,7 @@ type CompactBlock struct {
 	Hash          []byte         `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`                   // the ID (hash) of this block, same as in block explorers
 	PrevHash      []byte         `protobuf:"bytes,4,opt,name=prevHash,proto3" json:"prevHash,omitempty"`           // the ID (hash) of this block's predecessor
 	Time          uint32         `protobuf:"varint,5,opt,name=time,proto3" json:"time,omitempty"`                  // Unix epoch time when the block was mined
-	Header        []byte         `protobuf:"bytes,6,opt,name=header,proto3" json:"header,omitempty"`               // (hash, prevHash, and time) OR (full header)
+	Header        []byte         `protobuf:"bytes,6,opt,name=header,proto3" json:"header,omitempty"`               // full header (as returned by the getblock RPC)
 	Vtx           []*CompactTx   `protobuf:"bytes,7,rep,name=vtx,proto3" json:"vtx,omitempty"`                     // zero or more compact transactions from this block
 	ChainMetadata *ChainMetadata `protobuf:"bytes,8,opt,name=chainMetadata,proto3" json:"chainMetadata,omitempty"` // information about the state of the chain as of this block
 }
@@ -187,19 +190,25 @@ func (x *CompactBlock) GetChainMetadata() *ChainMetadata {
 	return nil
 }
 
+// A compact representation of a Zcash transaction.
+//
 // CompactTx contains the minimum information for a wallet to know if this transaction
-// is relevant to it (either pays to it or spends from it) via shielded elements
-// only. This message will not encode a transparent-to-transparent transaction.
+// is relevant to it (either pays to it or spends from it) via shielded elements. Additionally,
+// it can optionally include the minimum necessary data to detect payments to transparent addresses
+// related to your wallet.
 type CompactTx struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Index and hash will allow the receiver to call out to chain
-	// explorers or other data structures to retrieve more information
-	// about this transaction.
-	Index uint64 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"` // the index within the full block
-	Hash  []byte `protobuf:"bytes,2,opt,name=hash,proto3" json:"hash,omitempty"`    // the ID (hash) of this transaction, same as in block explorers
+	// The index of the transaction within the block.
+	Index uint64 `protobuf:"varint,1,opt,name=index,proto3" json:"index,omitempty"`
+	// The id of the transaction as defined in
+	// [§ 7.1.1 ‘Transaction Identifiers’](https://zips.z.cash/protocol/protocol.pdf#txnidentifiers)
+	// This byte array MUST be in protocol order and MUST NOT be reversed
+	// or hex-encoded; the byte-reversed and hex-encoded representation is
+	// exclusively a textual representation of a txid.
+	Txid []byte `protobuf:"bytes,2,opt,name=txid,proto3" json:"txid,omitempty"`
 	// The transaction fee: present if server can provide. In the case of a
 	// stateless server and a transaction with transparent inputs, this will be
 	// unset because the calculation requires reference to prior transactions.
@@ -210,6 +219,15 @@ type CompactTx struct {
 	Spends  []*CompactSaplingSpend  `protobuf:"bytes,4,rep,name=spends,proto3" json:"spends,omitempty"`
 	Outputs []*CompactSaplingOutput `protobuf:"bytes,5,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	Actions []*CompactOrchardAction `protobuf:"bytes,6,rep,name=actions,proto3" json:"actions,omitempty"`
+	// `CompactTxIn` values corresponding to the `vin` entries of the full transaction.
+	//
+	// Note: the single null-outpoint input for coinbase transactions is omitted. Light
+	// clients can test `CompactTx.index == 0` to determine whether a `CompactTx`
+	// represents a coinbase transaction, as the coinbase transaction is always the
+	// first transaction in any block.
+	Vin []*CompactTxIn `protobuf:"bytes,7,rep,name=vin,proto3" json:"vin,omitempty"`
+	// A sequence of transparent outputs being created by the transaction.
+	Vout []*TxOut `protobuf:"bytes,8,rep,name=vout,proto3" json:"vout,omitempty"`
 }
 
 func (x *CompactTx) Reset() {
@@ -251,9 +269,9 @@ func (x *CompactTx) GetIndex() uint64 {
 	return 0
 }
 
-func (x *CompactTx) GetHash() []byte {
+func (x *CompactTx) GetTxid() []byte {
 	if x != nil {
-		return x.Hash
+		return x.Txid
 	}
 	return nil
 }
@@ -286,6 +304,144 @@ func (x *CompactTx) GetActions() []*CompactOrchardAction {
 	return nil
 }
 
+func (x *CompactTx) GetVin() []*CompactTxIn {
+	if x != nil {
+		return x.Vin
+	}
+	return nil
+}
+
+func (x *CompactTx) GetVout() []*TxOut {
+	if x != nil {
+		return x.Vout
+	}
+	return nil
+}
+
+// A compact representation of a transparent transaction input.
+type CompactTxIn struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The id of the transaction that generated the output being spent. This
+	// byte array must be in protocol order and MUST NOT be reversed or
+	// hex-encoded.
+	PrevoutTxid []byte `protobuf:"bytes,1,opt,name=prevoutTxid,proto3" json:"prevoutTxid,omitempty"`
+	// The index of the output being spent in the `vout` array of the
+	// transaction referred to by `prevoutTxid`.
+	PrevoutIndex uint32 `protobuf:"varint,2,opt,name=prevoutIndex,proto3" json:"prevoutIndex,omitempty"`
+}
+
+func (x *CompactTxIn) Reset() {
+	*x = CompactTxIn{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_compact_formats_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *CompactTxIn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompactTxIn) ProtoMessage() {}
+
+func (x *CompactTxIn) ProtoReflect() protoreflect.Message {
+	mi := &file_compact_formats_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompactTxIn.ProtoReflect.Descriptor instead.
+func (*CompactTxIn) Descriptor() ([]byte, []int) {
+	return file_compact_formats_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CompactTxIn) GetPrevoutTxid() []byte {
+	if x != nil {
+		return x.PrevoutTxid
+	}
+	return nil
+}
+
+func (x *CompactTxIn) GetPrevoutIndex() uint32 {
+	if x != nil {
+		return x.PrevoutIndex
+	}
+	return 0
+}
+
+// A transparent output being created by the transaction.
+//
+// This contains identical data to the `TxOut` type in the transaction itself, and
+// thus it is not "compact".
+type TxOut struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// The value of the output, in Zatoshis.
+	Value uint64 `protobuf:"varint,1,opt,name=value,proto3" json:"value,omitempty"`
+	// The script pubkey that must be satisfied in order to spend this output.
+	ScriptPubKey []byte `protobuf:"bytes,2,opt,name=scriptPubKey,proto3" json:"scriptPubKey,omitempty"`
+}
+
+func (x *TxOut) Reset() {
+	*x = TxOut{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_compact_formats_proto_msgTypes[4]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *TxOut) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TxOut) ProtoMessage() {}
+
+func (x *TxOut) ProtoReflect() protoreflect.Message {
+	mi := &file_compact_formats_proto_msgTypes[4]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TxOut.ProtoReflect.Descriptor instead.
+func (*TxOut) Descriptor() ([]byte, []int) {
+	return file_compact_formats_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TxOut) GetValue() uint64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *TxOut) GetScriptPubKey() []byte {
+	if x != nil {
+		return x.ScriptPubKey
+	}
+	return nil
+}
+
+// A compact representation of a [Sapling Spend](https://zips.z.cash/protocol/protocol.pdf#spendencodingandconsensus).
+//
 // CompactSaplingSpend is a Sapling Spend Description as described in 7.3 of the Zcash
 // protocol specification.
 type CompactSaplingSpend struct {
@@ -293,13 +449,13 @@ type CompactSaplingSpend struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Nf []byte `protobuf:"bytes,1,opt,name=nf,proto3" json:"nf,omitempty"` // nullifier (see the Zcash protocol specification)
+	Nf []byte `protobuf:"bytes,1,opt,name=nf,proto3" json:"nf,omitempty"` // Nullifier (see the Zcash protocol specification)
 }
 
 func (x *CompactSaplingSpend) Reset() {
 	*x = CompactSaplingSpend{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_compact_formats_proto_msgTypes[3]
+		mi := &file_compact_formats_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -312,7 +468,7 @@ func (x *CompactSaplingSpend) String() string {
 func (*CompactSaplingSpend) ProtoMessage() {}
 
 func (x *CompactSaplingSpend) ProtoReflect() protoreflect.Message {
-	mi := &file_compact_formats_proto_msgTypes[3]
+	mi := &file_compact_formats_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +481,7 @@ func (x *CompactSaplingSpend) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompactSaplingSpend.ProtoReflect.Descriptor instead.
 func (*CompactSaplingSpend) Descriptor() ([]byte, []int) {
-	return file_compact_formats_proto_rawDescGZIP(), []int{3}
+	return file_compact_formats_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CompactSaplingSpend) GetNf() []byte {
@@ -335,25 +491,24 @@ func (x *CompactSaplingSpend) GetNf() []byte {
 	return nil
 }
 
-// output encodes the `cmu` field, `ephemeralKey` field, and a 52-byte prefix of the
-// `encCiphertext` field of a Sapling Output Description. These fields are described in
-// section 7.4 of the Zcash protocol spec:
-// https://zips.z.cash/protocol/protocol.pdf#outputencodingandconsensus
-// Total size is 116 bytes.
+// A compact representation of a [Sapling Output](https://zips.z.cash/protocol/protocol.pdf#outputencodingandconsensus).
+//
+// It encodes the `cmu` field, `ephemeralKey` field, and a 52-byte prefix of the
+// `encCiphertext` field of a Sapling Output Description. Total size is 116 bytes.
 type CompactSaplingOutput struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Cmu          []byte `protobuf:"bytes,1,opt,name=cmu,proto3" json:"cmu,omitempty"`                   // note commitment u-coordinate
-	EphemeralKey []byte `protobuf:"bytes,2,opt,name=ephemeralKey,proto3" json:"ephemeralKey,omitempty"` // ephemeral public key
-	Ciphertext   []byte `protobuf:"bytes,3,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`     // first 52 bytes of ciphertext
+	Cmu          []byte `protobuf:"bytes,1,opt,name=cmu,proto3" json:"cmu,omitempty"`                   // Note commitment u-coordinate.
+	EphemeralKey []byte `protobuf:"bytes,2,opt,name=ephemeralKey,proto3" json:"ephemeralKey,omitempty"` // Ephemeral public key.
+	Ciphertext   []byte `protobuf:"bytes,3,opt,name=ciphertext,proto3" json:"ciphertext,omitempty"`     // First 52 bytes of ciphertext.
 }
 
 func (x *CompactSaplingOutput) Reset() {
 	*x = CompactSaplingOutput{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_compact_formats_proto_msgTypes[4]
+		mi := &file_compact_formats_proto_msgTypes[6]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -366,7 +521,7 @@ func (x *CompactSaplingOutput) String() string {
 func (*CompactSaplingOutput) ProtoMessage() {}
 
 func (x *CompactSaplingOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_compact_formats_proto_msgTypes[4]
+	mi := &file_compact_formats_proto_msgTypes[6]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -379,7 +534,7 @@ func (x *CompactSaplingOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompactSaplingOutput.ProtoReflect.Descriptor instead.
 func (*CompactSaplingOutput) Descriptor() ([]byte, []int) {
-	return file_compact_formats_proto_rawDescGZIP(), []int{4}
+	return file_compact_formats_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CompactSaplingOutput) GetCmu() []byte {
@@ -403,8 +558,7 @@ func (x *CompactSaplingOutput) GetCiphertext() []byte {
 	return nil
 }
 
-// https://github.com/zcash/zips/blob/main/zip-0225.rst#orchard-action-description-orchardaction
-// (but not all fields are needed)
+// A compact representation of an [Orchard Action](https://zips.z.cash/protocol/protocol.pdf#actionencodingandconsensus).
 type CompactOrchardAction struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -419,7 +573,7 @@ type CompactOrchardAction struct {
 func (x *CompactOrchardAction) Reset() {
 	*x = CompactOrchardAction{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_compact_formats_proto_msgTypes[5]
+		mi := &file_compact_formats_proto_msgTypes[7]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -432,7 +586,7 @@ func (x *CompactOrchardAction) String() string {
 func (*CompactOrchardAction) ProtoMessage() {}
 
 func (x *CompactOrchardAction) ProtoReflect() protoreflect.Message {
-	mi := &file_compact_formats_proto_msgTypes[5]
+	mi := &file_compact_formats_proto_msgTypes[7]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -445,7 +599,7 @@ func (x *CompactOrchardAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompactOrchardAction.ProtoReflect.Descriptor instead.
 func (*CompactOrchardAction) Descriptor() ([]byte, []int) {
-	return file_compact_formats_proto_rawDescGZIP(), []int{5}
+	return file_compact_formats_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *CompactOrchardAction) GetNullifier() []byte {
@@ -509,10 +663,10 @@ var file_compact_formats_proto_rawDesc = []byte{
 	0x32, 0x24, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74,
 	0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x43, 0x68, 0x61, 0x69, 0x6e, 0x4d, 0x65,
 	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x52, 0x0d, 0x63, 0x68, 0x61, 0x69, 0x6e, 0x4d, 0x65, 0x74,
-	0x61, 0x64, 0x61, 0x74, 0x61, 0x22, 0x99, 0x02, 0x0a, 0x09, 0x43, 0x6f, 0x6d, 0x70, 0x61, 0x63,
+	0x61, 0x64, 0x61, 0x74, 0x61, 0x22, 0x81, 0x03, 0x0a, 0x09, 0x43, 0x6f, 0x6d, 0x70, 0x61, 0x63,
 	0x74, 0x54, 0x78, 0x12, 0x14, 0x0a, 0x05, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x01, 0x20, 0x01,
-	0x28, 0x04, 0x52, 0x05, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x12, 0x12, 0x0a, 0x04, 0x68, 0x61, 0x73,
-	0x68, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x68, 0x61, 0x73, 0x68, 0x12, 0x10, 0x0a,
+	0x28, 0x04, 0x52, 0x05, 0x69, 0x6e, 0x64, 0x65, 0x78, 0x12, 0x12, 0x0a, 0x04, 0x74, 0x78, 0x69,
+	0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x04, 0x74, 0x78, 0x69, 0x64, 0x12, 0x10, 0x0a,
 	0x03, 0x66, 0x65, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x03, 0x66, 0x65, 0x65, 0x12,
 	0x42, 0x0a, 0x06, 0x73, 0x70, 0x65, 0x6e, 0x64, 0x73, 0x18, 0x04, 0x20, 0x03, 0x28, 0x0b, 0x32,
 	0x2a, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e,
@@ -527,7 +681,23 @@ var file_compact_formats_proto_rawDesc = []byte{
 	0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e,
 	0x72, 0x70, 0x63, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x61, 0x63, 0x74, 0x4f, 0x72, 0x63, 0x68, 0x61,
 	0x72, 0x64, 0x41, 0x63, 0x74, 0x69, 0x6f, 0x6e, 0x52, 0x07, 0x61, 0x63, 0x74, 0x69, 0x6f, 0x6e,
-	0x73, 0x22, 0x25, 0x0a, 0x13, 0x43, 0x6f, 0x6d, 0x70, 0x61, 0x63, 0x74, 0x53, 0x61, 0x70, 0x6c,
+	0x73, 0x12, 0x34, 0x0a, 0x03, 0x76, 0x69, 0x6e, 0x18, 0x07, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x22,
+	0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77, 0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73,
+	0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x43, 0x6f, 0x6d, 0x70, 0x61, 0x63, 0x74, 0x54, 0x78,
+	0x49, 0x6e, 0x52, 0x03, 0x76, 0x69, 0x6e, 0x12, 0x30, 0x0a, 0x04, 0x76, 0x6f, 0x75, 0x74, 0x18,
+	0x08, 0x20, 0x03, 0x28, 0x0b, 0x32, 0x1c, 0x2e, 0x63, 0x61, 0x73, 0x68, 0x2e, 0x7a, 0x2e, 0x77,
+	0x61, 0x6c, 0x6c, 0x65, 0x74, 0x2e, 0x73, 0x64, 0x6b, 0x2e, 0x72, 0x70, 0x63, 0x2e, 0x54, 0x78,
+	0x4f, 0x75, 0x74, 0x52, 0x04, 0x76, 0x6f, 0x75, 0x74, 0x22, 0x53, 0x0a, 0x0b, 0x43, 0x6f, 0x6d,
+	0x70, 0x61, 0x63, 0x74, 0x54, 0x78, 0x49, 0x6e, 0x12, 0x20, 0x0a, 0x0b, 0x70, 0x72, 0x65, 0x76,
+	0x6f, 0x75, 0x74, 0x54, 0x78, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x0b, 0x70,
+	0x72, 0x65, 0x76, 0x6f, 0x75, 0x74, 0x54, 0x78, 0x69, 0x64, 0x12, 0x22, 0x0a, 0x0c, 0x70, 0x72,
+	0x65, 0x76, 0x6f, 0x75, 0x74, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d,
+	0x52, 0x0c, 0x70, 0x72, 0x65, 0x76, 0x6f, 0x75, 0x74, 0x49, 0x6e, 0x64, 0x65, 0x78, 0x22, 0x41,
+	0x0a, 0x05, 0x54, 0x78, 0x4f, 0x75, 0x74, 0x12, 0x14, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
+	0x18, 0x01, 0x20, 0x01, 0x28, 0x04, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x12, 0x22, 0x0a,
+	0x0c, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x50, 0x75, 0x62, 0x4b, 0x65, 0x79, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0c, 0x52, 0x0c, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x50, 0x75, 0x62, 0x4b, 0x65,
+	0x79, 0x22, 0x25, 0x0a, 0x13, 0x43, 0x6f, 0x6d, 0x70, 0x61, 0x63, 0x74, 0x53, 0x61, 0x70, 0x6c,
 	0x69, 0x6e, 0x67, 0x53, 0x70, 0x65, 0x6e, 0x64, 0x12, 0x0e, 0x0a, 0x02, 0x6e, 0x66, 0x18, 0x01,
 	0x20, 0x01, 0x28, 0x0c, 0x52, 0x02, 0x6e, 0x66, 0x22, 0x6c, 0x0a, 0x14, 0x43, 0x6f, 0x6d, 0x70,
 	0x61, 0x63, 0x74, 0x53, 0x61, 0x70, 0x6c, 0x69, 0x6e, 0x67, 0x4f, 0x75, 0x74, 0x70, 0x75, 0x74,
@@ -562,26 +732,30 @@ func file_compact_formats_proto_rawDescGZIP() []byte {
 	return file_compact_formats_proto_rawDescData
 }
 
-var file_compact_formats_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_compact_formats_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_compact_formats_proto_goTypes = []interface{}{
 	(*ChainMetadata)(nil),        // 0: cash.z.wallet.sdk.rpc.ChainMetadata
 	(*CompactBlock)(nil),         // 1: cash.z.wallet.sdk.rpc.CompactBlock
 	(*CompactTx)(nil),            // 2: cash.z.wallet.sdk.rpc.CompactTx
-	(*CompactSaplingSpend)(nil),  // 3: cash.z.wallet.sdk.rpc.CompactSaplingSpend
-	(*CompactSaplingOutput)(nil), // 4: cash.z.wallet.sdk.rpc.CompactSaplingOutput
-	(*CompactOrchardAction)(nil), // 5: cash.z.wallet.sdk.rpc.CompactOrchardAction
+	(*CompactTxIn)(nil),          // 3: cash.z.wallet.sdk.rpc.CompactTxIn
+	(*TxOut)(nil),                // 4: cash.z.wallet.sdk.rpc.TxOut
+	(*CompactSaplingSpend)(nil),  // 5: cash.z.wallet.sdk.rpc.CompactSaplingSpend
+	(*CompactSaplingOutput)(nil), // 6: cash.z.wallet.sdk.rpc.CompactSaplingOutput
+	(*CompactOrchardAction)(nil), // 7: cash.z.wallet.sdk.rpc.CompactOrchardAction
 }
 var file_compact_formats_proto_depIdxs = []int32{
 	2, // 0: cash.z.wallet.sdk.rpc.CompactBlock.vtx:type_name -> cash.z.wallet.sdk.rpc.CompactTx
 	0, // 1: cash.z.wallet.sdk.rpc.CompactBlock.chainMetadata:type_name -> cash.z.wallet.sdk.rpc.ChainMetadata
-	3, // 2: cash.z.wallet.sdk.rpc.CompactTx.spends:type_name -> cash.z.wallet.sdk.rpc.CompactSaplingSpend
-	4, // 3: cash.z.wallet.sdk.rpc.CompactTx.outputs:type_name -> cash.z.wallet.sdk.rpc.CompactSaplingOutput
-	5, // 4: cash.z.wallet.sdk.rpc.CompactTx.actions:type_name -> cash.z.wallet.sdk.rpc.CompactOrchardAction
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 2: cash.z.wallet.sdk.rpc.CompactTx.spends:type_name -> cash.z.wallet.sdk.rpc.CompactSaplingSpend
+	6, // 3: cash.z.wallet.sdk.rpc.CompactTx.outputs:type_name -> cash.z.wallet.sdk.rpc.CompactSaplingOutput
+	7, // 4: cash.z.wallet.sdk.rpc.CompactTx.actions:type_name -> cash.z.wallet.sdk.rpc.CompactOrchardAction
+	3, // 5: cash.z.wallet.sdk.rpc.CompactTx.vin:type_name -> cash.z.wallet.sdk.rpc.CompactTxIn
+	4, // 6: cash.z.wallet.sdk.rpc.CompactTx.vout:type_name -> cash.z.wallet.sdk.rpc.TxOut
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_compact_formats_proto_init() }
@@ -627,7 +801,7 @@ func file_compact_formats_proto_init() {
 			}
 		}
 		file_compact_formats_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CompactSaplingSpend); i {
+			switch v := v.(*CompactTxIn); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -639,7 +813,7 @@ func file_compact_formats_proto_init() {
 			}
 		}
 		file_compact_formats_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*CompactSaplingOutput); i {
+			switch v := v.(*TxOut); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -651,6 +825,30 @@ func file_compact_formats_proto_init() {
 			}
 		}
 		file_compact_formats_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CompactSaplingSpend); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_compact_formats_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*CompactSaplingOutput); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_compact_formats_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*CompactOrchardAction); i {
 			case 0:
 				return &v.state
@@ -669,7 +867,7 @@ func file_compact_formats_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_compact_formats_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

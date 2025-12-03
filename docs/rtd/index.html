@@ -202,51 +202,16 @@
                   <a href="#cash.z.wallet.sdk.rpc.CompactTx"><span class="badge">M</span>CompactTx</a>
                 </li>
               
-              
-              
-              
-            </ul>
-          </li>
-        
-          
-          <li>
-            <a href="#darkside.proto">darkside.proto</a>
-            <ul>
-              
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideBlock"><span class="badge">M</span>DarksideBlock</a>
+                  <a href="#cash.z.wallet.sdk.rpc.CompactTxIn"><span class="badge">M</span>CompactTxIn</a>
                 </li>
               
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideBlocksURL"><span class="badge">M</span>DarksideBlocksURL</a>
-                </li>
-              
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideEmptyBlocks"><span class="badge">M</span>DarksideEmptyBlocks</a>
-                </li>
-              
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideHeight"><span class="badge">M</span>DarksideHeight</a>
-                </li>
-              
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideMetaState"><span class="badge">M</span>DarksideMetaState</a>
-                </li>
-              
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideSubtreeRoots"><span class="badge">M</span>DarksideSubtreeRoots</a>
-                </li>
-              
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL"><span class="badge">M</span>DarksideTransactionsURL</a>
+                  <a href="#cash.z.wallet.sdk.rpc.TxOut"><span class="badge">M</span>TxOut</a>
                 </li>
               
               
               
-              
-                <li>
-                  <a href="#cash.z.wallet.sdk.rpc.DarksideStreamer"><span class="badge">S</span>DarksideStreamer</a>
-                </li>
               
             </ul>
           </li>
@@ -289,10 +254,6 @@
                 </li>
               
                 <li>
-                  <a href="#cash.z.wallet.sdk.rpc.Exclude"><span class="badge">M</span>Exclude</a>
-                </li>
-              
-                <li>
                   <a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosArg"><span class="badge">M</span>GetAddressUtxosArg</a>
                 </li>
               
@@ -302,6 +263,10 @@
               
                 <li>
                   <a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReplyList"><span class="badge">M</span>GetAddressUtxosReplyList</a>
+                </li>
+              
+                <li>
+                  <a href="#cash.z.wallet.sdk.rpc.GetMempoolTxRequest"><span class="badge">M</span>GetMempoolTxRequest</a>
                 </li>
               
                 <li>
@@ -342,6 +307,10 @@
               
               
                 <li>
+                  <a href="#cash.z.wallet.sdk.rpc.PoolType"><span class="badge">E</span>PoolType</a>
+                </li>
+              
+                <li>
                   <a href="#cash.z.wallet.sdk.rpc.ShieldedProtocol"><span class="badge">E</span>ShieldedProtocol</a>
                 </li>
               
@@ -367,7 +336,7 @@
 
       
         <h3 id="cash.z.wallet.sdk.rpc.ChainMetadata">ChainMetadata</h3>
-        <p>ChainMetadata represents information about the state of the chain as of a given block.</p>
+        <p>Information about the state of the chain as of a given block.</p>
 
         
           <table class="field-table">
@@ -398,7 +367,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</h3>
-        <p>CompactBlock is a packaging of ONLY the data from a block that's needed to:</p><p>1. Detect a payment to your shielded Sapling address</p><p>2. Detect a spend of your shielded Sapling notes</p><p>3. Update your witnesses to generate new Sapling spend proofs.</p>
+        <p>A compact representation of a Zcash block.</p><p>CompactBlock is a packaging of ONLY the data from a block that's needed to:</p><p>1. Detect a payment to your Shielded address</p><p>2. Detect a spend of your Shielded notes</p><p>3. Update your witnesses to generate new spend proofs.</p><p>4. Spend UTXOs associated to t-addresses of your wallet.</p>
 
         
           <table class="field-table">
@@ -446,7 +415,7 @@
                   <td>header</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>(hash, prevHash, and time) OR (full header) </p></td>
+                  <td><p>full header (as returned by the getblock RPC) </p></td>
                 </tr>
               
                 <tr>
@@ -471,7 +440,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactOrchardAction">CompactOrchardAction</h3>
-        <p>https://github.com/zcash/zips/blob/main/zip-0225.rst#orchard-action-description-orchardaction</p><p>(but not all fields are needed)</p>
+        <p>A compact representation of an [Orchard Action](https://zips.z.cash/protocol/protocol.pdf#actionencodingandconsensus).</p>
 
         
           <table class="field-table">
@@ -516,7 +485,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactSaplingOutput">CompactSaplingOutput</h3>
-        <p>output encodes the `cmu` field, `ephemeralKey` field, and a 52-byte prefix of the</p><p>`encCiphertext` field of a Sapling Output Description. These fields are described in</p><p>section 7.4 of the Zcash protocol spec:</p><p>https://zips.z.cash/protocol/protocol.pdf#outputencodingandconsensus</p><p>Total size is 116 bytes.</p>
+        <p>A compact representation of a [Sapling Output](https://zips.z.cash/protocol/protocol.pdf#outputencodingandconsensus).</p><p>It encodes the `cmu` field, `ephemeralKey` field, and a 52-byte prefix of the</p><p>`encCiphertext` field of a Sapling Output Description. Total size is 116 bytes.</p>
 
         
           <table class="field-table">
@@ -529,21 +498,21 @@
                   <td>cmu</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>note commitment u-coordinate </p></td>
+                  <td><p>Note commitment u-coordinate. </p></td>
                 </tr>
               
                 <tr>
                   <td>ephemeralKey</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>ephemeral public key </p></td>
+                  <td><p>Ephemeral public key. </p></td>
                 </tr>
               
                 <tr>
                   <td>ciphertext</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>first 52 bytes of ciphertext </p></td>
+                  <td><p>First 52 bytes of ciphertext. </p></td>
                 </tr>
               
             </tbody>
@@ -554,7 +523,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactSaplingSpend">CompactSaplingSpend</h3>
-        <p>CompactSaplingSpend is a Sapling Spend Description as described in 7.3 of the Zcash</p><p>protocol specification.</p>
+        <p>A compact representation of a [Sapling Spend](https://zips.z.cash/protocol/protocol.pdf#spendencodingandconsensus).</p><p>CompactSaplingSpend is a Sapling Spend Description as described in 7.3 of the Zcash</p><p>protocol specification.</p>
 
         
           <table class="field-table">
@@ -567,7 +536,7 @@
                   <td>nf</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>nullifier (see the Zcash protocol specification) </p></td>
+                  <td><p>Nullifier (see the Zcash protocol specification) </p></td>
                 </tr>
               
             </tbody>
@@ -578,7 +547,7 @@
         
       
         <h3 id="cash.z.wallet.sdk.rpc.CompactTx">CompactTx</h3>
-        <p>CompactTx contains the minimum information for a wallet to know if this transaction</p><p>is relevant to it (either pays to it or spends from it) via shielded elements</p><p>only. This message will not encode a transparent-to-transparent transaction.</p>
+        <p>A compact representation of a Zcash transaction.</p><p>CompactTx contains the minimum information for a wallet to know if this transaction</p><p>is relevant to it (either pays to it or spends from it) via shielded elements. Additionally,</p><p>it can optionally include the minimum necessary data to detect payments to transparent addresses</p><p>related to your wallet.</p>
 
         
           <table class="field-table">
@@ -591,18 +560,18 @@
                   <td>index</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p>Index and hash will allow the receiver to call out to chain
-explorers or other data structures to retrieve more information
-about this transaction.
-
-the index within the full block </p></td>
+                  <td><p>The index of the transaction within the block. </p></td>
                 </tr>
               
                 <tr>
-                  <td>hash</td>
+                  <td>txid</td>
                   <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p>the ID (hash) of this transaction, same as in block explorers </p></td>
+                  <td><p>The id of the transaction as defined in
+[§ 7.1.1 ‘Transaction Identifiers’](https://zips.z.cash/protocol/protocol.pdf#txnidentifiers)
+This byte array MUST be in protocol order and MUST NOT be reversed
+or hex-encoded; the byte-reversed and hex-encoded representation is
+exclusively a textual representation of a txid. </p></td>
                 </tr>
               
                 <tr>
@@ -637,218 +606,23 @@ If there are no transparent inputs, the fee will be calculable as:
                   <td><p> </p></td>
                 </tr>
               
-            </tbody>
-          </table>
-
-          
-
-        
-      
-
-      
-
-      
-
-      
-    
-      
-      <div class="file-heading">
-        <h2 id="darkside.proto">darkside.proto</h2><a href="#title">Top</a>
-      </div>
-      <p></p>
-
-      
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideBlock">DarksideBlock</h3>
-        <p>A block is a hex-encoded string.</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
                 <tr>
-                  <td>block</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideBlocksURL">DarksideBlocksURL</h3>
-        <p>DarksideBlocksURL is typically something like:</p><p>https://raw.githubusercontent.com/zcash-hackworks/darksidewalletd-test-data/master/basic-reorg/before-reorg.txt</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>url</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideEmptyBlocks">DarksideEmptyBlocks</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>height</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>nonce</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>count</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideHeight">DarksideHeight</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>height</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideMetaState">DarksideMetaState</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>saplingActivation</td>
-                  <td><a href="#int32">int32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>branchID</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>chainName</td>
-                  <td><a href="#string">string</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>startSaplingCommitmentTreeSize</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>startOrchardCommitmentTreeSize</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
-
-        
-      
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideSubtreeRoots">DarksideSubtreeRoots</h3>
-        <p></p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>shieldedProtocol</td>
-                  <td><a href="#cash.z.wallet.sdk.rpc.ShieldedProtocol">ShieldedProtocol</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>startIndex</td>
-                  <td><a href="#uint32">uint32</a></td>
-                  <td></td>
-                  <td><p> </p></td>
-                </tr>
-              
-                <tr>
-                  <td>subtreeRoots</td>
-                  <td><a href="#cash.z.wallet.sdk.rpc.SubtreeRoot">SubtreeRoot</a></td>
+                  <td>vin</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.CompactTxIn">CompactTxIn</a></td>
                   <td>repeated</td>
-                  <td><p> </p></td>
+                  <td><p>`CompactTxIn` values corresponding to the `vin` entries of the full transaction.
+
+Note: the single null-outpoint input for coinbase transactions is omitted. Light
+clients can test `CompactTx.index == 0` to determine whether a `CompactTx`
+represents a coinbase transaction, as the coinbase transaction is always the
+first transaction in any block. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>vout</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.TxOut">TxOut</a></td>
+                  <td>repeated</td>
+                  <td><p>A sequence of transparent outputs being created by the transaction. </p></td>
                 </tr>
               
             </tbody>
@@ -858,8 +632,8 @@ If there are no transparent inputs, the fee will be calculable as:
 
         
       
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</h3>
-        <p>DarksideTransactionsURL refers to an HTTP source that contains a list</p><p>of hex-encoded transactions, one per line, that are to be associated</p><p>with the given height (fake-mined into the block at that height)</p>
+        <h3 id="cash.z.wallet.sdk.rpc.CompactTxIn">CompactTxIn</h3>
+        <p>A compact representation of a transparent transaction input.</p>
 
         
           <table class="field-table">
@@ -869,17 +643,51 @@ If there are no transparent inputs, the fee will be calculable as:
             <tbody>
               
                 <tr>
-                  <td>height</td>
-                  <td><a href="#int32">int32</a></td>
+                  <td>prevoutTxid</td>
+                  <td><a href="#bytes">bytes</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The id of the transaction that generated the output being spent. This
+byte array must be in protocol order and MUST NOT be reversed or
+hex-encoded. </p></td>
                 </tr>
               
                 <tr>
-                  <td>url</td>
-                  <td><a href="#string">string</a></td>
+                  <td>prevoutIndex</td>
+                  <td><a href="#uint32">uint32</a></td>
                   <td></td>
-                  <td><p> </p></td>
+                  <td><p>The index of the output being spent in the `vout` array of the
+transaction referred to by `prevoutTxid`. </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.TxOut">TxOut</h3>
+        <p>A transparent output being created by the transaction.</p><p>This contains identical data to the `TxOut` type in the transaction itself, and</p><p>thus it is not "compact".</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>value</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>The value of the output, in Zatoshis. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>scriptPubKey</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td></td>
+                  <td><p>The script pubkey that must be satisfied in order to spend this output. </p></td>
                 </tr>
               
             </tbody>
@@ -895,172 +703,6 @@ If there are no transparent inputs, the fee will be calculable as:
       
 
       
-        <h3 id="cash.z.wallet.sdk.rpc.DarksideStreamer">DarksideStreamer</h3>
-        <p>Darksidewalletd maintains two staging areas, blocks and transactions. The</p><p>Stage*() gRPCs add items to the staging area; ApplyStaged() "applies" everything</p><p>in the staging area to the working (operational) state that the mock zcashd</p><p>serves; transactions are placed into their corresponding blocks (by height).</p>
-        <table class="enum-table">
-          <thead>
-            <tr><td>Method Name</td><td>Request Type</td><td>Response Type</td><td>Description</td></tr>
-          </thead>
-          <tbody>
-            
-              <tr>
-                <td>Reset</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideMetaState">DarksideMetaState</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Reset reverts all darksidewalletd state (active block range, latest height,
-staged blocks and transactions) and lightwalletd state (cache) to empty,
-the same as the initial state. This occurs synchronously and instantaneously;
-no reorg happens in lightwalletd. This is good to do before each independent
-test so that no state leaks from one test to another.
-Also sets (some of) the values returned by GetLightdInfo(). The Sapling
-activation height specified here must be where the block range starts.</p></td>
-              </tr>
-            
-              <tr>
-                <td>StageBlocksStream</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlock">DarksideBlock</a> stream</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageBlocksStream accepts a list of blocks and saves them into the blocks
-staging area until ApplyStaged() is called; there is no immediate effect on
-the mock zcashd. Blocks are hex-encoded. Order is important, see ApplyStaged.</p></td>
-              </tr>
-            
-              <tr>
-                <td>StageBlocks</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideBlocksURL">DarksideBlocksURL</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageBlocks is the same as StageBlocksStream() except the blocks are fetched
-from the given URL. Blocks are one per line, hex-encoded (not JSON).</p></td>
-              </tr>
-            
-              <tr>
-                <td>StageBlocksCreate</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideEmptyBlocks">DarksideEmptyBlocks</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageBlocksCreate is like the previous two, except it creates &#39;count&#39;
-empty blocks at consecutive heights starting at height &#39;height&#39;. The
-&#39;nonce&#39; is part of the header, so it contributes to the block hash; this
-lets you create identical blocks (same transactions and height), but with
-different hashes.</p></td>
-              </tr>
-            
-              <tr>
-                <td>StageTransactionsStream</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageTransactionsStream stores the given transaction-height pairs in the
-staging area until ApplyStaged() is called. Note that these transactions
-are not returned by the production GetTransaction() gRPC until they
-appear in a &#34;mined&#34; block (contained in the active blockchain presented
-by the mock zcashd).</p></td>
-              </tr>
-            
-              <tr>
-                <td>StageTransactions</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideTransactionsURL">DarksideTransactionsURL</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>StageTransactions is the same except the transactions are fetched from
-the given url. They are all staged into the block at the given height.
-Staging transactions to different heights requires multiple calls.</p></td>
-              </tr>
-            
-              <tr>
-                <td>ApplyStaged</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideHeight">DarksideHeight</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>ApplyStaged iterates the list of blocks that were staged by the
-StageBlocks*() gRPCs, in the order they were staged, and &#34;merges&#34; each
-into the active, working blocks list that the mock zcashd is presenting
-to lightwalletd. Even as each block is applied, the active list can&#39;t
-have gaps; if the active block range is 1000-1006, and the staged block
-range is 1003-1004, the resulting range is 1000-1004, with 1000-1002
-unchanged, blocks 1003-1004 from the new range, and 1005-1006 dropped.
-
-After merging all blocks, ApplyStaged() appends staged transactions (in
-the order received) into each one&#39;s corresponding (by height) block
-The staging area is then cleared.
-
-The argument specifies the latest block height that mock zcashd reports
-(i.e. what&#39;s returned by GetLatestBlock). Note that ApplyStaged() can
-also be used to simply advance the latest block height presented by mock
-zcashd. That is, there doesn&#39;t need to be anything in the staging area.</p></td>
-              </tr>
-            
-              <tr>
-                <td>GetIncomingTransactions</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p>Calls to the production gRPC SendTransaction() store the transaction in
-a separate area (not the staging area); this method returns all transactions
-in this separate area, which is then cleared. The height returned
-with each transaction is -1 (invalid) since these transactions haven&#39;t
-been mined yet. The intention is that the transactions returned here can
-then, for example, be given to StageTransactions() to get them &#34;mined&#34;
-into a specified block on the next ApplyStaged().</p></td>
-              </tr>
-            
-              <tr>
-                <td>ClearIncomingTransactions</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Clear the incoming transaction pool.</p></td>
-              </tr>
-            
-              <tr>
-                <td>AddAddressUtxo</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReply">GetAddressUtxosReply</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Add a GetAddressUtxosReply entry to be returned by GetAddressUtxos().
-There is no staging or applying for these, very simple.</p></td>
-              </tr>
-            
-              <tr>
-                <td>ClearAddressUtxo</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Clear the list of GetAddressUtxos entries (can&#39;t fail)</p></td>
-              </tr>
-            
-              <tr>
-                <td>AddTreeState</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.TreeState">TreeState</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Adds a GetTreeState to the tree state cache</p></td>
-              </tr>
-            
-              <tr>
-                <td>RemoveTreeState</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Removes a GetTreeState for the given height from cache if present (can&#39;t fail)</p></td>
-              </tr>
-            
-              <tr>
-                <td>ClearAllTreeStates</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Clear the list of GetTreeStates entries (can&#39;t fail)</p></td>
-              </tr>
-            
-              <tr>
-                <td>SetSubtreeRoots</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.DarksideSubtreeRoots">DarksideSubtreeRoots</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Sets the subtree roots cache (for GetSubtreeRoots),
-replacing any existing entries</p></td>
-              </tr>
-            
-              <tr>
-                <td>Stop</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Empty">Empty</a></td>
-                <td><p>Stop causes the server to shut down cleanly.</p></td>
-              </tr>
-            
-          </tbody>
-        </table>
-
-        
     
       
       <div class="file-heading">
@@ -1173,7 +815,7 @@ replacing any existing entries</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.BlockRange">BlockRange</h3>
-        <p>BlockRange specifies a series of blocks from start to end inclusive.</p><p>Both BlockIDs must be heights; specification by hash is not yet supported.</p>
+        <p>BlockRange specifies a series of blocks from start to end inclusive.</p><p>Both BlockIDs must be heights; specification by hash is not yet supported.</p><p>If no pool types are specified, the server should default to the legacy</p><p>behavior of returning only data relevant to the shielded (Sapling and</p><p>Orchard) pools; otherwise, the server should prune `CompactBlocks` returned</p><p>to include only data relevant to the requested pool types. Clients MUST </p><p>verify that the version of the server they are connected to are capable</p><p>of returning pruned and/or transparent data before setting `poolTypes`</p><p>to a non-empty value.</p>
 
         
           <table class="field-table">
@@ -1193,6 +835,13 @@ replacing any existing entries</p></td>
                   <td>end</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
                   <td></td>
+                  <td><p> </p></td>
+                </tr>
+              
+                <tr>
+                  <td>poolTypes</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.PoolType">PoolType</a></td>
+                  <td>repeated</td>
                   <td><p> </p></td>
                 </tr>
               
@@ -1238,30 +887,6 @@ replacing any existing entries</p></td>
         <p>Empty is for gRPCs that take no arguments, currently only GetLightdInfo.</p>
 
         
-
-        
-      
-        <h3 id="cash.z.wallet.sdk.rpc.Exclude">Exclude</h3>
-        <p>The a shortened transaction ID is the prefix in big-endian (hex) format</p><p>(then converted to binary).</p>
-
-        
-          <table class="field-table">
-            <thead>
-              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
-            </thead>
-            <tbody>
-              
-                <tr>
-                  <td>txid</td>
-                  <td><a href="#bytes">bytes</a></td>
-                  <td>repeated</td>
-                  <td><p> </p></td>
-                </tr>
-              
-            </tbody>
-          </table>
-
-          
 
         
       
@@ -1377,6 +1002,45 @@ replacing any existing entries</p></td>
                   <td><a href="#cash.z.wallet.sdk.rpc.GetAddressUtxosReply">GetAddressUtxosReply</a></td>
                   <td>repeated</td>
                   <td><p> </p></td>
+                </tr>
+              
+            </tbody>
+          </table>
+
+          
+
+        
+      
+        <h3 id="cash.z.wallet.sdk.rpc.GetMempoolTxRequest">GetMempoolTxRequest</h3>
+        <p>Request parameters for the `GetMempoolTx` RPC.</p>
+
+        
+          <table class="field-table">
+            <thead>
+              <tr><td>Field</td><td>Type</td><td>Label</td><td>Description</td></tr>
+            </thead>
+            <tbody>
+              
+                <tr>
+                  <td>exclude_txid_suffixes</td>
+                  <td><a href="#bytes">bytes</a></td>
+                  <td>repeated</td>
+                  <td><p>A list of transaction ID byte string suffixes that should be excluded
+from the response. These suffixes may be produced either directly from
+the underlying txid bytes, or, if the source values are encoded txid
+strings, by truncating the hexadecimal representation of each
+transaction ID to an even number of characters, and then hex-decoding
+and then byte-reversing this value to obtain the byte representation. </p></td>
+                </tr>
+              
+                <tr>
+                  <td>poolTypes</td>
+                  <td><a href="#cash.z.wallet.sdk.rpc.PoolType">PoolType</a></td>
+                  <td>repeated</td>
+                  <td><p>The server must prune `CompactTx`s returned to include only data
+relevant to the requested pool types. If no pool types are specified,
+the server should default to the legacy behavior of returning only data
+relevant to the shielded (Sapling and Orchard) pools. </p></td>
                 </tr>
               
             </tbody>
@@ -1539,6 +1203,27 @@ replacing any existing entries</p></td>
                   <td><p>Zcash donation UA address </p></td>
                 </tr>
               
+                <tr>
+                  <td>upgradeName</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>name of next pending network upgrade, empty if none scheduled </p></td>
+                </tr>
+              
+                <tr>
+                  <td>upgradeHeight</td>
+                  <td><a href="#uint64">uint64</a></td>
+                  <td></td>
+                  <td><p>height of next pending upgrade, zero if none is scheduled </p></td>
+                </tr>
+              
+                <tr>
+                  <td>lightwalletProtocolVersion</td>
+                  <td><a href="#string">string</a></td>
+                  <td></td>
+                  <td><p>version of https://github.com/zcash/lightwallet-protocol served by this server </p></td>
+                </tr>
+              
             </tbody>
           </table>
 
@@ -1578,7 +1263,7 @@ replacing any existing entries</p></td>
         
       
         <h3 id="cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</h3>
-        <p>RawTransaction contains the complete transaction data. It also includes the</p><p>height for the block in which the transaction was included in the main</p><p>chain, if any (as detailed below).</p>
+        <p>RawTransaction contains the complete transaction data. It also optionally includes</p><p>the block height in which the transaction was included, or, when returned</p><p>by GetMempoolStream(), the latest block height.</p><p>FIXME: the documentation here about mempool status contradicts the documentation</p><p>for the `height` field. See https://github.com/zcash/librustzcash/issues/1484</p>
 
         
           <table class="field-table">
@@ -1695,7 +1380,7 @@ the `RawTransaction` type are as follows:
         
       
         <h3 id="cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</h3>
-        <p>TransparentAddressBlockFilter restricts the results to the given address</p><p>or block range.</p>
+        <p>TransparentAddressBlockFilter restricts the results of the GRPC methods that</p><p>use it to the transactions that involve the given address and were mined in</p><p>the specified block range. Non-default values for both the address and the</p><p>block range must be specified. Mempool transactions are not included.</p><p>The `poolTypes` field of the `range` argument should be ignored.</p><p>Implementations MAY consider it an error if any pool types are specified.</p>
 
         
           <table class="field-table">
@@ -1715,7 +1400,7 @@ the `RawTransaction` type are as follows:
                   <td>range</td>
                   <td><a href="#cash.z.wallet.sdk.rpc.BlockRange">BlockRange</a></td>
                   <td></td>
-                  <td><p>start, end heights </p></td>
+                  <td><p>start, end heights only </p></td>
                 </tr>
               
             </tbody>
@@ -1824,6 +1509,41 @@ the `RawTransaction` type are as follows:
       
 
       
+        <h3 id="cash.z.wallet.sdk.rpc.PoolType">PoolType</h3>
+        <p>An identifier for a Zcash value pool.</p>
+        <table class="enum-table">
+          <thead>
+            <tr><td>Name</td><td>Number</td><td>Description</td></tr>
+          </thead>
+          <tbody>
+            
+              <tr>
+                <td>POOL_TYPE_INVALID</td>
+                <td>0</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>TRANSPARENT</td>
+                <td>1</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>SAPLING</td>
+                <td>2</td>
+                <td><p></p></td>
+              </tr>
+            
+              <tr>
+                <td>ORCHARD</td>
+                <td>3</td>
+                <td><p></p></td>
+              </tr>
+            
+          </tbody>
+        </table>
+      
         <h3 id="cash.z.wallet.sdk.rpc.ShieldedProtocol">ShieldedProtocol</h3>
         <p></p>
         <table class="enum-table">
@@ -1863,7 +1583,7 @@ the `RawTransaction` type are as follows:
                 <td>GetLatestBlock</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.ChainSpec">ChainSpec</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
-                <td><p>Return the height of the tip of the best chain</p></td>
+                <td><p>Return the BlockID of the block at the tip of the best chain</p></td>
               </tr>
             
               <tr>
@@ -1877,21 +1597,33 @@ the `RawTransaction` type are as follows:
                 <td>GetBlockNullifiers</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockID">BlockID</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</a></td>
-                <td><p>Same as GetBlock except actions contain only nullifiers</p></td>
+                <td><p>Same as GetBlock except the returned CompactBlock value contains only
+nullifiers.
+
+Note: this method is deprecated. Implementations should ignore any
+`PoolType::TRANSPARENT` member of the `poolTypes` argument.</p></td>
               </tr>
             
               <tr>
                 <td>GetBlockRange</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockRange">BlockRange</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</a> stream</td>
-                <td><p>Return a list of consecutive compact blocks</p></td>
+                <td><p>Return a list of consecutive compact blocks in the specified range,
+which is inclusive of `range.end`.
+
+If range.start &lt;= range.end, blocks are returned increasing height order;
+otherwise blocks are returned in decreasing height order.</p></td>
               </tr>
             
               <tr>
                 <td>GetBlockRangeNullifiers</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.BlockRange">BlockRange</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.CompactBlock">CompactBlock</a> stream</td>
-                <td><p>Same as GetBlockRange except actions contain only nullifiers</p></td>
+                <td><p>Same as GetBlockRange except the returned CompactBlock values contain
+only nullifiers.
+
+Note: this method is deprecated. Implementations should ignore any
+`PoolType::TRANSPARENT` member of the `poolTypes` argument.</p></td>
               </tr>
             
               <tr>
@@ -1912,8 +1644,9 @@ the `RawTransaction` type are as follows:
                 <td>GetTaddressTxids</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p>Return the transactions corresponding to the given t-address within the given block range
-NB - this method is misnamed, it returns transactions, not transaction IDs.
+                <td><p>Return RawTransactions that match the given transparent address filter.
+
+Note: This function is misnamed, it returns complete `RawTransaction` values, not TxIds.
 NOTE: this method is deprecated, please use GetTaddressTransactions instead.</p></td>
               </tr>
             
@@ -1921,7 +1654,8 @@ NOTE: this method is deprecated, please use GetTaddressTransactions instead.</p>
                 <td>GetTaddressTransactions</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TransparentAddressBlockFilter">TransparentAddressBlockFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a> stream</td>
-                <td><p>Return the transactions corresponding to the given t-address within the given block range</p></td>
+                <td><p>Return the transactions corresponding to the given t-address within the given block range.
+Mempool transactions are not included in the results.</p></td>
               </tr>
             
               <tr>
@@ -1940,20 +1674,20 @@ NOTE: this method is deprecated, please use GetTaddressTransactions instead.</p>
             
               <tr>
                 <td>GetMempoolTx</td>
-                <td><a href="#cash.z.wallet.sdk.rpc.Exclude">Exclude</a></td>
+                <td><a href="#cash.z.wallet.sdk.rpc.GetMempoolTxRequest">GetMempoolTxRequest</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.CompactTx">CompactTx</a> stream</td>
-                <td><p>Return the compact transactions currently in the mempool; the results
-can be a few seconds out of date. If the Exclude list is empty, return
-all transactions; otherwise return all *except* those in the Exclude list
-(if any); this allows the client to avoid receiving transactions that it
-already has (from an earlier call to this rpc). The transaction IDs in the
-Exclude list can be shortened to any number of bytes to make the request
-more bandwidth-efficient; if two or more transactions in the mempool
-match a shortened txid, they are all sent (none is excluded). Transactions
-in the exclude list that don&#39;t exist in the mempool are ignored.
-
-The a shortened transaction ID is the prefix in big-endian (hex) format
-(then converted to binary). See smoke-test.bash for examples.</p></td>
+                <td><p>Returns a stream of the compact transaction representation for transactions
+currently in the mempool. The results of this operation may be a few
+seconds out of date. If the `exclude_txid_suffixes` list is empty,
+return all transactions; otherwise return all *except* those in the
+`exclude_txid_suffixes` list (if any); this allows the client to avoid
+receiving transactions that it already has (from an earlier call to this
+RPC). The transaction IDs in the `exclude_txid_suffixes` list can be
+shortened to any number of bytes to make the request more
+bandwidth-efficient; if two or more transactions in the mempool match a
+txid suffix, none of the matching transactions are excluded. Txid
+suffixes in the exclude list that don&#39;t match any transactions in the
+mempool are ignored.</p></td>
               </tr>
             
               <tr>

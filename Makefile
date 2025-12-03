@@ -80,8 +80,8 @@ coverage_html: coverage
 # Generate documents, requires docker, see https://github.com/pseudomuto/protoc-gen-doc
 doc: docs/rtd/index.html
 
-docs/rtd/index.html: walletrpc/compact_formats.proto walletrpc/service.proto walletrpc/darkside.proto
-	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/walletrpc:/protos pseudomuto/protoc-gen-doc
+docs/rtd/index.html: lightwallet-protocol/walletrpc/compact_formats.proto lightwallet-protocol/walletrpc/service.proto
+	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/lightwallet-protocol/walletrpc:/protos pseudomuto/protoc-gen-doc
 
 proto: walletrpc/service.pb.go walletrpc/darkside.pb.go walletrpc/compact_formats.pb.go
 
