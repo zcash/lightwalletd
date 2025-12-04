@@ -25,10 +25,10 @@ func loggerFromContext(ctx context.Context) *logrus.Entry {
 
 func LogInterceptor(
 	ctx context.Context,
-	req interface{},
+	req any,
 	info *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
-) (interface{}, error) {
+) (any, error) {
 	reqLog := loggerFromContext(ctx)
 	start := time.Now()
 

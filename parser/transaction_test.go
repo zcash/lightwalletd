@@ -29,7 +29,7 @@ type TxTestData struct {
 
 // https://jhall.io/posts/go-json-tricks-array-as-structs/
 func (r *TxTestData) UnmarshalJSON(p []byte) error {
-	var t []interface{}
+	var t []any
 	if err := json.Unmarshal(p, &t); err != nil {
 		return err
 	}

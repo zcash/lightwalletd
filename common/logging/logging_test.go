@@ -18,7 +18,7 @@ import (
 
 var step int
 
-func testhandler(ctx context.Context, req interface{}) (interface{}, error) {
+func testhandler(ctx context.Context, req any) (any, error) {
 	step++
 	switch step {
 	case 1:
@@ -40,7 +40,7 @@ func TestLogInterceptor(t *testing.T) {
 	common.Log = logger.WithFields(logrus.Fields{
 		"app": "test",
 	})
-	var req interface{}
+	var req any
 	resp, err := LogInterceptor(peer.NewContext(context.Background(), &peer.Peer{}),
 		&req, &grpc.UnaryServerInfo{}, testhandler)
 	if err == nil {
