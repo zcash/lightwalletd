@@ -302,7 +302,9 @@ func startServer(opts *common.Options) error {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		s := <-signals
-		cache.Sync()
+		if cache != nil {
+			cache.Sync()
+		}
 		common.Log.WithFields(logrus.Fields{
 			"signal": s.String(),
 		}).Info("caught signal, stopping gRPC server")
