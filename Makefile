@@ -83,7 +83,7 @@ doc: docs/rtd/index.html
 docs/rtd/index.html: lightwallet-protocol/walletrpc/compact_formats.proto lightwallet-protocol/walletrpc/service.proto
 	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/lightwallet-protocol/walletrpc:/protos pseudomuto/protoc-gen-doc
 
-proto: walletrpc/service.pb.go walletrpc/darkside.pb.go walletrpc/compact_formats.pb.go
+proto: walletrpc/service.pb.go walletrpc/compact_formats.pb.go walletrpc/darkside.pb.go
 
 walletrpc/service.pb.go: walletrpc/service.proto
 	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto

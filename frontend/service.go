@@ -558,7 +558,9 @@ func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.C
 	return err
 }
 
-// Key is 32-byte txid (as a 64-character string), data is pointer to compact tx.
+// Key is 32-byte txid (as a 64-character string), data is pointer to compact tx
+// if the tx has shielded parts, or else it will be a null tx, including a zero-length
+// txid. (We do need these entries in the map so we don't fetch the tx again.)
 var mempoolMap *map[string]*walletrpc.CompactTx
 
 // Txids in big-endian hex (from the backend)
@@ -661,6 +663,9 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
 		if tx, ok := (*mempoolMap)[txid]; ok {
+			// Note that if the transaction has no shielded components, an entry
+			// will be added to the map but with no fields populated. See the call
+			// to `tx.HasShieldedElements()` earlier in this function.
 			if len(tx.Txid) > 0 {
 				err := resp.Send(tx)
 				if err != nil {

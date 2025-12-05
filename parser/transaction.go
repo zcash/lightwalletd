@@ -347,14 +347,9 @@ func (tx *Transaction) SetTxID(txid hash32.T) {
 	tx.txID = txid
 }
 
-// GetDisplayHash returns the transaction hash in big-endian display order.
-func (tx *Transaction) GetDisplayHash() hash32.T {
-	// Convert to big-endian
-	return hash32.Reverse(tx.txID)
-}
-
+// GetDisplayHashSring returns the transaction hash in hex big-endian display order.
 func (tx *Transaction) GetDisplayHashString() string {
-	return hash32.Encode(tx.GetDisplayHash())
+	return hash32.Encode(hash32.Reverse(tx.txID))
 }
 
 // GetEncodableHash returns the transaction hash in little-endian wire format order.
