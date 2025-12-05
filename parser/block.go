@@ -70,16 +70,6 @@ func (b *Block) GetDisplayPrevHashString() string {
 	return hash32.Encode(hash32.Reverse(b.hdr.RawBlockHeader.HashPrevBlock))
 }
 
-// HasSaplingTransactions indicates if the block contains any Sapling tx.
-func (b *Block) HasSaplingTransactions() bool {
-	for _, tx := range b.vtx {
-		if tx.HasShieldedElements() {
-			return true
-		}
-	}
-	return false
-}
-
 // see https://github.com/zcash/lightwalletd/issues/17#issuecomment-467110828
 const genesisTargetDifficulty = 520617983
 
@@ -130,9 +120,7 @@ func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	// Only Sapling transactions have a meaningful compact encoding
 	saplingTxns := make([]*walletrpc.CompactTx, 0, len(b.vtx))
 	for idx, tx := range b.vtx {
-		if tx.HasShieldedElements() {
-			saplingTxns = append(saplingTxns, tx.ToCompact(idx))
-		}
+		saplingTxns = append(saplingTxns, tx.ToCompact(idx))
 	}
 	compactBlock.Vtx = saplingTxns
 	return compactBlock

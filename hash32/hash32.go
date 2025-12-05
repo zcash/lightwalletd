@@ -18,6 +18,15 @@ type T [32]byte
 // so we use that to represent an unset or undefined hash value.
 var Nil = [32]byte{}
 
+// FromSlice converts a slice to a hash32. If the slice is too long,
+// the return is only the first 32 bytes; if the slice is too short,
+// the remaining bytes in the return value are zeros. This should
+// not happen in practice.
+func FromSlice(arg []byte) T {
+	return T(arg)
+}
+
+// ToSlice converts a hash32 to a byte slice.
 func ToSlice(arg T) []byte {
 	return arg[:]
 }
