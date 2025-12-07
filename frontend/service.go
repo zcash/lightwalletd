@@ -576,6 +576,16 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
 		}
 	}
+	if slices.Contains(exclude.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
+		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
+	}
+	if len(exclude.PoolTypes) == 0 {
+		// legacy behavior: return only blocks containing sheilded components.
+		exclude.PoolTypes = []walletrpc.PoolType{
+			walletrpc.PoolType_SAPLING,
+			walletrpc.PoolType_ORCHARD,
+		}
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -639,7 +649,6 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 				return status.Error(codes.Internal,
 					"GetMempoolTx: extra data deserializing transaction")
 			}
-			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
 			txidBigEndian, err := hex.DecodeString(txidstr)
 			if err != nil {
 				return status.Errorf(codes.Internal,
@@ -660,15 +669,11 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		if tx, ok := (*mempoolMap)[txid]; ok {
-			// Note that if the transaction has no shielded components, an entry
-			// will be added to the map but with no fields populated. See the call
-			// to `tx.HasShieldedElements()` earlier in this function.
-			if len(tx.Txid) > 0 {
-				err := resp.Send(tx)
-				if err != nil {
-					return err
-				}
+		ctx := (*mempoolMap)[txid]
+		if rtx := common.FilterTxPool(ctx, exclude.PoolTypes); rtx != nil {
+			err := resp.Send(rtx)
+			if err != nil {
+				return err
 			}
 		}
 	}
