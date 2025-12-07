@@ -135,6 +135,8 @@ wait_height 663190
 
 # The transaction in this block is on mainnet, but in block 663229.
 # Its txid is 0821a89be7f2fc1311792c3fa1dd2171a8cdfb2effd98590cbd5ebcdcfcf491f
+# This transaction has one shielded input and two shielded outputs, no actions,
+# and zero transparent ins or outs
 echo Getblock 663190 ...
 actual=$(gp GetBlock '{"height":663190}')
 expected='{
@@ -193,23 +195,37 @@ gt StageTransactions '{"height":663195,"url":"https://raw.githubusercontent.com/
 # The first two bytes of 0821...cf491f (big-endian, see above) are 08 and 21; specifying
 # 0821 as the exclude filter should cause the transaction with that txid to NOT be returned.
 # 0821 converted to base64 (which grpcurl expects for binary data), is IQg=
-echo GetMempoolTx with 2-byte matching filter ...
-# This returns all of the transparent transactions in the mempool; to avoid having to list
-# them all here, just make sure there are the correct number of them.
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"IQg="}' | jq -s '.|length')
+
+echo GetMempoolTx no txid filter, default shielded only...
+actual=$(gp GetMempoolTx | jq -s '.|length')
+expected='1'
+compare "$expected" "$actual"
+
+echo GetMempoolTx with 2-byte matching filter, should exclude the one shielded tx...
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":["IQg="]}' | jq -s '.|length')
+expected='0'
+compare "$expected" "$actual"
+
+echo GetMempoolTx no txid filter, transparent only...
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT"]}' | jq -s '.|length')
+expected='100'
+compare "$expected" "$actual"
+
+echo GetMempoolTx with 2-byte filter matching the shielded tx, transparent only...
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT"], "exclude_txid_suffixes":["IQg="]}' | jq -s '.|length')
 expected='100'
 compare "$expected" "$actual"
 
 # Should also work with a 3-byte filter, 0821a8. Convert to base64 for the argument.
 echo GetMempoolTx with 3-byte matching filter ...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"qCEI"}' | jq -s '.|length')
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT"], "exclude_txid_suffixes":["qCEI"]}' | jq -s '.|length')
 expected='100'
 compare "$expected" "$actual"
 
 # Any other filter should cause the entry to be returned (no exclude match).
 # So the shielded transaction should be return (one more tx than above).
 echo GetMempoolTx with unmatched filter...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"SR8="}' | jq -s '.|length')
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT", "SAPLING"], "exclude_txid_suffixes":["SR8="]}' | jq -s '.|length')
 expected='101'
 compare "$expected" "$actual"
 
