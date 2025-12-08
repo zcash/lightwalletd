@@ -19,6 +19,13 @@ The most recent changes are listed first.
 
 - Add the ability to not create and maintain a compact block cache.
 
+- Add support for transparent transactions.
+
+- Add `poolType` argument to `GetBlockRange` and `GetMempoolTx`. This
+  filtering allows the caller to request specific components (transparent,
+  shielded, or a combination) of blocks (`GetBlockRange`) and transactions
+  (`GetMempoolTx`).
+
 
 ### Changed
 
@@ -27,6 +34,8 @@ The most recent changes are listed first.
   the results of calls to `GetTransaction`. See the documentation of
   `RawTransaction` in `walletrpc/service.proto` for more details on
   the semantics of this field.
+
+- `GetBlock` result now includes transparent transaction data.
 
 - If corruption is detected in the cache file, the cache is rebuilt
   completely (instead of attempting an incremental correction). The
