@@ -1,4 +1,4 @@
-FROM golang:1.23 AS lightwalletd_base
+FROM golang:1.25 AS lightwalletd_base
 
 ADD . /go/src/github.com/zcash/lightwalletd
 WORKDIR /go/src/github.com/zcash/lightwalletd
