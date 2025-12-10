@@ -118,7 +118,7 @@ func darksideSetTxID(tx *parser.Transaction) {
 	// detected). This will be fixed when lightwalletd calculates txids correctly .
 	digest := sha256.Sum256(tx.Bytes())
 	digest = sha256.Sum256(digest[:])
-	tx.SetTxID(hash32.T(digest))
+	tx.SetTxID(digest)
 }
 
 func darksideSetBlockTxID(block *parser.Block) {

@@ -24,6 +24,9 @@ const (
 
 // RawBlockHeader implements the block header as defined in version
 // 2018.0-beta-29 of the Zcash Protocol Spec.
+// Note that this struct differs from the wire-encoded block header, in that
+// the latter includes 3 bytes of compact length encoding of the size of
+// the Solution, even though it's a constant size (1344, encoded as 0xfd4005).
 type RawBlockHeader struct {
 	// The block version number indicates which set of block validation rules
 	// to follow. The current and only defined block version number for Zcash
@@ -62,6 +65,9 @@ type RawBlockHeader struct {
 	// CompactSize-prefixed value.
 	Solution [1344]byte
 }
+
+// size of a block header,, 1487, including the 3-byte compact-length for Solution
+const RawBlockHeaderLength int = 4 + 32 + 32 + 32 + 4 + 4 + 32 + 3 + 1344
 
 // BlockHeader extends RawBlockHeader by adding a cache for the block hash.
 type BlockHeader struct {
@@ -148,17 +154,17 @@ func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read HashPrevBlock")
 	}
-	hdr.HashPrevBlock = hash32.T(b32)
+	hdr.HashPrevBlock = hash32.FromSlice(b32)
 
 	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read HashMerkleRoot")
 	}
-	hdr.HashMerkleRoot = hash32.T(b32)
+	hdr.HashMerkleRoot = hash32.FromSlice(b32)
 
 	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read HashFinalSaplingRoot")
 	}
-	hdr.HashFinalSaplingRoot = hash32.T(b32)
+	hdr.HashFinalSaplingRoot = hash32.FromSlice(b32)
 
 	if !s.ReadUint32(&hdr.Time) {
 		return in, errors.New("could not read timestamp")
@@ -173,7 +179,7 @@ func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 	if !s.ReadBytes(&b32, 32) {
 		return in, errors.New("could not read Nonce bytes")
 	}
-	hdr.Nonce = hash32.T(b32)
+	hdr.Nonce = hash32.FromSlice(b32)
 
 	{
 		var length int
