@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -221,6 +224,38 @@ func startServer(opts *common.Options) error {
 		if strings.Contains(getLightdInfo.ZcashdSubversion, "MagicBean") {
 			// The default is zebrad
 			common.NodeName = "zcashd"
+		}
+
+		// Detect backend from subversion and, for zcashd, ensure the
+		// required experimental features are enabled.
+		subver := getLightdInfo.ZcashdSubversion
+
+		switch {
+		case strings.Contains(subver, "/Zebra:"):
+			common.Log.Info("Detected zebrad backend; skipping experimental feature check")
+
+		case strings.Contains(subver, "/MagicBean:"):
+			result, rpcErr := common.RawRequest("getexperimentalfeatures", []json.RawMessage{})
+			if rpcErr != nil {
+				common.Log.Fatalf("zcashd backend detected but getexperimentalfeatures RPC failed: %s", rpcErr.Error())
+			}
+
+			var feats []string
+			if err := json.Unmarshal(result, &feats); err != nil {
+				common.Log.Info("failed to decode getexperimentalfeatures reply: %w", err)
+			}
+
+			switch {
+			case slices.Contains(feats, "lightwalletd"):
+			case slices.Contains(feats, "insightexplorer"):
+			default:
+				common.Log.Fatal(
+					"zcashd is running without the required experimental feature enabled; " +
+						"enable 'lightwalletd' or 'insightexplorer'")
+			}
+
+		default:
+			common.Log.Fatalf("unsupported backend subversion %q (expected zcashd or zebrad)", subver)
 		}
 	}
 
