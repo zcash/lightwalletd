@@ -5,6 +5,7 @@
 package common
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -54,6 +55,13 @@ type Options struct {
 	PingEnable          bool   `json:"ping_enable"`
 	Darkside            bool   `json:"darkside"`
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
+
+	// PIR (Private Information Retrieval) configuration
+	PirServiceURL       string        `json:"pir_service_url,omitempty"`
+	PirTrialDecryptBlks int           `json:"pir_trial_decrypt_blocks,omitempty"`
+	PirTimeout          time.Duration `json:"pir_timeout,omitempty"`
+	PirWaitOnStartup    bool          `json:"pir_wait_on_startup,omitempty"`
+	PirStartupTimeout   time.Duration `json:"pir_startup_timeout,omitempty"`
 }
 
 // RawRequest points to the function to send an RPC request to zcashd;
@@ -470,6 +478,11 @@ func BlockIngestor(c *BlockCache, rep int) {
 			if err = c.Add(height, block); err != nil {
 				Log.Fatal("Cache add failed:", err)
 			}
+			// Extract and send nullifiers to PIR service (non-blocking)
+			// The extractor internally applies a timeout if the context doesn't have one
+			if extractor := GetNullifierExtractor(); extractor != nil && extractor.IsEnabled() {
+				extractor.ExtractAndSend(context.Background(), block)
+			}
 			// Don't log these too often.
 			if DarksideEnabled || Time.Now().Sub(lastLog).Seconds() >= 4 {
 				lastLog = Time.Now()
@@ -485,6 +498,11 @@ func BlockIngestor(c *BlockCache, rep int) {
 			continue
 		}
 		Log.Info("REORG: dropping block ", height-1, " ", displayHash(c.GetLatestHash()))
+		// Notify PIR service of reorg (non-blocking)
+		// The extractor internally applies a timeout if the context doesn't have one
+		if extractor := GetNullifierExtractor(); extractor != nil && extractor.IsEnabled() {
+			extractor.HandleReorg(context.Background(), uint64(height-1))
+		}
 		c.Reorg(height - 1)
 	}
 }

@@ -216,6 +216,106 @@ message GetAddressUtxosReplyList {
     repeated GetAddressUtxosReply addressUtxos = 1;
 }
 
+// PIR (Private Information Retrieval) messages for privacy-preserving nullifier lookups
+
+// Request for PIR parameters needed by clients to construct queries
+message GetPirParamsRequest {}
+
+// Cuckoo hash table parameters
+message CuckooParams {
+    uint64 numBuckets = 1;       // Number of buckets in the Cuckoo table
+    uint32 bucketSize = 2;       // Size of each bucket in bytes
+    bytes hashSeed = 3;          // Seed for the hash functions
+    uint32 numHashFunctions = 4; // Number of hash functions used
+}
+
+// YPIR-specific parameters
+message YpirParams {
+    uint64 numRows = 1;          // Number of rows in the PIR database
+    uint64 numCols = 2;          // Number of columns in the PIR database
+    uint64 elementSize = 3;      // Size of each element in bytes
+}
+
+// InsPIRe-specific parameters (when available)
+message InspireParams {
+    uint64 numRows = 1;          // Number of rows
+    uint64 numCols = 2;          // Number of columns
+    uint64 elementSize = 3;      // Element size
+    uint32 factor = 4;           // InsPIRe factor parameter
+}
+
+// Response containing PIR parameters
+message PirParamsResponse {
+    // Height below which clients should use PIR queries
+    // Above this height, clients should use trial decryption (GetBlockRangeNullifiers)
+    uint64 pirCutoffHeight = 1;
+
+    // Cuckoo hash table parameters for bucket index calculation
+    CuckooParams cuckooParams = 2;
+
+    // YPIR parameters (always available)
+    YpirParams ypirParams = 3;
+
+    // InsPIRe parameters (may be absent if not compiled with inspire feature)
+    InspireParams inspireParams = 4;
+
+    // Total number of nullifiers in the PIR database
+    uint64 numNullifiers = 5;
+
+    // Whether the PIR service is ready to handle queries
+    bool pirReady = 6;
+}
+
+// Request to execute a YPIR query
+message YpirQueryRequest {
+    bytes query = 1;  // Serialized YPIR query
+}
+
+// Response from a YPIR query
+message YpirQueryResponse {
+    bytes response = 1;  // Serialized YPIR response
+}
+
+// Request to execute an InsPIRe query
+message InspireQueryRequest {
+    bytes query = 1;  // Serialized InsPIRe query
+}
+
+// Response from an InsPIRe query
+message InspireQueryResponse {
+    bytes response = 1;  // Serialized InsPIRe response
+}
+
+// Request for PIR service status
+message GetPirStatusRequest {}
+
+// Response with PIR service status
+message PirStatusResponse {
+    // Whether PIR service is available
+    bool available = 1;
+
+    // Current status: "ready", "building", "unavailable"
+    string status = 2;
+
+    // Height of the current PIR database
+    uint64 pirDbHeight = 3;
+
+    // Number of blocks pending processing
+    uint32 pendingBlocks = 4;
+
+    // Total number of nullifiers in the database
+    uint64 numNullifiers = 5;
+
+    // Number of Cuckoo buckets
+    uint64 numBuckets = 6;
+
+    // Whether a rebuild is currently in progress
+    bool rebuildInProgress = 7;
+
+    // Timestamp of the last successful database build (ISO 8601)
+    string lastBuildTime = 8;
+}
+
 service CompactTxStreamer {
     // Return the BlockID of the block at the tip of the best chain
     rpc GetLatestBlock(ChainSpec) returns (BlockID) {}
@@ -300,4 +400,24 @@ service CompactTxStreamer {
 
     // Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
     rpc Ping(Duration) returns (PingResponse) {}
+
+    // PIR (Private Information Retrieval) methods for privacy-preserving nullifier lookups
+
+    // Get PIR parameters needed by clients to construct queries.
+    // Returns cutoff height, Cuckoo params, and PIR-specific parameters.
+    // Clients should use trial decryption (GetBlockRangeNullifiers) for blocks
+    // above pirCutoffHeight, and PIR queries for blocks at or below it.
+    rpc GetPirParams(GetPirParamsRequest) returns (PirParamsResponse) {}
+
+    // Execute a YPIR query against the nullifier database.
+    // The query should be constructed using the parameters from GetPirParams.
+    rpc YpirQuery(YpirQueryRequest) returns (YpirQueryResponse) {}
+
+    // Execute an InsPIRe query against the nullifier database.
+    // Only available if the PIR service was compiled with InsPIRe support.
+    rpc InspireQuery(InspireQueryRequest) returns (InspireQueryResponse) {}
+
+    // Get the current status of the PIR service.
+    // Useful for monitoring and debugging.
+    rpc GetPirStatus(GetPirStatusRequest) returns (PirStatusResponse) {}
 }

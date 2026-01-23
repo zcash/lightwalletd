@@ -23,6 +23,7 @@ import (
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
+	"github.com/zcash/lightwalletd/pirclient"
 	"github.com/zcash/lightwalletd/walletrpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,13 +33,19 @@ type lwdStreamer struct {
 	cache      *common.BlockCache
 	chainName  string
 	pingEnable bool
+	pirClient  *pirclient.Client
 	mutex      sync.Mutex
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
 // NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}, nil
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, pirClient *pirclient.Client) (walletrpc.CompactTxStreamerServer, error) {
+	return &lwdStreamer{
+		cache:      cache,
+		chainName:  chainName,
+		pingEnable: enablePing,
+		pirClient:  pirClient,
+	}, nil
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
@@ -894,6 +901,172 @@ func (s *lwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	time.Sleep(time.Duration(in.IntervalUs) * time.Microsecond)
 	response.Exit = atomic.AddInt64(&concurrent, -1)
 	return &response, nil
+}
+
+// GetPirParams returns the PIR parameters needed by clients to construct queries.
+// Clients should use trial decryption (GetBlockRangeNullifiers) for blocks
+// above pirCutoffHeight, and PIR queries for blocks at or below it.
+func (s *lwdStreamer) GetPirParams(ctx context.Context, req *walletrpc.GetPirParamsRequest) (*walletrpc.PirParamsResponse, error) {
+	common.Log.Debugf("gRPC GetPirParams()\n")
+
+	// Check if PIR is enabled
+	if s.pirClient == nil || !s.pirClient.IsEnabled() {
+		return &walletrpc.PirParamsResponse{
+			PirReady: false,
+		}, nil
+	}
+
+	// Get status to check readiness and get basic info
+	pirStatus, err := s.pirClient.GetStatus(ctx)
+	if err != nil {
+		common.Log.Warnf("GetPirParams: failed to get PIR status: %s", err)
+		return &walletrpc.PirParamsResponse{
+			PirReady: false,
+		}, nil
+	}
+
+	response := &walletrpc.PirParamsResponse{
+		PirCutoffHeight: pirStatus.PirDbHeight,
+		NumNullifiers:   uint64(pirStatus.NumNullifiers),
+		PirReady:        pirStatus.Status == "ready",
+	}
+
+	// Get YPIR parameters
+	ypirParams, err := s.pirClient.GetYpirParams(ctx)
+	if err != nil {
+		common.Log.Warnf("GetPirParams: failed to get YPIR params: %s", err)
+	} else {
+		// Convert seed from string to bytes
+		seedBytes, err := hex.DecodeString(ypirParams.CuckooParams.Seed)
+		if err != nil {
+			common.Log.Warnf("GetPirParams: invalid hex seed from PIR service: %s", err)
+			// Return response without CuckooParams - client should check if present
+		} else {
+			response.CuckooParams = &walletrpc.CuckooParams{
+				NumBuckets:       uint64(ypirParams.CuckooParams.NumBuckets),
+				BucketSize:       uint32(ypirParams.CuckooParams.BucketSize),
+				HashSeed:         seedBytes,
+				NumHashFunctions: 3, // Standard Cuckoo uses 3 hash functions
+			}
+
+			response.YpirParams = &walletrpc.YpirParams{
+				NumRows:     uint64(ypirParams.NumRecords),
+				NumCols:     uint64(ypirParams.Instances),
+				ElementSize: uint64(ypirParams.RecordSize),
+			}
+		}
+	}
+
+	// Try to get InsPIRe parameters (may not be available)
+	inspireParams, err := s.pirClient.GetInspireParams(ctx)
+	if err == nil {
+		response.InspireParams = &walletrpc.InspireParams{
+			NumRows:     uint64(inspireParams.PirSetup.DbRows),
+			NumCols:     uint64(inspireParams.PirSetup.DbCols),
+			ElementSize: uint64(inspireParams.RecordSize),
+			Factor:      uint32(inspireParams.Factor),
+		}
+	}
+
+	common.Log.Tracef("  return: %+v\n", response)
+	return response, nil
+}
+
+// YpirQuery executes a YPIR query against the nullifier database.
+func (s *lwdStreamer) YpirQuery(ctx context.Context, req *walletrpc.YpirQueryRequest) (*walletrpc.YpirQueryResponse, error) {
+	common.Log.Debugf("gRPC YpirQuery(query_len=%d)\n", len(req.Query))
+
+	// Check if PIR is enabled
+	if s.pirClient == nil || !s.pirClient.IsEnabled() {
+		return nil, status.Error(codes.Unavailable, "PIR service not enabled")
+	}
+
+	// The query bytes are expected to be JSON-encoded YpirQueryRequest from the client
+	var clientReq pirclient.YpirQueryRequest
+	if err := json.Unmarshal(req.Query, &clientReq); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid YPIR query format: %s", err.Error())
+	}
+
+	// Execute the query
+	resp, err := s.pirClient.QueryYpir(ctx, &clientReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "YPIR query failed: %s", err.Error())
+	}
+
+	// Serialize the response
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to marshal YPIR response: %s", err.Error())
+	}
+
+	return &walletrpc.YpirQueryResponse{
+		Response: respBytes,
+	}, nil
+}
+
+// InspireQuery executes an InsPIRe query against the nullifier database.
+func (s *lwdStreamer) InspireQuery(ctx context.Context, req *walletrpc.InspireQueryRequest) (*walletrpc.InspireQueryResponse, error) {
+	common.Log.Debugf("gRPC InspireQuery(query_len=%d)\n", len(req.Query))
+
+	// Check if PIR is enabled
+	if s.pirClient == nil || !s.pirClient.IsEnabled() {
+		return nil, status.Error(codes.Unavailable, "PIR service not enabled")
+	}
+
+	// Use binary query endpoint for efficiency
+	resp, err := s.pirClient.QueryInspireBinary(ctx, req.Query)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "InsPIRe query failed: %s", err.Error())
+	}
+
+	// Serialize the response
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to marshal InsPIRe response: %s", err.Error())
+	}
+
+	return &walletrpc.InspireQueryResponse{
+		Response: respBytes,
+	}, nil
+}
+
+// GetPirStatus returns the current status of the PIR service.
+func (s *lwdStreamer) GetPirStatus(ctx context.Context, req *walletrpc.GetPirStatusRequest) (*walletrpc.PirStatusResponse, error) {
+	common.Log.Debugf("gRPC GetPirStatus()\n")
+
+	// Check if PIR is enabled
+	if s.pirClient == nil || !s.pirClient.IsEnabled() {
+		return &walletrpc.PirStatusResponse{
+			Available: false,
+			Status:    "unavailable",
+		}, nil
+	}
+
+	pirStatus, err := s.pirClient.GetStatus(ctx)
+	if err != nil {
+		common.Log.Warnf("GetPirStatus: failed to get PIR status: %s", err)
+		return &walletrpc.PirStatusResponse{
+			Available: false,
+			Status:    "error",
+		}, nil
+	}
+
+	response := &walletrpc.PirStatusResponse{
+		Available:         true,
+		Status:            pirStatus.Status,
+		PirDbHeight:       pirStatus.PirDbHeight,
+		PendingBlocks:     uint32(pirStatus.PendingBlocks),
+		NumNullifiers:     uint64(pirStatus.NumNullifiers),
+		NumBuckets:        uint64(pirStatus.NumBuckets),
+		RebuildInProgress: pirStatus.RebuildInProgress,
+	}
+
+	if pirStatus.BuildTimestamp != nil {
+		response.LastBuildTime = *pirStatus.BuildTimestamp
+	}
+
+	common.Log.Tracef("  return: %+v\n", response)
+	return response, nil
 }
 
 // SetMetaState lets the test driver control some GetLightdInfo values.

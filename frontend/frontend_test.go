@@ -40,7 +40,7 @@ const (
 func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
 	os.RemoveAll(unitTestPath)
 	cache := common.NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
-	lwd, err := NewLwdStreamer(cache, "main", false /* enablePing */)
+	lwd, err := NewLwdStreamer(cache, "main", false /* enablePing */, nil /* pirClient */)
 	if err != nil {
 		os.Stderr.WriteString(fmt.Sprint("NewLwdStreamer failed:", err))
 		os.Exit(1)
@@ -596,4 +596,77 @@ func TestMempoolFilter(t *testing.T) {
 		}
 	}
 
+}
+
+// ============================================================================
+// PIR (Private Information Retrieval) Tests
+// ============================================================================
+
+// TestGetPirParamsWithoutPirClient verifies that GetPirParams returns pirReady=false
+// when the PIR client is not configured.
+func TestGetPirParamsWithoutPirClient(t *testing.T) {
+	lwd, _ := testsetup() // testsetup creates lwd with nil pirClient
+
+	resp, err := lwd.GetPirParams(context.Background(), &walletrpc.GetPirParamsRequest{})
+	if err != nil {
+		t.Fatalf("GetPirParams unexpected error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("GetPirParams returned nil response")
+	}
+	if resp.PirReady {
+		t.Fatal("GetPirParams should return pirReady=false when PIR client is nil")
+	}
+}
+
+// TestGetPirStatusWithoutPirClient verifies that GetPirStatus returns unavailable
+// when the PIR client is not configured.
+func TestGetPirStatusWithoutPirClient(t *testing.T) {
+	lwd, _ := testsetup() // testsetup creates lwd with nil pirClient
+
+	resp, err := lwd.GetPirStatus(context.Background(), &walletrpc.GetPirStatusRequest{})
+	if err != nil {
+		t.Fatalf("GetPirStatus unexpected error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("GetPirStatus returned nil response")
+	}
+	if resp.Available {
+		t.Fatal("GetPirStatus should return available=false when PIR client is nil")
+	}
+	if resp.Status != "unavailable" {
+		t.Fatalf("GetPirStatus expected status 'unavailable', got '%s'", resp.Status)
+	}
+}
+
+// TestYpirQueryWithoutPirClient verifies that YpirQuery returns an error
+// when the PIR client is not configured.
+func TestYpirQueryWithoutPirClient(t *testing.T) {
+	lwd, _ := testsetup() // testsetup creates lwd with nil pirClient
+
+	_, err := lwd.YpirQuery(context.Background(), &walletrpc.YpirQueryRequest{
+		Query: []byte("{}"),
+	})
+	if err == nil {
+		t.Fatal("YpirQuery should return error when PIR client is nil")
+	}
+	if !strings.Contains(err.Error(), "PIR service not enabled") {
+		t.Fatalf("YpirQuery expected 'PIR service not enabled' error, got: %v", err)
+	}
+}
+
+// TestInspireQueryWithoutPirClient verifies that InspireQuery returns an error
+// when the PIR client is not configured.
+func TestInspireQueryWithoutPirClient(t *testing.T) {
+	lwd, _ := testsetup() // testsetup creates lwd with nil pirClient
+
+	_, err := lwd.InspireQuery(context.Background(), &walletrpc.InspireQueryRequest{
+		Query: []byte("test query"),
+	})
+	if err == nil {
+		t.Fatal("InspireQuery should return error when PIR client is nil")
+	}
+	if !strings.Contains(err.Error(), "PIR service not enabled") {
+		t.Fatalf("InspireQuery expected 'PIR service not enabled' error, got: %v", err)
+	}
 }
