@@ -233,7 +233,7 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			"GetBlockRange: must specify start and end heights")
 	}
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, span)
 
 	for {
 		select {
@@ -258,8 +258,17 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 		return status.Error(codes.InvalidArgument,
 			"GetBlockRangeNullifiers: must specify start and end heights")
 	}
+	// Remove requests for transparent elements (use GetBlockRange to get those);
+	// this function returns only nullifiers.
+	filtered := make([]walletrpc.PoolType, 0)
+	for _, poolType := range span.PoolTypes {
+		if poolType != walletrpc.PoolType_TRANSPARENT {
+			filtered = append(filtered, poolType)
+		}
+	}
+	span.PoolTypes = filtered
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, int(span.Start.Height), int(span.End.Height))
+	go common.GetBlockRange(s.cache, blockChan, errChan, span)
 
 	for {
 		select {
@@ -380,7 +389,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 				"GetTransaction: transaction ID has invalid length: %d", len(txf.Hash))
 		}
 		// Convert from little endian to big endian.
-		txidHex := hash32.Encode(hash32.Reverse(hash32.T(txf.Hash)))
+		txidHex := hash32.Encode(hash32.Reverse(hash32.FromSlice(txf.Hash)))
 		txidJSON, err := json.Marshal(txidHex)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument,
@@ -574,6 +583,16 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
 		}
 	}
+	if slices.Contains(exclude.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
+		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
+	}
+	if len(exclude.PoolTypes) == 0 {
+		// legacy behavior: return only blocks containing shielded components.
+		exclude.PoolTypes = []walletrpc.PoolType{
+			walletrpc.PoolType_SAPLING,
+			walletrpc.PoolType_ORCHARD,
+		}
+	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -637,17 +656,14 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 				return status.Error(codes.Internal,
 					"GetMempoolTx: extra data deserializing transaction")
 			}
-			newmempoolMap[txidstr] = &walletrpc.CompactTx{}
-			if tx.HasShieldedElements() {
-				txidBigEndian, err := hex.DecodeString(txidstr)
-				if err != nil {
-					return status.Errorf(codes.Internal,
-						"GetMempoolTx: failed decode txid, error: %s", err.Error())
-				}
-				// convert from big endian bytes to little endian and set as the txid
-				tx.SetTxID(hash32.Reverse(hash32.T(txidBigEndian)))
-				newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+			txidBigEndian, err := hex.DecodeString(txidstr)
+			if err != nil {
+				return status.Errorf(codes.Internal,
+					"GetMempoolTx: failed decode txid, error: %s", err.Error())
 			}
+			// convert from big endian bytes to little endian and set as the txid
+			tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
+			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
 		mempoolMap = &newmempoolMap
 	}
@@ -660,15 +676,10 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		if tx, ok := (*mempoolMap)[txid]; ok {
-			// Note that if the transaction has no shielded components, an entry
-			// will be added to the map but with no fields populated. See the call
-			// to `tx.HasShieldedElements()` earlier in this function.
-			if len(tx.Txid) > 0 {
-				err := resp.Send(tx)
-				if err != nil {
-					return err
-				}
+		if ftx := common.FilterTxPool((*mempoolMap)[txid], exclude.PoolTypes); ftx != nil {
+			err := resp.Send(ftx)
+			if err != nil {
+				return err
 			}
 		}
 	}
@@ -1027,7 +1038,7 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
 	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
 		Address:     arg.Address,
-		Txid:        hash32.Encode(hash32.Reverse(hash32.T(arg.Txid))),
+		Txid:        hash32.Encode(hash32.Reverse(hash32.FromSlice(arg.Txid))),
 		OutputIndex: int64(arg.Index),
 		Script:      hex.EncodeToString(arg.Script),
 		Satoshis:    uint64(arg.ValueZat),

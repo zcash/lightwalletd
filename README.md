@@ -117,8 +117,7 @@ Example using server binary built from Makefile:
 
 ## Block cache
 
-lightwalletd caches all blocks from Sapling activation up to the
-most recent block, which takes about an hour the first time you run
+lightwalletd caches all blocks, which takes about an hour the first time it runs
 lightwalletd. During this syncing, lightwalletd is fully available,
 but block fetches are slower until the download completes.
 

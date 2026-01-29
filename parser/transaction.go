@@ -1,4 +1,4 @@
-// Copyright (c) 2019-2020 The Zcash developers
+// Copyright (c) 2019-present The Zcash developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -36,11 +36,9 @@ type rawTransaction struct {
 // Txin format as described in https://en.bitcoin.it/wiki/Transaction
 type txIn struct {
 	// SHA256d of a previous (to-be-used) transaction
-	//PrevTxHash []byte
-
+	PrevTxHash hash32.T
 	// Index of the to-be-used output in the previous tx
-	//PrevTxOutIndex uint32
-
+	PrevTxOutIndex uint32
 	// CompactSize-prefixed, could be a pubkey or a script
 	ScriptSig []byte
 
@@ -51,12 +49,14 @@ type txIn struct {
 func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if !s.Skip(32) {
-		return nil, errors.New("could not skip PrevTxHash")
+	b32 := make([]byte, 32)
+	if !s.ReadBytes(&b32, 32) {
+		return nil, errors.New("could not read HashPrevBlock")
 	}
+	tx.PrevTxHash = hash32.FromSlice(b32)
 
-	if !s.Skip(4) {
-		return nil, errors.New("could not skip PrevTxOutIndex")
+	if !s.ReadUint32(&tx.PrevTxOutIndex) {
+		return nil, errors.New("could not read PrevTxOutIndex")
 	}
 
 	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.ScriptSig)) {
@@ -70,27 +70,41 @@ func (tx *txIn) ParseFromSlice(data []byte) ([]byte, error) {
 	return []byte(s), nil
 }
 
+func (tinput *txIn) ToCompact() *walletrpc.CompactTxIn {
+	return &walletrpc.CompactTxIn{
+		PrevoutTxid:  hash32.ToSlice(tinput.PrevTxHash),
+		PrevoutIndex: tinput.PrevTxOutIndex,
+	}
+}
+
 // Txout format as described in https://en.bitcoin.it/wiki/Transaction
 type txOut struct {
 	// Non-negative int giving the number of zatoshis to be transferred
 	Value uint64
 
 	// Script. CompactSize-prefixed.
-	//Script []byte
+	Script []byte
 }
 
 func (tx *txOut) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 
-	if !s.Skip(8) {
-		return nil, errors.New("could not skip txOut value")
+	if !s.ReadUint64(&tx.Value) {
+		return nil, errors.New("could not read txOut value")
 	}
 
-	if !s.SkipCompactLengthPrefixed() {
-		return nil, errors.New("could not skip txOut script")
+	if !s.ReadCompactLengthPrefixed((*bytestring.String)(&tx.Script)) {
+		return nil, errors.New("could not read txOut script")
 	}
 
 	return []byte(s), nil
+}
+
+func (toutput *txOut) ToCompact() *walletrpc.TxOut {
+	return &walletrpc.TxOut{
+		Value:        toutput.Value,
+		ScriptPubKey: toutput.Script,
+	}
 }
 
 // parse the transparent parts of the transaction
@@ -233,11 +247,11 @@ type joinSplit struct {
 	//ephemeralKey   []byte    // 32
 	//randomSeed     []byte    // 32
 	//vmacs          [2][]byte // 64 [N_old][32]byte
-	//proofGroth16   []byte    // 192 (version 4 only)
+	//proofGroth16   []byte    // 192 (version 4, sapling), or 296 (pre-sapling)
 	//encCiphertexts [2][]byte // 1202 [N_new][601]byte
 }
 
-func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
+func (p *joinSplit) ParseFromSlice(data []byte, isGroth16Proof bool) ([]byte, error) {
 	s := bytestring.String(data)
 
 	if !s.Skip(8) {
@@ -278,8 +292,16 @@ func (p *joinSplit) ParseFromSlice(data []byte) ([]byte, error) {
 		}
 	}
 
-	if !s.Skip(192) {
-		return nil, errors.New("could not skip Groth16 proof")
+	// For these sizes, see 5.4.10.2 (page 110) of the Zcash protocol spec 2025.6.1-103
+	if isGroth16Proof {
+		if !s.Skip(192) {
+			return nil, errors.New("could not skip Groth16 proof")
+		}
+	} else {
+		// older PHGR proof
+		if !s.Skip(296) {
+			return nil, errors.New("could not skip PHGR proof")
+		}
 	}
 
 	for i := 0; i < 2; i++ {
@@ -362,13 +384,6 @@ func (tx *Transaction) Bytes() []byte {
 	return tx.rawBytes
 }
 
-// HasShieldedElements indicates whether a transaction has
-// at least one shielded input or output.
-func (tx *Transaction) HasShieldedElements() bool {
-	nshielded := len(tx.shieldedSpends) + len(tx.shieldedOutputs) + len(tx.orchardActions)
-	return tx.version >= 4 && nshielded > 0
-}
-
 // SaplingOutputsCount returns the number of Sapling outputs in the transaction.
 func (tx *Transaction) SaplingOutputsCount() int {
 	return len(tx.shieldedOutputs)
@@ -381,6 +396,11 @@ func (tx *Transaction) OrchardActionsCount() int {
 
 // ToCompact converts the given (full) transaction to compact format.
 func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
+	// we don't need to store the vin (transparent inputs) of a coinbase tx
+	var vinLen int
+	if index > 0 {
+		vinLen = len(tx.transparentInputs)
+	}
 	ctx := &walletrpc.CompactTx{
 		Index: uint64(index), // index is contextual
 		Txid:  hash32.ToSlice(tx.GetEncodableHash()),
@@ -388,6 +408,8 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 		Spends:  make([]*walletrpc.CompactSaplingSpend, len(tx.shieldedSpends)),
 		Outputs: make([]*walletrpc.CompactSaplingOutput, len(tx.shieldedOutputs)),
 		Actions: make([]*walletrpc.CompactOrchardAction, len(tx.orchardActions)),
+		Vin:     make([]*walletrpc.CompactTxIn, vinLen),
+		Vout:    make([]*walletrpc.TxOut, len(tx.transparentOutputs)),
 	}
 	for i, spend := range tx.shieldedSpends {
 		ctx.Spends[i] = spend.ToCompact()
@@ -398,16 +420,21 @@ func (tx *Transaction) ToCompact(index int) *walletrpc.CompactTx {
 	for i, a := range tx.orchardActions {
 		ctx.Actions[i] = a.ToCompact()
 	}
+	if vinLen > 0 {
+		for i, tinput := range tx.transparentInputs {
+			ctx.Vin[i] = tinput.ToCompact()
+		}
+	}
+	for i, toutput := range tx.transparentOutputs {
+		ctx.Vout[i] = toutput.ToCompact()
+	}
 	return ctx
 }
 
 // parse version 4 transaction data after the nVersionGroupId field.
-func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
+func (tx *Transaction) parsePreV5(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 	var err error
-	if tx.nVersionGroupID != 0x892F2085 {
-		return nil, fmt.Errorf("version group ID %x must be 0x892F2085", tx.nVersionGroupID)
-	}
 	s, err = tx.ParseTransparent([]byte(s))
 	if err != nil {
 		return nil, err
@@ -416,62 +443,65 @@ func (tx *Transaction) parseV4(data []byte) ([]byte, error) {
 		return nil, errors.New("could not skip nLockTime")
 	}
 
-	if !s.Skip(4) {
-		return nil, errors.New("could not skip nExpiryHeight")
-	}
-
-	var spendCount, outputCount int
-
-	if !s.Skip(8) {
-		return nil, errors.New("could not skip valueBalance")
-	}
-	if !s.ReadCompactSize(&spendCount) {
-		return nil, errors.New("could not read nShieldedSpend")
-	}
-	tx.shieldedSpends = make([]spend, spendCount)
-	for i := 0; i < spendCount; i++ {
-		newSpend := &tx.shieldedSpends[i]
-		s, err = newSpend.ParseFromSlice([]byte(s), 4)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing shielded Spend: %w", err)
+	if tx.version > 1 {
+		if (tx.isOverwinterV3() || tx.isSaplingV4()) && !s.Skip(4) {
+			return nil, errors.New("could not skip nExpiryHeight")
 		}
-	}
-	if !s.ReadCompactSize(&outputCount) {
-		return nil, errors.New("could not read nShieldedOutput")
-	}
-	tx.shieldedOutputs = make([]output, outputCount)
-	for i := 0; i < outputCount; i++ {
-		newOutput := &tx.shieldedOutputs[i]
-		s, err = newOutput.ParseFromSlice([]byte(s), 4)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing shielded Output: %w", err)
-		}
-	}
-	var joinSplitCount int
-	if !s.ReadCompactSize(&joinSplitCount) {
-		return nil, errors.New("could not read nJoinSplit")
-	}
 
-	tx.joinSplits = make([]joinSplit, joinSplitCount)
-	if joinSplitCount > 0 {
-		for i := 0; i < joinSplitCount; i++ {
-			js := &tx.joinSplits[i]
-			s, err = js.ParseFromSlice([]byte(s))
-			if err != nil {
-				return nil, fmt.Errorf("error parsing JoinSplit: %w", err)
+		var spendCount, outputCount int
+
+		if tx.isSaplingV4() {
+			if !s.Skip(8) {
+				return nil, errors.New("could not skip valueBalance")
+			}
+			if !s.ReadCompactSize(&spendCount) {
+				return nil, errors.New("could not read nShieldedSpend")
+			}
+			tx.shieldedSpends = make([]spend, spendCount)
+			for i := 0; i < spendCount; i++ {
+				newSpend := &tx.shieldedSpends[i]
+				s, err = newSpend.ParseFromSlice([]byte(s), 4)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing shielded Spend: %w", err)
+				}
+			}
+			if !s.ReadCompactSize(&outputCount) {
+				return nil, errors.New("could not read nShieldedOutput")
+			}
+			tx.shieldedOutputs = make([]output, outputCount)
+			for i := 0; i < outputCount; i++ {
+				newOutput := &tx.shieldedOutputs[i]
+				s, err = newOutput.ParseFromSlice([]byte(s), tx.version)
+				if err != nil {
+					return nil, fmt.Errorf("error parsing shielded Output: %w", err)
+				}
 			}
 		}
 
-		if !s.Skip(32) {
-			return nil, errors.New("could not skip joinSplitPubKey")
+		var joinSplitCount int
+		if !s.ReadCompactSize(&joinSplitCount) {
+			return nil, errors.New("could not read nJoinSplit")
 		}
 
-		if !s.Skip(64) {
-			return nil, errors.New("could not skip joinSplitSig")
+		tx.joinSplits = make([]joinSplit, joinSplitCount)
+		if joinSplitCount > 0 {
+			for i := 0; i < joinSplitCount; i++ {
+				js := &tx.joinSplits[i]
+				s, err = js.ParseFromSlice([]byte(s), tx.isGroth16Proof())
+				if err != nil {
+					return nil, fmt.Errorf("error parsing JoinSplit: %w", err)
+				}
+			}
+			if !s.Skip(32) {
+				return nil, errors.New("could not skip joinSplitPubKey")
+			}
+			if !s.Skip(64) {
+				return nil, errors.New("could not skip joinSplitSig")
+			}
 		}
-	}
-	if spendCount+outputCount > 0 && !s.Skip(64) {
-		return nil, errors.New("could not skip bindingSigSapling")
+		if tx.isSaplingV4() && spendCount+outputCount > 0 && !s.Skip(64) {
+			return nil, errors.New("could not skip bindingSigSapling")
+		}
 	}
 	return s, nil
 }
@@ -484,7 +514,8 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		return nil, errors.New("could not read nVersionGroupId")
 	}
 	if tx.nVersionGroupID != 0x26A7270A {
-		return nil, errors.New(fmt.Sprintf("version group ID %d must be 0x26A7270A", tx.nVersionGroupID))
+		// This shouldn't be possible
+		return nil, fmt.Errorf("version group ID %d must be 0x26A7270A", tx.nVersionGroupID)
 	}
 	if !s.Skip(4) {
 		return nil, errors.New("could not skip nLockTime")
@@ -502,7 +533,7 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		return nil, errors.New("could not read nShieldedSpend")
 	}
 	if spendCount >= (1 << 16) {
-		return nil, errors.New(fmt.Sprintf("spentCount (%d) must be less than 2^16", spendCount))
+		return nil, fmt.Errorf("spentCount (%d) must be less than 2^16", spendCount)
 	}
 	tx.shieldedSpends = make([]spend, spendCount)
 	for i := 0; i < spendCount; i++ {
@@ -516,7 +547,7 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		return nil, errors.New("could not read nShieldedOutput")
 	}
 	if outputCount >= (1 << 16) {
-		return nil, errors.New(fmt.Sprintf("outputCount (%d) must be less than 2^16", outputCount))
+		return nil, fmt.Errorf("outputCount (%d) must be less than 2^16", outputCount)
 	}
 	tx.shieldedOutputs = make([]output, outputCount)
 	for i := 0; i < outputCount; i++ {
@@ -549,7 +580,7 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 		return nil, errors.New("could not read nActionsOrchard")
 	}
 	if actionsCount >= (1 << 16) {
-		return nil, errors.New(fmt.Sprintf("actionsCount (%d) must be less than 2^16", actionsCount))
+		return nil, fmt.Errorf("actionsCount (%d) must be less than 2^16", actionsCount)
 	}
 	tx.orchardActions = make([]action, actionsCount)
 	for i := 0; i < actionsCount; i++ {
@@ -586,6 +617,42 @@ func (tx *Transaction) parseV5(data []byte) ([]byte, error) {
 	return s, nil
 }
 
+// The logic in the following four functions is copied from
+// https://github.com/zcash/zcash/blob/master/src/primitives/transaction.h#L811
+
+const OVERWINTER_TX_VERSION uint32 = 3
+const SAPLING_TX_VERSION uint32 = 4
+const ZIP225_TX_VERSION uint32 = 5
+
+const OVERWINTER_VERSION_GROUP_ID uint32 = 0x03C48270
+const SAPLING_VERSION_GROUP_ID uint32 = 0x892F2085
+const ZIP225_VERSION_GROUP_ID uint32 = 0x26A7270A
+
+func (tx *Transaction) isOverwinterV3() bool {
+	return tx.fOverwintered &&
+		tx.nVersionGroupID == OVERWINTER_VERSION_GROUP_ID &&
+		tx.version == OVERWINTER_TX_VERSION
+}
+
+func (tx *Transaction) isSaplingV4() bool {
+	return tx.fOverwintered &&
+		tx.nVersionGroupID == SAPLING_VERSION_GROUP_ID &&
+		tx.version == SAPLING_TX_VERSION
+}
+
+func (tx *Transaction) isZip225V5() bool {
+	return tx.fOverwintered &&
+		tx.nVersionGroupID == ZIP225_VERSION_GROUP_ID &&
+		tx.version == ZIP225_TX_VERSION
+}
+
+func (tx *Transaction) isGroth16Proof() bool {
+	// Sapling changed the joinSplit proof from PHGR (BCTV14) to Groth16;
+	// this applies also to versions beyond Sapling.
+	return tx.fOverwintered &&
+		tx.version >= SAPLING_TX_VERSION
+}
+
 // ParseFromSlice deserializes a single transaction from the given data.
 func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
@@ -599,22 +666,23 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	}
 
 	tx.fOverwintered = (header >> 31) == 1
-	if !tx.fOverwintered {
-		return nil, errors.New("fOverwinter flag must be set")
-	}
 	tx.version = header & 0x7FFFFFFF
-	if tx.version < 4 {
-		return nil, errors.New(fmt.Sprintf("version number %d must be greater or equal to 4", tx.version))
+
+	if tx.fOverwintered {
+		if !s.ReadUint32(&tx.nVersionGroupID) {
+			return nil, errors.New("could not read nVersionGroupId")
+		}
 	}
 
-	if !s.ReadUint32(&tx.nVersionGroupID) {
-		return nil, errors.New("could not read nVersionGroupId")
+	if tx.fOverwintered &&
+		!(tx.isOverwinterV3() || tx.isSaplingV4() || tx.isZip225V5()) {
+		return nil, errors.New("unknown transaction format")
 	}
 	// parse the main part of the transaction
-	if tx.version <= 4 {
-		s, err = tx.parseV4([]byte(s))
-	} else {
+	if tx.isZip225V5() {
 		s, err = tx.parseV5([]byte(s))
+	} else {
+		s, err = tx.parsePreV5([]byte(s))
 	}
 	if err != nil {
 		return nil, err

@@ -54,6 +54,7 @@ type -p jq >/dev/null || {
 kill_background_server() {
   echo -n Stopping darkside server ...
   grpcurl -plaintext localhost:9067 cash.z.wallet.sdk.rpc.DarksideStreamer/Stop &>/dev/null
+  echo ''
 }
 
 if $start_server
@@ -134,6 +135,8 @@ wait_height 663190
 
 # The transaction in this block is on mainnet, but in block 663229.
 # Its txid is 0821a89be7f2fc1311792c3fa1dd2171a8cdfb2effd98590cbd5ebcdcfcf491f
+# This transaction has one shielded input and two shielded outputs, no actions,
+# and zero transparent ins or outs
 echo Getblock 663190 ...
 actual=$(gp GetBlock '{"height":663190}')
 expected='{
@@ -142,6 +145,19 @@ expected='{
   "prevHash": "xOcqS6kNnE4yHGnLcvi1LMOqh9iY3ynEGpUTraSKpvQ=",
   "time": 1,
   "vtx": [
+    {
+      "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo=",
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    },
     {
       "index": "1",
       "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
@@ -179,40 +195,38 @@ gt StageTransactions '{"height":663195,"url":"https://raw.githubusercontent.com/
 # The first two bytes of 0821...cf491f (big-endian, see above) are 08 and 21; specifying
 # 0821 as the exclude filter should cause the transaction with that txid to NOT be returned.
 # 0821 converted to base64 (which grpcurl expects for binary data), is IQg=
-echo GetMempoolTx with 2-byte matching filter ...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"IQg="}')
-expected=''
+
+echo GetMempoolTx no txid filter, default shielded only...
+actual=$(gp GetMempoolTx | jq -s '.|length')
+expected='1'
+compare "$expected" "$actual"
+
+echo GetMempoolTx with 2-byte matching filter, should exclude the one shielded tx...
+actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":["IQg="]}' | jq -s '.|length')
+expected='0'
+compare "$expected" "$actual"
+
+echo GetMempoolTx no txid filter, transparent only...
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT"]}' | jq -s '.|length')
+expected='100'
+compare "$expected" "$actual"
+
+echo GetMempoolTx with 2-byte filter matching the shielded tx, transparent only...
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT"], "exclude_txid_suffixes":["IQg="]}' | jq -s '.|length')
+expected='100'
 compare "$expected" "$actual"
 
 # Should also work with a 3-byte filter, 0821a8. Convert to base64 for the argument.
 echo GetMempoolTx with 3-byte matching filter ...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"qCEI"}')
-expected=''
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT"], "exclude_txid_suffixes":["qCEI"]}' | jq -s '.|length')
+expected='100'
 compare "$expected" "$actual"
 
 # Any other filter should cause the entry to be returned (no exclude match).
+# So the shielded transaction should be return (one more tx than above).
 echo GetMempoolTx with unmatched filter...
-actual=$(gp GetMempoolTx '{"exclude_txid_suffixes":"SR8="}')
-expected='{
-  "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
-  "spends": [
-    {
-      "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
-    }
-  ],
-  "outputs": [
-    {
-      "cmu": "pe/G9q13FyE6vAhrTPzIGpU5Dht5DvJTuc9zmTEx0gU=",
-      "ephemeralKey": "qw5MPsRoe8aOnvZ/VB3r1Ja/WkHb52TVU1vyHjGEOqc=",
-      "ciphertext": "R2uN3CHagj7Oo+6O9VeBrE6x4dQ07Jl18rVM27vGhl1Io75lFYCHA1SrV72Zu+bgwMilTA=="
-    },
-    {
-      "cmu": "3rQ9DMmk7RaWGf9q0uOYQ7FieHL/TE8Z+QCcS/IJfkA=",
-      "ephemeralKey": "U1NCOlTzIF1qlprAjuGUUj591GpO5Vs5WTsmCW35Pio=",
-      "ciphertext": "2MbBHjPbkDT/GVsXgDHhihFQizxvizHINXKVbXKnv3Ih1P4c1f3By+TLH2g1yAG3lSARuQ=="
-    }
-  ]
-}'
+actual=$(gp GetMempoolTx '{"poolTypes":["TRANSPARENT", "SAPLING"], "exclude_txid_suffixes":["SR8="]}' | jq -s '.|length')
+expected='101'
 compare "$expected" "$actual"
 
 echo -n test: ApplyStaged to block 663210 ...
@@ -226,6 +240,21 @@ expected='{
   "hash": "BaN41+Qi/8MY9vrJxDD1gPde1uGt4d3FTeXwhJaqea8=",
   "prevHash": "xOcqS6kNnE4yHGnLcvi1LMOqh9iY3ynEGpUTraSKpvQ=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo=",
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }'
 compare "$expected" "$actual"
@@ -238,6 +267,19 @@ expected='{
   "prevHash": "gJUabqKu3i1XfWeKHRveM8eyNYXB9e/W6ndgi3d9ntA=",
   "time": 1,
   "vtx": [
+    {
+      "txid": "k6QFCtomiH4+XGaUhij/QXwGM5/k0KgvEZbwa/oJ5VI=",
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    },
     {
       "index": "1",
       "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
@@ -303,12 +345,27 @@ expected='{
 compare "$expected" "$actual"
 
 echo GetBlockRange 663152 to 663154 ...
-actual=$(gp GetBlockRange '{"start":{"height":663152},"end":{"height":663154}}')
+actual=$(gp GetBlockRange '{"poolTypes": ["TRANSPARENT"], "start":{"height":663152},"end":{"height":663154}}')
 expected='{
   "height": "663152",
   "hash": "uzuBbqy3JKKpssnPJHLXLq+nv1eTHsuyQAkYiR84y7M=",
   "prevHash": "oh3nSTQCTZgnRGBgS8rEZt/cyjjxMI78X49lkTXJyBc=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "+qNwLv47uukw7U1Ge1x7p1Ym2SrQ67z5SgahxefXxIs=",
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }
 {
@@ -316,6 +373,21 @@ expected='{
   "hash": "BQpVcT2DPoC71Oo1DyL4arAeXWFEMDsOQfwsObbKY4s=",
   "prevHash": "uzuBbqy3JKKpssnPJHLXLq+nv1eTHsuyQAkYiR84y7M=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "v8CDZ8SiXuyV60eFHNGqnEwQhsR1761v3djLh5MaRBg=",
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }
 {
@@ -323,6 +395,21 @@ expected='{
   "hash": "5KcOajo6RLRL8ZKgdALls72ByFgTKE4zJ9kbzBh/k1I=",
   "prevHash": "EneA7vMz88tX2BvMT6UhNd+DMOSVWNVurPyEJZO/IkU=",
   "time": 1,
+  "vtx": [
+    {
+      "txid": "P4MhIyT2ziuCKfejzrBlWwl/wegqR763c4vzqxqZlWQ=",
+      "vout": [
+        {
+          "value": "500100000",
+          "scriptPubKey": "dqkUftFZRuwUrgzY+omR62CERS6z93yIrA=="
+        },
+        {
+          "value": "125000000",
+          "scriptPubKey": "qRTkRc+pRLbyvazvvakEqB1f3SbXf4c="
+        }
+      ]
+    }
+  ],
   "chainMetadata": {}
 }'
 compare "$expected" "$actual"

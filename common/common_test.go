@@ -450,7 +450,11 @@ func TestGetBlockRange(t *testing.T) {
 	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
-	go GetBlockRange(testcache, blockChan, errChan, 380640, 380642)
+	blockRange := &walletrpc.BlockRange{
+		Start: &walletrpc.BlockID{Height: 380640},
+		End:   &walletrpc.BlockID{Height: 380642},
+	}
+	go GetBlockRange(testcache, blockChan, errChan, blockRange)
 
 	// read in block 380640
 	select {
@@ -549,7 +553,11 @@ func TestGetBlockRangeReverse(t *testing.T) {
 	errChan := make(chan error)
 
 	// Request the blocks in reverse order by specifying start greater than end
-	go GetBlockRange(testcache, blockChan, errChan, 380642, 380640)
+	blockRange := &walletrpc.BlockRange{
+		Start: &walletrpc.BlockID{Height: 380642},
+		End:   &walletrpc.BlockID{Height: 380640},
+	}
+	go GetBlockRange(testcache, blockChan, errChan, blockRange)
 
 	// read in block 380642
 	select {
