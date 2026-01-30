@@ -60,7 +60,8 @@ type RawBlockHeader struct {
 
 	// The Equihash solution. In the wire format, this is a
 	// CompactSize-prefixed value.
-	Solution [1344]byte
+	// Note: mainnet uses 1344 bytes, regtest uses 36 bytes
+	Solution []byte
 }
 
 // BlockHeader extends RawBlockHeader by adding a cache for the block hash.
@@ -120,7 +121,7 @@ func (hdr *RawBlockHeader) MarshalBinary() ([]byte, error) {
 	binary.Write(buf, binary.LittleEndian, hdr.Time)
 	binary.Write(buf, binary.LittleEndian, hdr.NBitsBytes)
 	binary.Write(buf, binary.LittleEndian, hdr.Nonce)
-	WriteCompactLengthPrefixedLen(buf, 1344)
+	WriteCompactLengthPrefixedLen(buf, len(hdr.Solution))
 	binary.Write(buf, binary.LittleEndian, hdr.Solution)
 	return backing[:headerSize], nil
 }
@@ -180,14 +181,10 @@ func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 		if !s.ReadCompactSize(&length) {
 			return in, errors.New("could not read compact size of solution")
 		}
-		if length != 1344 {
-			return in, errors.New("solution length is not 1344 as expected")
-		}
-		b1344 := make([]byte, 1344)
-		if !s.ReadBytes(&b1344, 1344) {
+		hdr.Solution = make([]byte, length)
+		if !s.ReadBytes(&hdr.Solution, length) {
 			return in, errors.New("could not read CompactSize-prefixed Equihash solution")
 		}
-		hdr.Solution = [1344]byte(b1344)
 	}
 
 	// TODO: interpret the bytes
