@@ -1058,6 +1058,22 @@ func (s *DarksideStreamer) ClearAddressUtxo(ctx context.Context, arg *walletrpc.
 	return &walletrpc.Empty{}, err
 }
 
+// AddAddressTxid adds a (address, txid, height) entry returned by GetTaddressTxids
+func (s *DarksideStreamer) AddAddressTxid(ctx context.Context, arg *walletrpc.DarksideAddressTxid) (*walletrpc.Empty, error) {
+	txidHex := hash32.Encode(hash32.Reverse(hash32.FromSlice(arg.Txid)))
+	err := common.DarksideAddAddressTxid(arg.Address, txidHex, arg.Height)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, "AddAddressTxid failed: %s", err.Error())
+	}
+	return &walletrpc.Empty{}, nil
+}
+
+// ClearAddressTxids clears the list of address txid entries
+func (s *DarksideStreamer) ClearAddressTxids(ctx context.Context, arg *walletrpc.Empty) (*walletrpc.Empty, error) {
+	err := common.DarksideClearAddressTxids()
+	return &walletrpc.Empty{}, err
+}
+
 // Adds a tree state to the cached tree states
 func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.TreeState) (*walletrpc.Empty, error) {
 	tree := common.DarksideTreeState{

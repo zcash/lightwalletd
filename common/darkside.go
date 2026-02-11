@@ -56,6 +56,9 @@ type darksideState struct {
 	// Unordered list of replies
 	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
 
+	// List of (address, txid, height) tuples for getaddresstxids
+	getAddressTxids []darksideAddressTxid
+
 	stagedTreeStates       map[uint64]*DarksideTreeState
 	stagedTreeStatesByHash map[string]*DarksideTreeState
 
@@ -95,6 +98,12 @@ type DarksideTreeState struct {
 	Time        uint32
 	SaplingTree string
 	OrchardTree string
+}
+
+type darksideAddressTxid struct {
+	address string
+	txid    string // big-endian hex (matching zcashd response format)
+	height  uint64
 }
 
 type darksideSubtree struct {
@@ -610,8 +619,25 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(block.GetDisplayHashString())
 
 	case "getaddresstxids":
-		// Not required for minimal reorg testing.
-		return nil, errors.New("not implemented yet")
+		var req ZcashdRpcRequestGetaddresstxids
+		err := json.Unmarshal(params[0], &req)
+		if err != nil {
+			return nil, errors.New("failed to parse getaddresstxids JSON")
+		}
+		txids := make([]string, 0)
+		for _, entry := range state.getAddressTxids {
+			if !slices.Contains(req.Addresses, entry.address) {
+				continue
+			}
+			if entry.height < req.Start {
+				continue
+			}
+			if req.End > 0 && entry.height > req.End {
+				continue
+			}
+			txids = append(txids, entry.txid)
+		}
+		return json.Marshal(txids)
 
 	case "getrawtransaction":
 		return darksideGetRawTransaction(params)
@@ -904,6 +930,20 @@ func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
 func DarksideClearAddressUtxos() error {
 	mutex.Lock()
 	state.getAddressUtxos = nil
+	mutex.Unlock()
+	return nil
+}
+
+func DarksideAddAddressTxid(address, txid string, height uint64) error {
+	mutex.Lock()
+	state.getAddressTxids = append(state.getAddressTxids, darksideAddressTxid{address, txid, height})
+	mutex.Unlock()
+	return nil
+}
+
+func DarksideClearAddressTxids() error {
+	mutex.Lock()
+	state.getAddressTxids = nil
 	mutex.Unlock()
 	return nil
 }
