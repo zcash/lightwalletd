@@ -691,6 +691,14 @@ func (tx *Transaction) ParseFromSlice(data []byte) ([]byte, error) {
 	txLen := len(data) - len(s)
 	tx.rawBytes = data[:txLen]
 
+	if tx.isZip225V5() {
+		txid, err := computeV5TxID(tx.rawBytes)
+		if err != nil {
+			return nil, fmt.Errorf("error computing v5 txid: %w", err)
+		}
+		tx.txID = txid
+	}
+
 	return []byte(s), nil
 }
 
