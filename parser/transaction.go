@@ -646,6 +646,11 @@ func (tx *Transaction) isZip225V5() bool {
 		tx.version == ZIP225_TX_VERSION
 }
 
+// IsV5 reports whether the transaction uses the ZIP 225 v5 format.
+func (tx *Transaction) IsV5() bool {
+	return tx.isZip225V5()
+}
+
 func (tx *Transaction) isGroth16Proof() bool {
 	// Sapling changed the joinSplit proof from PHGR (BCTV14) to Groth16;
 	// this applies also to versions beyond Sapling.
