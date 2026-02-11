@@ -323,8 +323,18 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		}
 		params[0] = hashJSON
 	}
+	// Save original params; we may need to restart from this block
+	// to follow the Orchard SkipHash chain independently.
+	originalParam := make(json.RawMessage, len(params[0]))
+	copy(originalParam, params[0])
+
+	// Follow Sapling SkipHash chain to find Sapling FinalState.
+	// SkipHash forms a skip-list with O(log N) depth, so 64 iterations
+	// is more than sufficient; this guard prevents infinite loops if
+	// zcashd returns malformed data.
+	const maxSkipHashHops = 64
 	var gettreestateReply common.ZcashdRpcReplyGettreestate
-	for {
+	for i := 0; i < maxSkipHashHops; i++ {
 		result, rpcErr := common.RawRequest("z_gettreestate", params)
 		if rpcErr != nil {
 			return nil, status.Errorf(codes.InvalidArgument,
@@ -333,7 +343,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		err := json.Unmarshal(result, &gettreestateReply)
 		if err != nil {
 			return nil, status.Errorf(codes.InvalidArgument,
-				"GetTreeState: cannot marshal treestate: %s", err.Error())
+				"GetTreeState: cannot unmarshal treestate: %s", err.Error())
 		}
 		if gettreestateReply.Sapling.Commitments.FinalState != "" {
 			break
@@ -352,13 +362,52 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		return nil, status.Error(codes.InvalidArgument,
 			"GetTreeState: z_gettreestate did not return treestate")
 	}
+
+	// The Sapling loop may have landed on a block that lacks Orchard
+	// FinalState (the two pools have independent SkipHash chains).
+	// If so, restart from the original block and follow Orchard's chain.
+	orchardTree := gettreestateReply.Orchard.Commitments.FinalState
+	if orchardTree == "" {
+		params[0] = originalParam
+		for i := 0; i < maxSkipHashHops; i++ {
+			result, rpcErr := common.RawRequest("z_gettreestate", params)
+			if rpcErr != nil {
+				return nil, status.Errorf(codes.InvalidArgument,
+					"GetTreeState: z_gettreestate failed (orchard): %s", rpcErr.Error())
+			}
+			var orchardReply common.ZcashdRpcReplyGettreestate
+			err := json.Unmarshal(result, &orchardReply)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument,
+					"GetTreeState: cannot unmarshal treestate (orchard): %s", err.Error())
+			}
+			if orchardReply.Orchard.Commitments.FinalState != "" {
+				orchardTree = orchardReply.Orchard.Commitments.FinalState
+				break
+			}
+			if orchardReply.Orchard.SkipHash == "" {
+				break // Pre-NU5 block or no Orchard activity; orchardTree stays empty.
+			}
+			hashJSON, err = json.Marshal(orchardReply.Orchard.SkipHash)
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument,
+					"GetTreeState: cannot marshal Orchard SkipHash: %s", err.Error())
+			}
+			params[0] = hashJSON
+		}
+	}
+
+	// Height/Hash/Time reflect the Sapling SkipHash ancestor (the most
+	// recent block with Sapling activity), not necessarily the originally
+	// requested block. The tree states are valid for any block between
+	// the ancestor and the next activity block.
 	r := &walletrpc.TreeState{
 		Network:     s.chainName,
 		Height:      uint64(gettreestateReply.Height),
 		Hash:        gettreestateReply.Hash,
 		Time:        gettreestateReply.Time,
 		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
-		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
+		OrchardTree: orchardTree,
 	}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
