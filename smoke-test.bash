@@ -186,6 +186,32 @@ expected='{
 }'
 compare "$expected" "$actual"
 
+# Same as previous except with only the nullifiers remaining
+echo GetblockNullifiers 663190 ...
+actual=$(gp GetBlockNullifiers '{"height":663190}')
+expected='{
+  "height": "663190",
+  "hash": "rnAgBry+ZWhKw+LSrWfMDFuLalVQVq7u/QyJAPFae1Y=",
+  "prevHash": "xOcqS6kNnE4yHGnLcvi1LMOqh9iY3ynEGpUTraSKpvQ=",
+  "time": 1,
+  "vtx": [
+    {
+      "txid": "jZno30toIVWj7Np39zJPgvdkZnTAGn4L8Mgcn8t79zo="
+    },
+    {
+      "index": "1",
+      "txid": "H0nPz83r1cuQhdn/LvvNqHEh3aE/LHkRE/zy55uoIQg=",
+      "spends": [
+        {
+          "nf": "xrZLCu+Kbv6PXo8cqM+f25Hp55L2cm95bM68JwUnDHg="
+        }
+      ]
+    }
+  ],
+  "chainMetadata": {}
+}'
+compare "$expected" "$actual"
+
 # force a reorg with the transactions now in 663195
 echo -n test: StageBlocksCreate blocks 663180 to 663179 ...
 gt StageBlocksCreate '{"height":663180,"count":100}'
