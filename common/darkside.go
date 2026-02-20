@@ -167,7 +167,7 @@ func DarksideReset(sa int, bi, cn string, sst, sot uint32) error {
 	return nil
 }
 
-// DarksideAddBlock adds a single block to the active blocks list.
+// addBlockActive adds a single block to the active blocks list.
 func addBlockActive(blockBytes []byte) error {
 	block := parser.NewBlock()
 	rest, err := block.ParseFromSlice(blockBytes)
