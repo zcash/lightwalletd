@@ -214,6 +214,8 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
 		}
 		tx.Outputs = nil
+		tx.Vin = nil
+		tx.Vout = nil
 	}
 	// these are not needed (we prefer to save bandwidth)
 	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
