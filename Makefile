@@ -83,16 +83,8 @@ doc: docs/rtd/index.html
 docs/rtd/index.html: lightwallet-protocol/walletrpc/compact_formats.proto lightwallet-protocol/walletrpc/service.proto
 	docker run --rm -v $(PWD)/docs/rtd:/out -v $(PWD)/lightwallet-protocol/walletrpc:/protos pseudomuto/protoc-gen-doc
 
-proto: walletrpc/service.pb.go walletrpc/compact_formats.pb.go walletrpc/darkside.pb.go
-
-walletrpc/service.pb.go: walletrpc/service.proto
-	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
-
-walletrpc/darkside.pb.go: walletrpc/darkside.proto
-	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative darkside.proto
-
-walletrpc/compact_formats.pb.go: walletrpc/compact_formats.proto
-	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative compact_formats.proto
+proto:
+	./scripts/regenerate-protos.sh
 
 # Generate documents using a very simple wrap-in-html approach (not ideal)
 simpledoc: lwd-api.html
@@ -142,15 +134,6 @@ build_rel:
 # Install binaries into Go path
 install:
 	go install ./...
-
-# Update your protoc, protobufs, grpc, .pb.go files
-update-grpc:
-	go get -u google.golang.org/protobuf
-	go get -u google.golang.org/grpc
-	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative service.proto
-	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative darkside.proto
-	cd walletrpc && protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative compact_formats.proto
-	go mod tidy
 
 clean:
 	@echo "clean project..."
