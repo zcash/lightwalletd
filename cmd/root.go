@@ -140,6 +140,7 @@ func startServer(opts *common.Options) error {
 		common.Log.Warningln("Starting insecure no-TLS (plaintext) server")
 		fmt.Println("Starting insecure server")
 		server = grpc.NewServer(
+			grpc.StatsHandler(&connStatsHandler{}),
 			grpc.StreamInterceptor(
 				grpc_middleware.ChainStreamServer(
 					grpc_prometheus.StreamServerInterceptor),
@@ -168,6 +169,7 @@ func startServer(opts *common.Options) error {
 		}
 		server = grpc.NewServer(
 			grpc.Creds(transportCreds),
+			grpc.StatsHandler(&connStatsHandler{}),
 			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 				grpc_prometheus.StreamServerInterceptor),
 			),
