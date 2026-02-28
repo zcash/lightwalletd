@@ -112,10 +112,11 @@ type darksideProtocolSubtreeRoots struct {
 var DarksideEnabled bool
 
 func darksideSetTxID(tx *parser.Transaction) {
-	// SHA256d
-	// This is correct for V4 transactions, but not for V5, but in this test
-	// environment, it's harmless (the incorrect txid calculation can't be
-	// detected). This will be fixed when lightwalletd calculates txids correctly .
+	if tx.IsV5() {
+		// V5 txids are computed via ZIP 244 during ParseFromSlice.
+		return
+	}
+	// SHA256d (correct for pre-v5 transactions).
 	digest := sha256.Sum256(tx.Bytes())
 	digest = sha256.Sum256(digest[:])
 	tx.SetTxID(digest)
@@ -935,11 +936,17 @@ func DarksideRemoveTreeState(arg *walletrpc.BlockID) error {
 	}
 	if arg.Height > 0 {
 		treestate := state.stagedTreeStates[arg.Height]
+		if treestate == nil {
+			return fmt.Errorf("no tree state at height %d", arg.Height)
+		}
 		delete(state.stagedTreeStatesByHash, treestate.Hash)
 		delete(state.stagedTreeStates, treestate.Height)
 	} else {
 		h := hex.EncodeToString(arg.Hash)
 		treestate := state.stagedTreeStatesByHash[h]
+		if treestate == nil {
+			return fmt.Errorf("no tree state for hash %s", h)
+		}
 		delete(state.stagedTreeStatesByHash, treestate.Hash)
 		delete(state.stagedTreeStates, treestate.Height)
 	}
