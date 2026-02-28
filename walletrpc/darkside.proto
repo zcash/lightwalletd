@@ -51,6 +51,12 @@ message DarksideSubtreeRoots {
     repeated SubtreeRoot subtreeRoots = 3;
 }
 
+message DarksideAddressTransaction {
+    string address = 1;   // t-address
+    bytes data = 2;        // raw transaction bytes
+    uint64 height = 3;     // block height where this tx was mined
+}
+
 // Darksidewalletd maintains two staging areas, blocks and transactions. The
 // Stage*() gRPCs add items to the staging area; ApplyStaged() "applies" everything
 // in the staging area to the working (operational) state that the mock zcashd
@@ -129,6 +135,12 @@ service DarksideStreamer {
 
     // Clear the list of GetAddressUtxos entries (can't fail)
     rpc ClearAddressUtxo(Empty) returns (Empty) {}
+
+    // Add a (address, transaction, height) entry to be returned by GetTaddressTransactions.
+    rpc AddAddressTransaction(DarksideAddressTransaction) returns (Empty) {}
+
+    // Clear the list of address transaction entries (can't fail)
+    rpc ClearAddressTransactions(Empty) returns (Empty) {}
 
     // Adds a GetTreeState to the tree state cache
     rpc AddTreeState(TreeState) returns (Empty) {}

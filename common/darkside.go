@@ -56,6 +56,9 @@ type darksideState struct {
 	// Unordered list of replies
 	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
 
+	// List of (address, transaction, height) tuples for getaddresstxids
+	getAddressTransactions []*walletrpc.DarksideAddressTransaction
+
 	stagedTreeStates       map[uint64]*DarksideTreeState
 	stagedTreeStatesByHash map[string]*DarksideTreeState
 
@@ -610,8 +613,32 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(block.GetDisplayHashString())
 
 	case "getaddresstxids":
-		// Not required for minimal reorg testing.
-		return nil, errors.New("not implemented yet")
+		var req ZcashdRpcRequestGetaddresstxids
+		err := json.Unmarshal(params[0], &req)
+		if err != nil {
+			return nil, errors.New("failed to parse getaddresstxids JSON")
+		}
+		matchingTxids := make([]string, 0)
+		for _, entry := range state.getAddressTransactions {
+			if !slices.Contains(req.Addresses, entry.Address) {
+				continue
+			}
+			if entry.Height < req.Start {
+				continue
+			}
+			if req.End > 0 && entry.Height > req.End {
+				continue
+			}
+			// Parse the stored transaction to compute its txid
+			tx := parser.NewTransaction()
+			_, err := tx.ParseFromSlice(entry.Data)
+			if err != nil {
+				return nil, errors.New("failed to parse stored address transaction")
+			}
+			darksideSetTxID(tx)
+			matchingTxids = append(matchingTxids, tx.GetDisplayHashString())
+		}
+		return json.Marshal(matchingTxids)
 
 	case "getrawtransaction":
 		return darksideGetRawTransaction(params)
@@ -824,6 +851,18 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 			return marshalReply(tx, 0), nil
 		}
 	}
+	// Also search address transactions (added via AddAddressTransaction)
+	for _, entry := range state.getAddressTransactions {
+		tx := parser.NewTransaction()
+		_, err := tx.ParseFromSlice(entry.Data)
+		if err != nil {
+			continue
+		}
+		darksideSetTxID(tx)
+		if tx.GetDisplayHashString() == txidBigEndian {
+			return marshalReply(tx, int(entry.Height)), nil
+		}
+	}
 	return nil, errors.New("-5: No information available about transaction")
 }
 
@@ -904,6 +943,20 @@ func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
 func DarksideClearAddressUtxos() error {
 	mutex.Lock()
 	state.getAddressUtxos = nil
+	mutex.Unlock()
+	return nil
+}
+
+func DarksideAddAddressTransaction(arg *walletrpc.DarksideAddressTransaction) error {
+	mutex.Lock()
+	state.getAddressTransactions = append(state.getAddressTransactions, arg)
+	mutex.Unlock()
+	return nil
+}
+
+func DarksideClearAddressTransactions() error {
+	mutex.Lock()
+	state.getAddressTransactions = nil
 	mutex.Unlock()
 	return nil
 }
