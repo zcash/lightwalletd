@@ -1060,6 +1060,21 @@ func (s *DarksideStreamer) ClearAddressUtxo(ctx context.Context, arg *walletrpc.
 	return &walletrpc.Empty{}, err
 }
 
+// AddAddressTransaction adds a (address, transaction, height) entry returned by GetTaddressTransactions
+func (s *DarksideStreamer) AddAddressTransaction(ctx context.Context, arg *walletrpc.DarksideAddressTransaction) (*walletrpc.Empty, error) {
+	err := common.DarksideAddAddressTransaction(arg)
+	if err != nil {
+		return nil, status.Errorf(codes.Unknown, "AddAddressTransaction failed: %s", err.Error())
+	}
+	return &walletrpc.Empty{}, nil
+}
+
+// ClearAddressTransactions clears the list of address transaction entries
+func (s *DarksideStreamer) ClearAddressTransactions(ctx context.Context, arg *walletrpc.Empty) (*walletrpc.Empty, error) {
+	err := common.DarksideClearAddressTransactions()
+	return &walletrpc.Empty{}, err
+}
+
 // Adds a tree state to the cached tree states
 func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.TreeState) (*walletrpc.Empty, error) {
 	tree := common.DarksideTreeState{
