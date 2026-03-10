@@ -232,6 +232,11 @@ func setPrevhash() {
 	prevhash := hash32.Nil
 	for _, activeBlock := range state.activeBlocks {
 		// Set this block's prevhash.
+		if prevhash != hash32.Nil {
+			copy(activeBlock.bytes[4:4+32], prevhash[:])
+		}
+		// Re-parse the block from the (possibly modified) bytes
+		// so that the hash we compute includes the updated prevhash.
 		block := parser.NewBlock()
 		rest, err := block.ParseFromSlice(activeBlock.bytes)
 		if err != nil {
@@ -239,9 +244,6 @@ func setPrevhash() {
 		}
 		if len(rest) != 0 {
 			Log.Fatal(errors.New("block is too long"))
-		}
-		if prevhash != hash32.Nil {
-			copy(activeBlock.bytes[4:4+32], prevhash[:])
 		}
 		prevhash = block.GetEncodableHash()
 		Log.Info("Darkside active block height ", block.GetHeight(), " hash ",
