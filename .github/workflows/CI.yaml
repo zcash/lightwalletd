@@ -9,25 +9,22 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        go-version: ['>=1.25.0']
-
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
-        id: go
+          go-version: '>=1.25.0'
 
-      - name: Build ${{ matrix.go-version }}
+      - name: Build and test
         run: |
           make
           make test
@@ -35,25 +32,47 @@ jobs:
       - name: Race conditions test
         run: make race
 
-      - name: test Build Docker image
+      - name: Test Docker build
         run: docker build .
 
-  docker_set_env:
+  docker_push:
     needs: [build]
     if: github.event_name == 'release'
-    uses: zcash/.github/.github/workflows/standard-versioning-for-docker.yaml@main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
 
-  docker_build_push:
-    uses: zcash/.github/.github/workflows/build-and-push-docker-hub.yaml@main
-    needs: [build, docker_set_env]
-    if: github.event_name == 'release'
-    with:
-      image_name: ${{ github.event.repository.name }}
-      image_tags: ${{ needs.docker_set_env.outputs.tags }}
-      dockerfile: ./Dockerfile
-      context: .
-      build-args: ""
-    secrets:
-      dockerhub_registry: ${{ secrets.DOCKERHUB_REGISTRY }}
-      dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
-      dockerhub_password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub (electriccoinco)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and push to electriccoinco
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            electriccoinco/lightwalletd:${{ github.event.release.tag_name }}
+            electriccoinco/lightwalletd:latest
+
+      - name: Log in to Docker Hub (zodlinc)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.ZODLINC_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
+
+      - name: Push to zodlinc
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          docker buildx imagetools create \
+            --tag zodlinc/lightwalletd:${TAG} \
+            electriccoinco/lightwalletd:${TAG}
+          docker buildx imagetools create \
+            --tag zodlinc/lightwalletd:latest \
+            electriccoinco/lightwalletd:latest
