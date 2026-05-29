@@ -108,12 +108,41 @@ func (toutput *txOut) ToCompact() *walletrpc.TxOut {
 	}
 }
 
+const (
+	minTxInWireBytes        = 41  // 32-byte prevout hash + 4-byte index + 1-byte script length + 4-byte sequence
+	minTxOutWireBytes       = 9   // 8-byte value + 1-byte script length
+	minSaplingV4SpendBytes  = 384 // cv + anchor + nullifier + rk + zkproof + spendAuthSig
+	minSaplingV4OutputBytes = 948 // cv + cmu + ephemeralKey + encCiphertext + outCiphertext + zkproof
+	minSaplingV5SpendBytes  = 96  // cv + nullifier + rk
+	minSaplingV5OutputBytes = 756 // cv + cmu + ephemeralKey + encCiphertext + outCiphertext
+	minOrchardActionBytes   = 820 // cv + nullifier + rk + cmx + ephemeralKey + encCiphertext + outCiphertext
+	minJoinSplitGrothBytes  = 1698
+	minJoinSplitPHGRBytes   = 1802
+)
+
+func rejectCountExceedingRemaining(label string, count int, remaining int, minElementBytes int) error {
+	if count > remaining/minElementBytes {
+		return fmt.Errorf("%s %d exceeds remaining input length %d", label, count, remaining)
+	}
+	return nil
+}
+
+func minJoinSplitWireBytes(isGroth16Proof bool) int {
+	if isGroth16Proof {
+		return minJoinSplitGrothBytes
+	}
+	return minJoinSplitPHGRBytes
+}
+
 // parse the transparent parts of the transaction
 func (tx *Transaction) ParseTransparent(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
 	var txInCount int
 	if !s.ReadCompactSize(&txInCount) {
 		return nil, errors.New("could not read tx_in_count")
+	}
+	if err := rejectCountExceedingRemaining("tx_in_count", txInCount, len(s), minTxInWireBytes); err != nil {
+		return nil, err
 	}
 	var err error
 	tx.transparentInputs = make([]txIn, txInCount)
@@ -128,6 +157,9 @@ func (tx *Transaction) ParseTransparent(data []byte) ([]byte, error) {
 	var txOutCount int
 	if !s.ReadCompactSize(&txOutCount) {
 		return nil, errors.New("could not read tx_out_count")
+	}
+	if err := rejectCountExceedingRemaining("tx_out_count", txOutCount, len(s), minTxOutWireBytes); err != nil {
+		return nil, err
 	}
 	tx.transparentOutputs = make([]txOut, txOutCount)
 	for i := 0; i < txOutCount; i++ {
@@ -467,6 +499,9 @@ func (tx *Transaction) parsePreV5(data []byte) ([]byte, error) {
 			if !s.ReadCompactSize(&spendCount) {
 				return nil, errors.New("could not read nShieldedSpend")
 			}
+			if err := rejectCountExceedingRemaining("nShieldedSpend", spendCount, len(s), minSaplingV4SpendBytes); err != nil {
+				return nil, err
+			}
 			tx.shieldedSpends = make([]spend, spendCount)
 			for i := 0; i < spendCount; i++ {
 				newSpend := &tx.shieldedSpends[i]
@@ -477,6 +512,9 @@ func (tx *Transaction) parsePreV5(data []byte) ([]byte, error) {
 			}
 			if !s.ReadCompactSize(&outputCount) {
 				return nil, errors.New("could not read nShieldedOutput")
+			}
+			if err := rejectCountExceedingRemaining("nShieldedOutput", outputCount, len(s), minSaplingV4OutputBytes); err != nil {
+				return nil, err
 			}
 			tx.shieldedOutputs = make([]output, outputCount)
 			for i := 0; i < outputCount; i++ {
@@ -491,6 +529,9 @@ func (tx *Transaction) parsePreV5(data []byte) ([]byte, error) {
 		var joinSplitCount int
 		if !s.ReadCompactSize(&joinSplitCount) {
 			return nil, errors.New("could not read nJoinSplit")
+		}
+		if err := rejectCountExceedingRemaining("nJoinSplit", joinSplitCount, len(s), minJoinSplitWireBytes(tx.isGroth16Proof())); err != nil {
+			return nil, err
 		}
 
 		tx.joinSplits = make([]joinSplit, joinSplitCount)
@@ -618,6 +659,9 @@ func (tx *Transaction) parseSaplingBundle(data []byte) ([]byte, error) {
 	if !s.ReadCompactSize(&spendCount) {
 		return nil, errors.New("could not read nShieldedSpend")
 	}
+	if err := rejectCountExceedingRemaining("nShieldedSpend", spendCount, len(s), minSaplingV5SpendBytes); err != nil {
+		return nil, err
+	}
 	if spendCount >= (1 << 16) {
 		return nil, fmt.Errorf("spentCount (%d) must be less than 2^16", spendCount)
 	}
@@ -631,6 +675,9 @@ func (tx *Transaction) parseSaplingBundle(data []byte) ([]byte, error) {
 	}
 	if !s.ReadCompactSize(&outputCount) {
 		return nil, errors.New("could not read nShieldedOutput")
+	}
+	if err := rejectCountExceedingRemaining("nShieldedOutput", outputCount, len(s), minSaplingV5OutputBytes); err != nil {
+		return nil, err
 	}
 	if outputCount >= (1 << 16) {
 		return nil, fmt.Errorf("outputCount (%d) must be less than 2^16", outputCount)
@@ -673,6 +720,9 @@ func parseOrchardActionShapeBundle(data []byte, pool string) ([]byte, []action, 
 	var actionsCount int
 	if !s.ReadCompactSize(&actionsCount) {
 		return nil, nil, fmt.Errorf("could not read nActions%s", pool)
+	}
+	if err := rejectCountExceedingRemaining("nActionsOrchard", actionsCount, len(s), minOrchardActionBytes); err != nil {
+		return nil, nil, err
 	}
 	if actionsCount >= (1 << 16) {
 		return nil, nil, fmt.Errorf("actionsCount (%d) must be less than 2^16", actionsCount)

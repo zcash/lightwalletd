@@ -72,6 +72,7 @@ func (b *Block) GetDisplayPrevHashString() string {
 
 // see https://github.com/zcash/lightwalletd/issues/17#issuecomment-467110828
 const genesisTargetDifficulty = 520617983
+const minTransactionWireBytes = 5 // 4-byte header + at least one CompactSize byte
 
 // GetHeight extracts the block height from the coinbase transaction. See
 // BIP34. Returns block height on success, or -1 on error.
@@ -138,6 +139,9 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	var txCount int
 	if !s.ReadCompactSize(&txCount) {
 		return nil, errors.New("could not read tx_count")
+	}
+	if err := rejectCountExceedingRemaining("tx_count", txCount, len(s), minTransactionWireBytes); err != nil {
+		return nil, err
 	}
 	data = []byte(s)
 

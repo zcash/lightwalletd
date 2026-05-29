@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -248,5 +249,140 @@ func appendOrchardLikeBundle(raw *bytes.Buffer, actionsCount int) {
 		raw.WriteByte(0x00)                      // proofs length
 		raw.Write(make([]byte, 64*actionsCount)) // spend auth signatures
 		raw.Write(make([]byte, 64))              // binding signature
+	}
+}
+
+func TestParseTransparentRejectsCountsThatCannotFit(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			name:    "transparent inputs",
+			data:    []byte{0x01},
+			wantErr: "tx_in_count 1 exceeds remaining input length 0",
+		},
+		{
+			name:    "transparent outputs",
+			data:    []byte{0x00, 0x01},
+			wantErr: "tx_out_count 1 exceeds remaining input length 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := NewTransaction()
+			_, err := tx.ParseTransparent(tt.data)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func requireErrorContains(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, want)
+	}
+}
+
+func saplingV4Prefix() []byte {
+	return []byte{
+		0x00,                   // tx_in_count
+		0x00,                   // tx_out_count
+		0x00, 0x00, 0x00, 0x00, // nLockTime
+		0x00, 0x00, 0x00, 0x00, // nExpiryHeight
+		0x00, 0x00, 0x00, 0x00, // valueBalance
+		0x00, 0x00, 0x00, 0x00,
+	}
+}
+
+func TestParsePreV5RejectsCountsThatCannotFit(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			name:    "sapling spends",
+			data:    append(saplingV4Prefix(), 0x01),
+			wantErr: "nShieldedSpend 1 exceeds remaining input length 0",
+		},
+		{
+			name:    "sapling outputs",
+			data:    append(saplingV4Prefix(), 0x00, 0x01),
+			wantErr: "nShieldedOutput 1 exceeds remaining input length 0",
+		},
+		{
+			name:    "join splits",
+			data:    append(saplingV4Prefix(), 0x00, 0x00, 0x01),
+			wantErr: "nJoinSplit 1 exceeds remaining input length 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := NewTransaction()
+			tx.fOverwintered = true
+			tx.version = SAPLING_TX_VERSION
+			tx.nVersionGroupID = SAPLING_VERSION_GROUP_ID
+
+			_, err := tx.parsePreV5(tt.data)
+			requireErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+func zip225V5Prefix() []byte {
+	return []byte{
+		0x00, 0x00, 0x00, 0x00, // nConsensusBranchId
+		0x00, 0x00, 0x00, 0x00, // nLockTime
+		0x00, 0x00, 0x00, 0x00, // nExpiryHeight
+		0x00, // tx_in_count
+		0x00, // tx_out_count
+	}
+}
+
+func TestParseV5RejectsCountsThatCannotFit(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			name:    "sapling spends",
+			data:    append(zip225V5Prefix(), 0x01),
+			wantErr: "nShieldedSpend 1 exceeds remaining input length 0",
+		},
+		{
+			name:    "sapling outputs",
+			data:    append(zip225V5Prefix(), 0x00, 0x01),
+			wantErr: "nShieldedOutput 1 exceeds remaining input length 0",
+		},
+		{
+			name:    "orchard actions",
+			data:    append(zip225V5Prefix(), 0x00, 0x00, 0x01),
+			wantErr: "nActionsOrchard 1 exceeds remaining input length 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := NewTransaction()
+			tx.fOverwintered = true
+			tx.version = ZIP225_TX_VERSION
+			tx.nVersionGroupID = ZIP225_VERSION_GROUP_ID
+
+			_, err := tx.parseV5(tt.data)
+			requireErrorContains(t, err, tt.wantErr)
+		})
 	}
 }
