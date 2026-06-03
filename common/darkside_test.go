@@ -15,8 +15,9 @@ import (
 // add/reorg loop in BlockIngestor.
 func TestSetPrevhashChainConsistency(t *testing.T) {
 	os.RemoveAll(unitTestPath)
-	defer os.RemoveAll(unitTestPath)
 	cache = NewBlockCache(unitTestPath, unitTestChain, 100, 0)
+	defer os.RemoveAll(unitTestPath)
+	defer cache.Close()
 	DarksideEnabled = true
 	defer func() { DarksideEnabled = false }()
 
