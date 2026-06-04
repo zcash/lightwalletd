@@ -235,8 +235,6 @@ func setPrevhash() {
 		if prevhash != hash32.Nil {
 			copy(activeBlock.bytes[4:4+32], prevhash[:])
 		}
-		// Re-parse the block from the (possibly modified) bytes
-		// so that the hash we compute includes the updated prevhash.
 		block := parser.NewBlock()
 		rest, err := block.ParseFromSlice(activeBlock.bytes)
 		if err != nil {
