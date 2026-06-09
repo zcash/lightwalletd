@@ -221,6 +221,12 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 		c.nextBlock++
 	}
 	Log.Info("Done reading ", c.nextBlock-c.firstBlock, " blocks from disk cache")
+
+	// Initialize latestHash from the last block on disk so that the first
+	// block ingested after a restart is checked against the cache tip.
+	// Otherwise, a reorg that occurred while the server was down would go
+	// undetected, permanently leaving orphan blocks in the cache.
+	c.setLatestHash()
 	return c
 }
 

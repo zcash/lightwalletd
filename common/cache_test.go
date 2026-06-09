@@ -81,6 +81,21 @@ func TestCache(t *testing.T) {
 	if cache.nextBlock != 289466 {
 		t.Fatal("unexpected nextBlock height")
 	}
+	// The hash of the top block must be restored from disk so that a reorg
+	// that occurred while the server was down can be detected (the first
+	// block ingested after a restart must connect to the cache tip).
+	if cache.latestHash == hash32.Nil {
+		t.Fatal("latestHash not initialized after restart")
+	}
+	if cache.latestHash != hash32.FromSlice(compacts[5].Hash) {
+		t.Fatal("unexpected latestHash after restart")
+	}
+	if cache.HashMatch(hash32.FromSlice(compacts[4].Hash)) {
+		t.Fatal("HashMatch should reject a non-connecting block after restart")
+	}
+	if !cache.HashMatch(hash32.FromSlice(compacts[5].Hash)) {
+		t.Fatal("HashMatch should accept a block connecting to the cache tip")
+	}
 	reorgCache(t)
 
 	// Reorg to before the first block moves back to only the first block
