@@ -68,7 +68,7 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 				g_lastTime = time.Time{}
 				break
 			}
-			if err = refreshMempoolTxns(); err != nil {
+			if err = refreshMempoolTxns(ctx); err != nil {
 				g_lock.Unlock()
 				return err
 			}
@@ -102,9 +102,9 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 }
 
 // RefreshMempoolTxns gets all new mempool txns and sends any new ones to waiting clients
-func refreshMempoolTxns() error {
+func refreshMempoolTxns(ctx context.Context) error {
 	params := []json.RawMessage{}
-	result, rpcErr := RawRequest("getrawmempool", params)
+	result, rpcErr := RawRequest(ctx, "getrawmempool", params)
 	if rpcErr != nil {
 		return rpcErr
 	}
@@ -129,7 +129,7 @@ func refreshMempoolTxns() error {
 		}
 
 		params := []json.RawMessage{txidJSON, json.RawMessage("1")}
-		result, rpcErr := RawRequest("getrawtransaction", params)
+		result, rpcErr := RawRequest(ctx, "getrawtransaction", params)
 		if rpcErr != nil {
 			// Not an error; mempool transactions can disappear
 			continue
