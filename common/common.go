@@ -131,6 +131,12 @@ type (
 			}
 			SkipHash string
 		}
+		Ironwood struct {
+			Commitments struct {
+				FinalState string
+			}
+			SkipHash string
+		}
 	}
 
 	// zcashd rpc "getrawtransaction txid 1" (1 means verbose), there are
@@ -170,6 +176,9 @@ type (
 				Size uint32
 			}
 			Orchard struct {
+				Size uint32
+			}
+			Ironwood struct {
 				Size uint32
 			}
 		}
@@ -334,7 +343,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	}
 	// Fetch the block using the verbose option ("1") because it provides
 	// both the list of txids, which we're not yet able to compute for
-	// Orchard (V5) transactions, and the block hash (block ID), which
+	// v5 and later transactions, and the block hash (block ID), which
 	// we need to fetch the raw data format of the same block. Don't fetch
 	// by height in case a reorg occurs between the two getblock calls;
 	// using block hash ensures that we're fetching the same block.
@@ -398,6 +407,7 @@ func getBlockFromRPC(height int) (*walletrpc.CompactBlock, error) {
 	r := block.ToCompact()
 	r.ChainMetadata.SaplingCommitmentTreeSize = block1.Trees.Sapling.Size
 	r.ChainMetadata.OrchardCommitmentTreeSize = block1.Trees.Orchard.Size
+	r.ChainMetadata.IronwoodCommitmentTreeSize = block1.Trees.Ironwood.Size
 	return r, nil
 }
 
@@ -540,11 +550,15 @@ func FilterTxPool(tx *walletrpc.CompactTx, poolTypes []walletrpc.PoolType) *wall
 	if slices.Contains(poolTypes, walletrpc.PoolType_ORCHARD) {
 		r.Actions = tx.Actions
 	}
+	if slices.Contains(poolTypes, walletrpc.PoolType_IRONWOOD) {
+		r.IronwoodActions = tx.IronwoodActions
+	}
 	if len(r.Vin) > 0 ||
 		len(r.Vout) > 0 ||
 		len(r.Spends) > 0 ||
 		len(r.Outputs) > 0 ||
-		len(r.Actions) > 0 {
+		len(r.Actions) > 0 ||
+		len(r.IronwoodActions) > 0 {
 		return r
 	}
 	return nil
@@ -556,10 +570,11 @@ func FilterTxPool(tx *walletrpc.CompactTx, poolTypes []walletrpc.PoolType) *wall
 // don't bother to return empty transactions).
 func filterBlockPool(vtx []*walletrpc.CompactTx, poolTypes []walletrpc.PoolType) []*walletrpc.CompactTx {
 	if len(poolTypes) == 0 {
-		// legacy behavior: return only blocks containing shielded components.
+		// Return all shielded pools when no explicit pool filter is requested.
 		poolTypes = []walletrpc.PoolType{
 			walletrpc.PoolType_SAPLING,
 			walletrpc.PoolType_ORCHARD,
+			walletrpc.PoolType_IRONWOOD,
 		}
 	}
 	trimmedVtx := []*walletrpc.CompactTx{}
