@@ -46,6 +46,12 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- Darkside: `ClearAllTreeStates` now also clears the by-hash index, so
+  cleared tree states are no longer retrievable by block hash;
+  `RemoveTreeState` no longer crashes when the requested tree state does
+  not exist; `GetSubtreeRoots` with `maxEntries` of 0 now returns all
+  remaining roots instead of none.
+
 - GetLatestBlock should report latest block hash in little-endian
   format, not big-endian.
 

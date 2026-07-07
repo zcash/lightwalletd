@@ -757,7 +757,7 @@ func DarksideGetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp walletrpc.C
 	}
 	sliceIndex := arg.StartIndex - subtrees.startIndex
 	var limit int = len(subtrees.subtrees) - int(sliceIndex)
-	if limit > int(arg.MaxEntries) {
+	if arg.MaxEntries > 0 && limit > int(arg.MaxEntries) {
 		limit = int(arg.MaxEntries)
 	}
 	for i := 0; i < limit; i++ {
@@ -964,6 +964,7 @@ func DarksideClearAddressTransactions() error {
 func DarksideClearAllTreeStates() error {
 	mutex.Lock()
 	state.stagedTreeStates = make(map[uint64]*DarksideTreeState)
+	state.stagedTreeStatesByHash = make(map[string]*DarksideTreeState)
 	mutex.Unlock()
 	return nil
 }
@@ -986,16 +987,18 @@ func DarksideRemoveTreeState(arg *walletrpc.BlockID) error {
 	if !state.resetted || state.stagedTreeStates == nil {
 		return errors.New("please call Reset first")
 	}
+	var treestate *DarksideTreeState
 	if arg.Height > 0 {
-		treestate := state.stagedTreeStates[arg.Height]
-		delete(state.stagedTreeStatesByHash, treestate.Hash)
-		delete(state.stagedTreeStates, treestate.Height)
+		treestate = state.stagedTreeStates[arg.Height]
 	} else {
 		h := hex.EncodeToString(arg.Hash)
-		treestate := state.stagedTreeStatesByHash[h]
-		delete(state.stagedTreeStatesByHash, treestate.Hash)
-		delete(state.stagedTreeStates, treestate.Height)
+		treestate = state.stagedTreeStatesByHash[h]
 	}
+	if treestate == nil {
+		return nil
+	}
+	delete(state.stagedTreeStatesByHash, treestate.Hash)
+	delete(state.stagedTreeStates, treestate.Height)
 	return nil
 }
 
