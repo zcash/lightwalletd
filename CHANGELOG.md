@@ -29,6 +29,13 @@ The most recent changes are listed first.
   shielded, or a combination) of blocks (`GetBlockRange`) and transactions
   (`GetMempoolTx`).
 
+- Add Ironwood (NU6.3) support: compact block, tree state, and subtree
+  root data for the Ironwood pool, and parsing of ZIP 229 v6 transactions
+  using the finalized NU6.3 consensus IDs. Empty `poolTypes` requests now
+  include Ironwood shielded data. The darkside test framework tracks
+  Ironwood commitment tree sizes and exposes
+  `startIronwoodCommitmentTreeSize` via `DarksideMetaState`.
+
 
 ### Changed
 

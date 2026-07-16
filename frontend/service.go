@@ -967,6 +967,7 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 		ms.ChainName,
 		ms.StartSaplingCommitmentTreeSize,
 		ms.StartOrchardCommitmentTreeSize,
+		ms.StartIronwoodCommitmentTreeSize,
 	)
 	if err != nil {
 		common.Log.Fatal("Reset failed, error: ", err.Error())
@@ -1118,12 +1119,13 @@ func (s *DarksideStreamer) ClearAddressTransactions(ctx context.Context, arg *wa
 // Adds a tree state to the cached tree states
 func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.TreeState) (*walletrpc.Empty, error) {
 	tree := common.DarksideTreeState{
-		Network:     arg.Network,
-		Height:      arg.Height,
-		Hash:        arg.Hash,
-		Time:        arg.Time,
-		SaplingTree: arg.SaplingTree,
-		OrchardTree: arg.OrchardTree,
+		Network:      arg.Network,
+		Height:       arg.Height,
+		Hash:         arg.Hash,
+		Time:         arg.Time,
+		SaplingTree:  arg.SaplingTree,
+		OrchardTree:  arg.OrchardTree,
+		IronwoodTree: arg.IronwoodTree,
 	}
 	err := common.DarksideAddTreeState(tree)
 

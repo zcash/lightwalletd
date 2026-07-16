@@ -117,16 +117,17 @@ func TestDarksideClearAllTreeStatesClearsHashIndex(t *testing.T) {
 	state.cache = cache
 	mutex.Unlock()
 
-	if err := DarksideReset(100, "cafe", "test", 0, 0); err != nil {
+	if err := DarksideReset(100, "cafe", "test", 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := DarksideAddTreeState(DarksideTreeState{
-		Network:     "test",
-		Height:      123,
-		Hash:        hash,
-		Time:        456,
-		SaplingTree: "sapling",
-		OrchardTree: "orchard",
+		Network:      "test",
+		Height:       123,
+		Hash:         hash,
+		Time:         456,
+		SaplingTree:  "sapling",
+		OrchardTree:  "orchard",
+		IronwoodTree: "ironwood",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -142,6 +143,9 @@ func TestDarksideClearAllTreeStatesClearsHashIndex(t *testing.T) {
 	var treeState ZcashdRpcReplyGettreestate
 	if err := json.Unmarshal(result, &treeState); err != nil {
 		t.Fatal(err)
+	}
+	if treeState.Ironwood.Commitments.FinalState != "ironwood" {
+		t.Fatal("ironwood tree state was not returned")
 	}
 
 	if err := DarksideClearAllTreeStates(); err != nil {
@@ -169,11 +173,11 @@ func TestDarksideGetSubtreeRootsZeroMaxEntriesReturnsAll(t *testing.T) {
 	state.cache = cache
 	mutex.Unlock()
 
-	if err := DarksideReset(100, "cafe", "test", 0, 0); err != nil {
+	if err := DarksideReset(100, "cafe", "test", 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := DarksideSetSubtreeRoots(&walletrpc.DarksideSubtreeRoots{
-		ShieldedProtocol: walletrpc.ShieldedProtocol_orchard,
+		ShieldedProtocol: walletrpc.ShieldedProtocol_ironwood,
 		StartIndex:       7,
 		SubtreeRoots: []*walletrpc.SubtreeRoot{
 			{
@@ -198,7 +202,7 @@ func TestDarksideGetSubtreeRootsZeroMaxEntriesReturnsAll(t *testing.T) {
 
 	allRoots := &subtreeRootStream{}
 	if err := DarksideGetSubtreeRoots(&walletrpc.GetSubtreeRootsArg{
-		ShieldedProtocol: walletrpc.ShieldedProtocol_orchard,
+		ShieldedProtocol: walletrpc.ShieldedProtocol_ironwood,
 		StartIndex:       7,
 	}, allRoots); err != nil {
 		t.Fatal(err)
@@ -209,7 +213,7 @@ func TestDarksideGetSubtreeRootsZeroMaxEntriesReturnsAll(t *testing.T) {
 
 	limitedRoots := &subtreeRootStream{}
 	if err := DarksideGetSubtreeRoots(&walletrpc.GetSubtreeRootsArg{
-		ShieldedProtocol: walletrpc.ShieldedProtocol_orchard,
+		ShieldedProtocol: walletrpc.ShieldedProtocol_ironwood,
 		StartIndex:       8,
 		MaxEntries:       1,
 	}, limitedRoots); err != nil {
