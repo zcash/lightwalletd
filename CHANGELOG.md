@@ -32,6 +32,11 @@ The most recent changes are listed first.
 
 ### Changed
 
+- Update to [zcash/lightwallet-protocol v0.5.0](https://github.com/zcash/lightwallet-protocol/releases/tag/v0.5.0),
+  which adds the Ironwood fields and removes the (never used)
+  `CompactBlock.protoVersion` field; the field number and name are now
+  reserved.
+
 - The `RawTransaction` values returned from a call to `GetMempoolStream`
   now report a `Height` value of `0`, in order to be consistent with
   the results of calls to `GetTransaction`. See the documentation of
