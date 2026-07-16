@@ -190,13 +190,16 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 
 // pruneCompactBlockToNullifiers prunes the compact block, in place, down to
 // the data needed by the nullifier RPCs: Sapling spends (which are already
-// nullifier-only) and the nullifiers of Orchard actions. Sapling outputs,
-// transparent inputs and outputs, and commitment tree sizes are removed to
-// save bandwidth.
+// nullifier-only) and the nullifiers of Orchard and Ironwood actions.
+// Sapling outputs, transparent inputs and outputs, and commitment tree
+// sizes are removed to save bandwidth.
 func pruneCompactBlockToNullifiers(cBlock *walletrpc.CompactBlock) {
 	for _, tx := range cBlock.Vtx {
 		for i, action := range tx.Actions {
 			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+		}
+		for i, action := range tx.IronwoodActions {
+			tx.IronwoodActions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
 		}
 		tx.Outputs = nil
 		tx.Vin = nil
@@ -204,6 +207,7 @@ func pruneCompactBlockToNullifiers(cBlock *walletrpc.CompactBlock) {
 	}
 	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
 	cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+	cBlock.ChainMetadata.IronwoodCommitmentTreeSize = 0
 }
 
 // GetBlockNullifiers is the same as GetBlock except that it returns the compact block
@@ -374,12 +378,13 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 			"GetTreeState: z_gettreestate did not return treestate")
 	}
 	r := &walletrpc.TreeState{
-		Network:     s.chainName,
-		Height:      uint64(gettreestateReply.Height),
-		Hash:        gettreestateReply.Hash,
-		Time:        gettreestateReply.Time,
-		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
-		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
+		Network:      s.chainName,
+		Height:       uint64(gettreestateReply.Height),
+		Hash:         gettreestateReply.Hash,
+		Time:         gettreestateReply.Time,
+		SaplingTree:  gettreestateReply.Sapling.Commitments.FinalState,
+		OrchardTree:  gettreestateReply.Orchard.Commitments.FinalState,
+		IronwoodTree: gettreestateReply.Ironwood.Commitments.FinalState,
 	}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
@@ -608,10 +613,11 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
 	}
 	if len(exclude.PoolTypes) == 0 {
-		// legacy behavior: return only blocks containing shielded components.
+		// Return all shielded pools when no explicit pool filter is requested.
 		exclude.PoolTypes = []walletrpc.PoolType{
 			walletrpc.PoolType_SAPLING,
 			walletrpc.PoolType_ORCHARD,
+			walletrpc.PoolType_IRONWOOD,
 		}
 	}
 	s.mutex.Lock()
@@ -844,6 +850,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 	switch arg.ShieldedProtocol {
 	case walletrpc.ShieldedProtocol_sapling:
 	case walletrpc.ShieldedProtocol_orchard:
+	case walletrpc.ShieldedProtocol_ironwood:
 		break
 	default:
 		return errors.New("unrecognized shielded protocol")
