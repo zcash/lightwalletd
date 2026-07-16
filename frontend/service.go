@@ -697,7 +697,14 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		if ftx := common.FilterTxPool((*mempoolMap)[txid], exclude.PoolTypes); ftx != nil {
+		ctx, ok := (*mempoolMap)[txid]
+		if !ok {
+			// The transaction was in getrawmempool's reply but its
+			// getrawtransaction failed (it may have been mined or evicted
+			// in between); it will be picked up on the next refresh.
+			continue
+		}
+		if ftx := common.FilterTxPool(ctx, exclude.PoolTypes); ftx != nil {
 			err := resp.Send(ftx)
 			if err != nil {
 				return err

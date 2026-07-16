@@ -46,6 +46,9 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- `GetMempoolTx` no longer crashes when a transaction leaves the mempool
+  between the `getrawmempool` and `getrawtransaction` calls.
+
 - `GetBlockRangeNullifiers` no longer includes transparent inputs and
   outputs (`vin`/`vout`), consistent with `GetBlockNullifiers` and with
   the documented behavior of the nullifier RPCs.
