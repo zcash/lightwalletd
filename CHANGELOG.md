@@ -46,6 +46,10 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- `GetBlockRangeNullifiers` no longer includes transparent inputs and
+  outputs (`vin`/`vout`), consistent with `GetBlockNullifiers` and with
+  the documented behavior of the nullifier RPCs.
+
 - Darkside: `ClearAllTreeStates` now also clears the by-hash index, so
   cleared tree states are no longer retrievable by block hash;
   `RemoveTreeState` no longer crashes when the requested tree state does

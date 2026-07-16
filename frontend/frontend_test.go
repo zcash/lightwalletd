@@ -597,3 +597,34 @@ func TestMempoolFilter(t *testing.T) {
 	}
 
 }
+
+func TestPruneCompactBlockToNullifiers(t *testing.T) {
+	cb := &walletrpc.CompactBlock{
+		Vtx: []*walletrpc.CompactTx{
+			{
+				Actions: []*walletrpc.CompactOrchardAction{
+					{Nullifier: []byte{1}, Cmx: []byte{2}},
+				},
+				Outputs: []*walletrpc.CompactSaplingOutput{{Cmu: []byte{5}}},
+				Vin:     []*walletrpc.CompactTxIn{{PrevoutTxid: []byte{6}}},
+				Vout:    []*walletrpc.TxOut{{Value: 7}},
+			},
+		},
+		ChainMetadata: &walletrpc.ChainMetadata{
+			SaplingCommitmentTreeSize: 10,
+			OrchardCommitmentTreeSize: 20,
+		},
+	}
+	pruneCompactBlockToNullifiers(cb)
+	tx := cb.Vtx[0]
+	if len(tx.Actions) != 1 || len(tx.Actions[0].Cmx) != 0 || !bytes.Equal(tx.Actions[0].Nullifier, []byte{1}) {
+		t.Fatalf("orchard action not pruned to nullifier only: %+v", tx.Actions[0])
+	}
+	if len(tx.Outputs) != 0 || len(tx.Vin) != 0 || len(tx.Vout) != 0 {
+		t.Fatalf("non-nullifier components not nil: outputs=%d vin=%d vout=%d", len(tx.Outputs), len(tx.Vin), len(tx.Vout))
+	}
+	if cb.ChainMetadata.SaplingCommitmentTreeSize != 0 ||
+		cb.ChainMetadata.OrchardCommitmentTreeSize != 0 {
+		t.Fatalf("chain metadata tree sizes not zeroed: %+v", cb.ChainMetadata)
+	}
+}
