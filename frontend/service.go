@@ -188,6 +188,28 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 	return cBlock, err
 }
 
+// pruneCompactBlockToNullifiers prunes the compact block, in place, down to
+// the data needed by the nullifier RPCs: Sapling spends (which are already
+// nullifier-only) and the nullifiers of Orchard and Ironwood actions.
+// Sapling outputs, transparent inputs and outputs, and commitment tree
+// sizes are removed to save bandwidth.
+func pruneCompactBlockToNullifiers(cBlock *walletrpc.CompactBlock) {
+	for _, tx := range cBlock.Vtx {
+		for i, action := range tx.Actions {
+			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+		}
+		for i, action := range tx.IronwoodActions {
+			tx.IronwoodActions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+		}
+		tx.Outputs = nil
+		tx.Vin = nil
+		tx.Vout = nil
+	}
+	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
+	cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+	cBlock.ChainMetadata.IronwoodCommitmentTreeSize = 0
+}
+
 // GetBlockNullifiers is the same as GetBlock except that it returns the compact block
 // with actions containing only the nullifiers (a subset of the full compact block).
 func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.CompactBlock, error) {
@@ -209,17 +231,7 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 		// GetBlock() returns gRPC-compatible errors.
 		return nil, err
 	}
-	for _, tx := range cBlock.Vtx {
-		for i, action := range tx.Actions {
-			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
-		}
-		tx.Outputs = nil
-		tx.Vin = nil
-		tx.Vout = nil
-	}
-	// these are not needed (we prefer to save bandwidth)
-	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
-	cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+	pruneCompactBlockToNullifiers(cBlock)
 	common.Log.Tracef("  return: %+v\n", cBlock)
 	return cBlock, err
 }
@@ -288,15 +300,7 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 			// this will also catch context.DeadlineExceeded from the timeout
 			return err
 		case cBlock := <-blockChan:
-			for _, tx := range cBlock.Vtx {
-				for i, action := range tx.Actions {
-					tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
-				}
-				tx.Outputs = nil
-			}
-			// these are not needed (we prefer to save bandwidth)
-			cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
-			cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+			pruneCompactBlockToNullifiers(cBlock)
 			if err := resp.Send(cBlock); err != nil {
 				return err
 			}
@@ -374,12 +378,13 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 			"GetTreeState: z_gettreestate did not return treestate")
 	}
 	r := &walletrpc.TreeState{
-		Network:     s.chainName,
-		Height:      uint64(gettreestateReply.Height),
-		Hash:        gettreestateReply.Hash,
-		Time:        gettreestateReply.Time,
-		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
-		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
+		Network:      s.chainName,
+		Height:       uint64(gettreestateReply.Height),
+		Hash:         gettreestateReply.Hash,
+		Time:         gettreestateReply.Time,
+		SaplingTree:  gettreestateReply.Sapling.Commitments.FinalState,
+		OrchardTree:  gettreestateReply.Orchard.Commitments.FinalState,
+		IronwoodTree: gettreestateReply.Ironwood.Commitments.FinalState,
 	}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
@@ -608,10 +613,11 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
 	}
 	if len(exclude.PoolTypes) == 0 {
-		// legacy behavior: return only blocks containing shielded components.
+		// Return all shielded pools when no explicit pool filter is requested.
 		exclude.PoolTypes = []walletrpc.PoolType{
 			walletrpc.PoolType_SAPLING,
 			walletrpc.PoolType_ORCHARD,
+			walletrpc.PoolType_IRONWOOD,
 		}
 	}
 	s.mutex.Lock()
@@ -697,7 +703,14 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		if ftx := common.FilterTxPool((*mempoolMap)[txid], exclude.PoolTypes); ftx != nil {
+		ctx, ok := (*mempoolMap)[txid]
+		if !ok {
+			// The transaction was in getrawmempool's reply but its
+			// getrawtransaction failed (it may have been mined or evicted
+			// in between); it will be picked up on the next refresh.
+			continue
+		}
+		if ftx := common.FilterTxPool(ctx, exclude.PoolTypes); ftx != nil {
 			err := resp.Send(ftx)
 			if err != nil {
 				return err
@@ -837,6 +850,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 	switch arg.ShieldedProtocol {
 	case walletrpc.ShieldedProtocol_sapling:
 	case walletrpc.ShieldedProtocol_orchard:
+	case walletrpc.ShieldedProtocol_ironwood:
 		break
 	default:
 		return errors.New("unrecognized shielded protocol")
@@ -953,6 +967,7 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 		ms.ChainName,
 		ms.StartSaplingCommitmentTreeSize,
 		ms.StartOrchardCommitmentTreeSize,
+		ms.StartIronwoodCommitmentTreeSize,
 	)
 	if err != nil {
 		common.Log.Fatal("Reset failed, error: ", err.Error())
@@ -1104,12 +1119,13 @@ func (s *DarksideStreamer) ClearAddressTransactions(ctx context.Context, arg *wa
 // Adds a tree state to the cached tree states
 func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.TreeState) (*walletrpc.Empty, error) {
 	tree := common.DarksideTreeState{
-		Network:     arg.Network,
-		Height:      arg.Height,
-		Hash:        arg.Hash,
-		Time:        arg.Time,
-		SaplingTree: arg.SaplingTree,
-		OrchardTree: arg.OrchardTree,
+		Network:      arg.Network,
+		Height:       arg.Height,
+		Hash:         arg.Hash,
+		Time:         arg.Time,
+		SaplingTree:  arg.SaplingTree,
+		OrchardTree:  arg.OrchardTree,
+		IronwoodTree: arg.IronwoodTree,
 	}
 	err := common.DarksideAddTreeState(tree)
 

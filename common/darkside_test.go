@@ -1,11 +1,17 @@
 package common
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
+	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // TestSetPrevhashChainConsistency verifies that after setPrevhash runs,
@@ -80,5 +86,140 @@ func TestSetPrevhashChainConsistency(t *testing.T) {
 			}
 		}
 		prevHash = block.GetEncodableHash()
+	}
+}
+
+// subtreeRootStream is a test double for the gRPC stream used by
+// DarksideGetSubtreeRoots.
+type subtreeRootStream struct {
+	roots []*walletrpc.SubtreeRoot
+}
+
+func (s *subtreeRootStream) Send(root *walletrpc.SubtreeRoot) error {
+	s.roots = append(s.roots, root)
+	return nil
+}
+func (s *subtreeRootStream) SetHeader(metadata.MD) error  { return nil }
+func (s *subtreeRootStream) SendHeader(metadata.MD) error { return nil }
+func (s *subtreeRootStream) SetTrailer(metadata.MD)       {}
+func (s *subtreeRootStream) Context() context.Context     { return context.Background() }
+func (s *subtreeRootStream) SendMsg(any) error            { return nil }
+func (s *subtreeRootStream) RecvMsg(any) error            { return nil }
+
+// TestDarksideClearAllTreeStatesClearsHashIndex is a regression test for the
+// bug where DarksideClearAllTreeStates cleared the by-height map but left
+// the by-hash index populated, so tree states remained retrievable by hash.
+func TestDarksideClearAllTreeStatesClearsHashIndex(t *testing.T) {
+	hash := strings.Repeat("ab", 32)
+	cache := NewBlockCache(t.TempDir(), unitTestChain, 100, 0)
+
+	mutex.Lock()
+	state.cache = cache
+	mutex.Unlock()
+
+	if err := DarksideReset(100, "cafe", "test", 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := DarksideAddTreeState(DarksideTreeState{
+		Network:      "test",
+		Height:       123,
+		Hash:         hash,
+		Time:         456,
+		SaplingTree:  "sapling",
+		OrchardTree:  "orchard",
+		IronwoodTree: "ironwood",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	hashJSON, err := json.Marshal(hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := darksideRawRequest("z_gettreestate", []json.RawMessage{hashJSON})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var treeState ZcashdRpcReplyGettreestate
+	if err := json.Unmarshal(result, &treeState); err != nil {
+		t.Fatal(err)
+	}
+	if treeState.Ironwood.Commitments.FinalState != "ironwood" {
+		t.Fatal("ironwood tree state was not returned")
+	}
+
+	if err := DarksideClearAllTreeStates(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := darksideRawRequest("z_gettreestate", []json.RawMessage{hashJSON}); err == nil {
+		t.Fatal("tree state should not be available by hash after clearing")
+	}
+	// Removing by height or hash after clearing should be a no-op, not a crash.
+	if err := DarksideRemoveTreeState(&walletrpc.BlockID{Height: 123}); err != nil {
+		t.Fatal(err)
+	}
+	if err := DarksideRemoveTreeState(&walletrpc.BlockID{Hash: bytes.Repeat([]byte{0xab}, 32)}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestDarksideGetSubtreeRootsZeroMaxEntriesReturnsAll is a regression test for
+// the bug where MaxEntries == 0 caused DarksideGetSubtreeRoots to return no
+// roots, because limit > 0 was always false. After the fix, 0 means unlimited.
+func TestDarksideGetSubtreeRootsZeroMaxEntriesReturnsAll(t *testing.T) {
+	cache := NewBlockCache(t.TempDir(), unitTestChain, 100, 0)
+
+	mutex.Lock()
+	state.cache = cache
+	mutex.Unlock()
+
+	if err := DarksideReset(100, "cafe", "test", 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := DarksideSetSubtreeRoots(&walletrpc.DarksideSubtreeRoots{
+		ShieldedProtocol: walletrpc.ShieldedProtocol_ironwood,
+		StartIndex:       7,
+		SubtreeRoots: []*walletrpc.SubtreeRoot{
+			{
+				RootHash:              []byte{1},
+				CompletingBlockHash:   []byte{11},
+				CompletingBlockHeight: 101,
+			},
+			{
+				RootHash:              []byte{2},
+				CompletingBlockHash:   []byte{12},
+				CompletingBlockHeight: 102,
+			},
+			{
+				RootHash:              []byte{3},
+				CompletingBlockHash:   []byte{13},
+				CompletingBlockHeight: 103,
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	allRoots := &subtreeRootStream{}
+	if err := DarksideGetSubtreeRoots(&walletrpc.GetSubtreeRootsArg{
+		ShieldedProtocol: walletrpc.ShieldedProtocol_ironwood,
+		StartIndex:       7,
+	}, allRoots); err != nil {
+		t.Fatal(err)
+	}
+	if len(allRoots.roots) != 3 {
+		t.Fatalf("expected all roots for zero maxEntries, got %d", len(allRoots.roots))
+	}
+
+	limitedRoots := &subtreeRootStream{}
+	if err := DarksideGetSubtreeRoots(&walletrpc.GetSubtreeRootsArg{
+		ShieldedProtocol: walletrpc.ShieldedProtocol_ironwood,
+		StartIndex:       8,
+		MaxEntries:       1,
+	}, limitedRoots); err != nil {
+		t.Fatal(err)
+	}
+	if len(limitedRoots.roots) != 1 || !bytes.Equal(limitedRoots.roots[0].RootHash, []byte{2}) {
+		t.Fatal("limited subtree roots response was incorrect")
 	}
 }

@@ -898,3 +898,31 @@ func TestMempoolStreamCancelOnEmptyMempool(t *testing.T) {
 	sleepCount = 0
 	sleepDuration = 0
 }
+
+func TestFilterTxPoolIronwood(t *testing.T) {
+	tx := &walletrpc.CompactTx{
+		Index: 7,
+		Txid:  []byte{1, 2, 3},
+		Actions: []*walletrpc.CompactOrchardAction{
+			{Nullifier: []byte{4}},
+		},
+		IronwoodActions: []*walletrpc.CompactOrchardAction{
+			{Nullifier: []byte{5}},
+		},
+	}
+
+	orchardOnly := FilterTxPool(tx, []walletrpc.PoolType{walletrpc.PoolType_ORCHARD})
+	if orchardOnly == nil || len(orchardOnly.Actions) != 1 || len(orchardOnly.IronwoodActions) != 0 {
+		t.Fatal("orchard-only filter returned unexpected actions")
+	}
+
+	ironwoodOnly := FilterTxPool(tx, []walletrpc.PoolType{walletrpc.PoolType_IRONWOOD})
+	if ironwoodOnly == nil || len(ironwoodOnly.Actions) != 0 || len(ironwoodOnly.IronwoodActions) != 1 {
+		t.Fatal("ironwood-only filter returned unexpected actions")
+	}
+
+	defaultFiltered := filterBlockPool([]*walletrpc.CompactTx{tx}, nil)
+	if len(defaultFiltered) != 1 || len(defaultFiltered[0].IronwoodActions) != 1 {
+		t.Fatal("default shielded filter should keep ironwood actions")
+	}
+}
