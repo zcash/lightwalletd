@@ -7,11 +7,14 @@ package frontend
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -36,12 +39,51 @@ func rpcHTTPURL(cfg *rpcclient.ConnConfig) string {
 	return protocol + "://" + cfg.Host
 }
 
+// newContextHTTPClient builds an HTTP client that honours the proxy and TLS
+// settings on cfg, mirroring btcsuite/btcd/rpcclient's newHTTPClient. This keeps
+// NewContextRawRequest a faithful drop-in for rpcclient.RawRequest rather than
+// silently dropping proxy or custom-CA configuration when TLS is enabled.
+func newContextHTTPClient(cfg *rpcclient.ConnConfig) (*http.Client, error) {
+	var proxyFunc func(*http.Request) (*url.URL, error)
+	if cfg.Proxy != "" {
+		proxyURL, err := url.Parse(cfg.Proxy)
+		if err != nil {
+			return nil, err
+		}
+		proxyFunc = http.ProxyURL(proxyURL)
+	}
+
+	var tlsConfig *tls.Config
+	if !cfg.DisableTLS && len(cfg.Certificates) > 0 {
+		pool := x509.NewCertPool()
+		pool.AppendCertsFromPEM(cfg.Certificates)
+		tlsConfig = &tls.Config{RootCAs: pool}
+	}
+
+	return &http.Client{
+		Timeout: defaultHTTPTimeout,
+		Transport: &http.Transport{
+			Proxy:           proxyFunc,
+			TLSClientConfig: tlsConfig,
+		},
+	}, nil
+}
+
 // NewContextRawRequest returns a context-aware JSON-RPC function for zcashd and
-// zebrad. HTTP POST requests honour ctx cancellation via http.NewRequestWithContext.
-// When btcd's rpcclient exposes RawRequestWithContext, this wrapper can delegate
-// to it instead of issuing requests directly.
-func NewContextRawRequest(cfg *rpcclient.ConnConfig) func(context.Context, string, []json.RawMessage) (json.RawMessage, error) {
-	httpClient := &http.Client{Timeout: defaultHTTPTimeout}
+// zebrad. It is a port of btcsuite/btcd/rpcclient's HTTP POST path (same retry
+// count, backoff schedule, and per-request connection handling) with ctx threaded
+// through via http.NewRequestWithContext, so that a cancelled gRPC stream aborts
+// the in-flight request instead of leaking a goroutine and a zcashd RPC slot.
+//
+// This wrapper exists only because btcd's rpcclient does not yet expose a
+// context-aware request method. Once btcsuite/btcd#2506 (RawRequestWithContext)
+// is merged and released, bump the btcd dependency and replace this with a direct
+// delegation to it: https://github.com/btcsuite/btcd/pull/2506
+func NewContextRawRequest(cfg *rpcclient.ConnConfig) (func(context.Context, string, []json.RawMessage) (json.RawMessage, error), error) {
+	httpClient, err := newContextHTTPClient(cfg)
+	if err != nil {
+		return nil, err
+	}
 	httpURL := rpcHTTPURL(cfg)
 
 	return func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
@@ -120,5 +162,5 @@ func NewContextRawRequest(cfg *rpcclient.ConnConfig) func(context.Context, strin
 		}
 		return nil, fmt.Errorf("invalid http POST response after retries, method: %s, last error=%v",
 			method, lastErr)
-	}
+	}, nil
 }

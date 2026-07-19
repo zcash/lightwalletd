@@ -215,7 +215,12 @@ func startServer(opts *common.Options) error {
 			}).Fatal("setting up RPC connection to zebrad or zcashd")
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
-		common.RawRequest = frontend.NewContextRawRequest(connCfg)
+		common.RawRequest, err = frontend.NewContextRawRequest(connCfg)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("setting up RPC connection to zebrad or zcashd")
+		}
 
 		// Ensure that we can communicate with zcashd
 		common.FirstRPC()
