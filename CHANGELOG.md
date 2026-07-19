@@ -8,6 +8,13 @@ The most recent changes are listed first.
 
 ## [Unreleased]
 
+### Fixed
+
+- Make `common.RawRequest` context-aware so cancelled `GetBlockRange` /
+  `GetBlockRangeNullifiers` streams abort in-flight zcashd JSON-RPC calls
+  instead of holding a goroutine and RPC connection until the request
+  completes.
+
 ### Added
 
 - Add debug logging to gRPC entry and exit points.
