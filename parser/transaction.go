@@ -108,32 +108,6 @@ func (toutput *txOut) ToCompact() *walletrpc.TxOut {
 	}
 }
 
-const (
-	minTxInWireBytes        = 41  // 32-byte prevout hash + 4-byte index + 1-byte script length + 4-byte sequence
-	minTxOutWireBytes       = 9   // 8-byte value + 1-byte script length
-	minSaplingV4SpendBytes  = 384 // cv + anchor + nullifier + rk + zkproof + spendAuthSig
-	minSaplingV4OutputBytes = 948 // cv + cmu + ephemeralKey + encCiphertext + outCiphertext + zkproof
-	minSaplingV5SpendBytes  = 96  // cv + nullifier + rk
-	minSaplingV5OutputBytes = 756 // cv + cmu + ephemeralKey + encCiphertext + outCiphertext
-	minOrchardActionBytes   = 820 // cv + nullifier + rk + cmx + ephemeralKey + encCiphertext + outCiphertext
-	minJoinSplitGrothBytes  = 1698
-	minJoinSplitPHGRBytes   = 1802
-)
-
-func rejectCountExceedingRemaining(label string, count int, remaining int, minElementBytes int) error {
-	if count > remaining/minElementBytes {
-		return fmt.Errorf("%s %d exceeds remaining input length %d", label, count, remaining)
-	}
-	return nil
-}
-
-func minJoinSplitWireBytes(isGroth16Proof bool) int {
-	if isGroth16Proof {
-		return minJoinSplitGrothBytes
-	}
-	return minJoinSplitPHGRBytes
-}
-
 // parse the transparent parts of the transaction
 func (tx *Transaction) ParseTransparent(data []byte) ([]byte, error) {
 	s := bytestring.String(data)
@@ -663,7 +637,7 @@ func (tx *Transaction) parseSaplingBundle(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	if spendCount >= (1 << 16) {
-		return nil, fmt.Errorf("spentCount (%d) must be less than 2^16", spendCount)
+		return nil, fmt.Errorf("spendCount (%d) must be less than 2^16", spendCount)
 	}
 	tx.shieldedSpends = make([]spend, spendCount)
 	for i := 0; i < spendCount; i++ {
@@ -721,7 +695,7 @@ func parseOrchardActionShapeBundle(data []byte, pool string) ([]byte, []action, 
 	if !s.ReadCompactSize(&actionsCount) {
 		return nil, nil, fmt.Errorf("could not read nActions%s", pool)
 	}
-	if err := rejectCountExceedingRemaining("nActionsOrchard", actionsCount, len(s), minOrchardActionBytes); err != nil {
+	if err := rejectCountExceedingRemaining("nActions"+pool, actionsCount, len(s), minOrchardActionBytes); err != nil {
 		return nil, nil, err
 	}
 	if actionsCount >= (1 << 16) {

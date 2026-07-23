@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/zcash/lightwalletd/hash32"
@@ -181,8 +182,12 @@ func (hdr *BlockHeader) ParseFromSlice(in []byte) (rest []byte, err error) {
 		if !s.ReadCompactSize(&length) {
 			return in, errors.New("could not read compact size of solution")
 		}
-		if err := rejectCountExceedingRemaining("solution_length", length, len(s), 1); err != nil {
-			return in, err
+		// Check before allocating: length is a byte count bounded only by
+		// maxCompactSize, so a truncated header could otherwise size a 32MB
+		// slice that the ReadBytes below immediately fails to fill.
+		if length > len(s) {
+			return in, fmt.Errorf("solution_length %d exceeds remaining input length %d",
+				length, len(s))
 		}
 		hdr.Solution = make([]byte, length)
 		if !s.ReadBytes(&hdr.Solution, length) {

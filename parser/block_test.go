@@ -88,7 +88,7 @@ func TestParseBlockRejectsTransactionCountThatCannotFit(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	wantErr := "tx_count 1 exceeds remaining input length 0"
+	wantErr := "tx_count 1 requires at least 10 bytes, but only 0 remain"
 	if !strings.Contains(err.Error(), wantErr) {
 		t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, wantErr)
 	}
