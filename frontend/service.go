@@ -560,6 +560,17 @@ func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletr
 	return r, err
 }
 
+// maxTaddrsPerRequest bounds the number of transparent addresses a single
+// request may cause lightwalletd to process, across the transparent-address
+// gRPC methods. Without a cap, an unauthenticated client can drive unbounded
+// memory growth and backend work: GetTaddressBalanceStream accumulates
+// streamed addresses until the process is OOM-killed, and GetAddressUtxos
+// forwards the whole list to zcashd and materializes the full result before
+// applying client-side limits. The unary GetTaddressBalance is already
+// implicitly bounded by gRPC's MaxRecvMsgSize; this gives the other methods an
+// equivalent bound, generous for any legitimate wallet (GHSA-x4m7-3gpp-xc36).
+const maxTaddrsPerRequest = 10000
+
 // GetTaddressBalanceStream returns the total balance for a list of taddrs
 func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer) error {
 	common.Log.Debugf("gRPC GetTaddressBalanceStream(%+v)\n", addresses)
@@ -571,6 +582,15 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 		}
 		if err != nil {
 			return status.Errorf(codes.Internal, "GetTaddressBalanceStream Recv error: %s", err.Error())
+		}
+		// Validate and bound each address as it arrives, rather than
+		// accumulating unbounded, unvalidated input (GHSA-x4m7-3gpp-xc36).
+		if err := checkTaddress(addr.Address); err != nil {
+			return err
+		}
+		if len(addressList) >= maxTaddrsPerRequest {
+			return status.Errorf(codes.ResourceExhausted,
+				"GetTaddressBalanceStream: too many addresses (limit %d)", maxTaddrsPerRequest)
 		}
 		addressList = append(addressList, addr.Address)
 	}
@@ -761,6 +781,15 @@ func MempoolFilter(items, exclude []string) []string {
 }
 
 func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
+	// Bound the address count before contacting zcashd: getaddressutxos cannot
+	// push down StartHeight/MaxEntries, so lightwalletd fetches and
+	// materializes the entire backend result before applying those limits.
+	// Capping the input keeps one request from forcing unbounded backend work
+	// and result materialization (GHSA-x4m7-3gpp-xc36).
+	if len(arg.Addresses) > maxTaddrsPerRequest {
+		return status.Errorf(codes.ResourceExhausted,
+			"getAddressUtxos: too many addresses (limit %d)", maxTaddrsPerRequest)
+	}
 	for _, a := range arg.Addresses {
 		if err := checkTaddress(a); err != nil {
 			return err

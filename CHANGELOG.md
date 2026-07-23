@@ -10,6 +10,16 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- Bound the transparent-address gRPC methods against unbounded per-request
+  work (GHSA-x4m7-3gpp-xc36). `GetTaddressBalanceStream` now caps the number of
+  streamed addresses and validates each one as it arrives, instead of buffering
+  the entire client stream before any validation; `GetAddressUtxos` and
+  `GetAddressUtxosStream` cap the number of requested addresses. Previously an
+  unauthenticated client could hold a stream open and send `Address` messages
+  indefinitely — growing the server's heap until the process was OOM-killed,
+  disconnecting all connected wallets — or name enough addresses to force
+  zcashd to materialize an unbounded result set.
+
 - Make `common.RawRequest` context-aware so cancelled `GetBlockRange` /
   `GetBlockRangeNullifiers` streams abort in-flight zcashd JSON-RPC calls
   instead of holding a goroutine and RPC connection until the request

@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -18,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -266,6 +269,125 @@ func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage)
 	}
 	testT.Fatal("unexpected call to zcashdrpcStub")
 	return nil, nil
+}
+
+// testtaddrbalance is a mock client-streaming server for
+// GetTaddressBalanceStream. It feeds the handler a fixed list of addresses,
+// then EOF, and records the balance returned via SendAndClose.
+type testtaddrbalance struct {
+	walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer
+	addrs   []string
+	idx     int
+	balance *walletrpc.Balance
+}
+
+func (t *testtaddrbalance) Context() context.Context {
+	return context.Background()
+}
+
+func (t *testtaddrbalance) Recv() (*walletrpc.Address, error) {
+	if t.idx >= len(t.addrs) {
+		return nil, io.EOF
+	}
+	a := &walletrpc.Address{Address: t.addrs[t.idx]}
+	t.idx++
+	return a, nil
+}
+
+func (t *testtaddrbalance) SendAndClose(b *walletrpc.Balance) error {
+	t.balance = b
+	return nil
+}
+
+// getaddressbalanceStub returns a fixed balance and asserts that the request
+// only reaches zcashd with the expected (valid, bounded) address list.
+func getaddressbalanceStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method != "getaddressbalance" {
+		testT.Fatal("unexpected method", method)
+	}
+	var req common.ZcashdRpcRequestGetaddressbalance
+	if err := json.Unmarshal(params[0], &req); err != nil {
+		testT.Fatal("could not unmarshal getaddressbalance request")
+	}
+	return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 1234})
+}
+
+func TestGetTaddressBalanceStream(t *testing.T) {
+	testT = t
+	lwd, _ := testsetup()
+
+	validAddr := "t1234567890123456789012345678901234"
+
+	// An invalid address must be rejected immediately, before any zcashd
+	// call, and before the whole (potentially unbounded) stream is buffered.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an invalid address")
+		return nil, nil
+	}
+	{
+		mock := &testtaddrbalance{addrs: []string{validAddr, "not-a-valid-address"}}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if err == nil {
+			t.Fatal("GetTaddressBalanceStream should have failed on bad address")
+		}
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatal("expected InvalidArgument on bad address, got:", err)
+		}
+	}
+
+	// Too many addresses must be rejected (GHSA-x4m7-3gpp-xc36), before the
+	// server accumulates or forwards them.
+	{
+		addrs := make([]string, maxTaddrsPerRequest+1)
+		for i := range addrs {
+			addrs[i] = validAddr
+		}
+		mock := &testtaddrbalance{addrs: addrs}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if err == nil {
+			t.Fatal("GetTaddressBalanceStream should have failed on too many addresses")
+		}
+		if status.Code(err) != codes.ResourceExhausted {
+			t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+		}
+	}
+
+	// A valid, bounded request succeeds and returns the balance from zcashd.
+	common.RawRequest = getaddressbalanceStub
+	{
+		mock := &testtaddrbalance{addrs: []string{validAddr, validAddr}}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if err != nil {
+			t.Fatal("GetTaddressBalanceStream failed:", err)
+		}
+		if mock.balance == nil || mock.balance.ValueZat != 1234 {
+			t.Fatal("unexpected balance:", mock.balance)
+		}
+	}
+}
+
+func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
+	testT = t
+	lwd, _ := testsetup()
+
+	// A request naming too many addresses must be rejected before zcashd is
+	// contacted, so one request can't force unbounded backend work
+	// (GHSA-x4m7-3gpp-xc36).
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called when the address list is over the limit")
+		return nil, nil
+	}
+	addrs := make([]string, maxTaddrsPerRequest+1)
+	for i := range addrs {
+		addrs[i] = "t1234567890123456789012345678901234"
+	}
+	_, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{Addresses: addrs})
+	if err == nil {
+		t.Fatal("GetAddressUtxos should have failed on too many addresses")
+	}
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+	}
 }
 
 type testgettx struct {
