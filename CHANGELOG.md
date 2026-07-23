@@ -43,6 +43,9 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- Call `setLatestHash()` during startup, to ensure the chain is correct
+  if a reorg occurred while we were down (#563).
+
 - GetLatestBlock should report latest block hash in little-endian
   format, not big-endian.
 

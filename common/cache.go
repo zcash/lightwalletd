@@ -126,7 +126,8 @@ func (c *BlockCache) readBlock(height int) *walletrpc.CompactBlock {
 	return block
 }
 
-// Caller should hold c.mutex.Lock().
+// Caller should hold c.mutex.Lock() (unless being called from startServer()/NewBlockCache()
+// during startup, when the server is single-threaded).
 func (c *BlockCache) setLatestHash() {
 	c.latestHash = hash32.Nil
 	// There is at least one block; get the last block's hash
