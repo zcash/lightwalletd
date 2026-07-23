@@ -138,7 +138,7 @@ func TestGetTransaction(t *testing.T) {
 	}
 }
 
-func getLatestBlockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+func getLatestBlockStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	step++
 
 	// Test retry logic (for the moment, it's very simple, just one retry).
@@ -194,7 +194,7 @@ func TestGetLatestBlock(t *testing.T) {
 	req := &walletrpc.ChainSpec{}
 
 	// This does zcashd rpc "getblock", calls getLatestBlockStub() above
-	block, err := common.GetBlock(cache, 380640)
+	block, err := common.GetBlock(context.Background(), cache, 380640)
 	if err != nil {
 		t.Fatal("getBlockFromRPC failed", err)
 	}
@@ -229,7 +229,7 @@ var addressTests = []string{
 	"t1234567890123456789012345678901234\n", // newline after
 }
 
-func zcashdrpcStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	step++
 	switch method {
 	case "getaddresstxids":
@@ -363,7 +363,7 @@ func TestGetTaddressTransactionsNilArgs(t *testing.T) {
 	}
 }
 
-func getblockStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+func getblockStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	if method != "getblock" {
 		testT.Fatal("unexpected method:", method)
 	}
@@ -494,7 +494,7 @@ func TestGetBlockRangeNilArgs(t *testing.T) {
 	}
 }
 
-func sendrawtransactionStub(method string, params []json.RawMessage) (json.RawMessage, error) {
+func sendrawtransactionStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	step++
 	if method != "sendrawtransaction" {
 		testT.Fatal("unexpected method")
@@ -596,4 +596,43 @@ func TestMempoolFilter(t *testing.T) {
 		}
 	}
 
+}
+
+func TestPruneCompactBlockToNullifiers(t *testing.T) {
+	cb := &walletrpc.CompactBlock{
+		Vtx: []*walletrpc.CompactTx{
+			{
+				Actions: []*walletrpc.CompactOrchardAction{
+					{Nullifier: []byte{1}, Cmx: []byte{2}},
+				},
+				IronwoodActions: []*walletrpc.CompactOrchardAction{
+					{Nullifier: []byte{3}, Cmx: []byte{4}},
+				},
+				Outputs: []*walletrpc.CompactSaplingOutput{{Cmu: []byte{5}}},
+				Vin:     []*walletrpc.CompactTxIn{{PrevoutTxid: []byte{6}}},
+				Vout:    []*walletrpc.TxOut{{Value: 7}},
+			},
+		},
+		ChainMetadata: &walletrpc.ChainMetadata{
+			SaplingCommitmentTreeSize:  10,
+			OrchardCommitmentTreeSize:  20,
+			IronwoodCommitmentTreeSize: 30,
+		},
+	}
+	pruneCompactBlockToNullifiers(cb)
+	tx := cb.Vtx[0]
+	if len(tx.Actions) != 1 || len(tx.Actions[0].Cmx) != 0 || !bytes.Equal(tx.Actions[0].Nullifier, []byte{1}) {
+		t.Fatalf("orchard action not pruned to nullifier only: %+v", tx.Actions[0])
+	}
+	if len(tx.IronwoodActions) != 1 || len(tx.IronwoodActions[0].Cmx) != 0 || !bytes.Equal(tx.IronwoodActions[0].Nullifier, []byte{3}) {
+		t.Fatalf("ironwood action not pruned to nullifier only: %+v", tx.IronwoodActions[0])
+	}
+	if len(tx.Outputs) != 0 || len(tx.Vin) != 0 || len(tx.Vout) != 0 {
+		t.Fatalf("non-nullifier components not nil: outputs=%d vin=%d vout=%d", len(tx.Outputs), len(tx.Vin), len(tx.Vout))
+	}
+	if cb.ChainMetadata.SaplingCommitmentTreeSize != 0 ||
+		cb.ChainMetadata.OrchardCommitmentTreeSize != 0 ||
+		cb.ChainMetadata.IronwoodCommitmentTreeSize != 0 {
+		t.Fatalf("chain metadata tree sizes not zeroed: %+v", cb.ChainMetadata)
+	}
 }

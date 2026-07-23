@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -140,6 +141,7 @@ func startServer(opts *common.Options) error {
 		common.Log.Warningln("Starting insecure no-TLS (plaintext) server")
 		fmt.Println("Starting insecure server")
 		server = grpc.NewServer(
+			grpc.StatsHandler(&connStatsHandler{}),
 			grpc.StreamInterceptor(
 				grpc_middleware.ChainStreamServer(
 					grpc_prometheus.StreamServerInterceptor),
@@ -168,6 +170,7 @@ func startServer(opts *common.Options) error {
 		}
 		server = grpc.NewServer(
 			grpc.Creds(transportCreds),
+			grpc.StatsHandler(&connStatsHandler{}),
 			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
 				grpc_prometheus.StreamServerInterceptor),
 			),
@@ -190,23 +193,34 @@ func startServer(opts *common.Options) error {
 	// of block streamer.
 
 	var chainName string
-	var rpcClient *rpcclient.Client
+	var connCfg *rpcclient.ConnConfig
 	var err error
 	if opts.Darkside {
 		chainName = "darkside"
 	} else {
 		if opts.RPCUser != "" && opts.RPCPassword != "" && opts.RPCHost != "" && opts.RPCPort != "" {
-			rpcClient, err = frontend.NewZRPCFromFlags(opts)
+			connCfg = frontend.ConnConfigFromFlags(opts)
 		} else {
-			rpcClient, err = frontend.NewZRPCFromConf(opts.ZcashConfPath)
+			connCfg, err = frontend.ConnConfigFromConf(opts.ZcashConfPath)
 		}
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
 			}).Fatal("setting up RPC connection to zebrad or zcashd")
 		}
+		_, err = rpcclient.New(connCfg, nil)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("setting up RPC connection to zebrad or zcashd")
+		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
-		common.RawRequest = rpcClient.RawRequest
+		common.RawRequest, err = frontend.NewContextRawRequest(connCfg)
+		if err != nil {
+			common.Log.WithFields(logrus.Fields{
+				"error": err,
+			}).Fatal("setting up RPC connection to zebrad or zcashd")
+		}
 
 		// Ensure that we can communicate with zcashd
 		common.FirstRPC()
@@ -236,7 +250,7 @@ func startServer(opts *common.Options) error {
 			common.Log.Info("Detected zebrad backend; skipping experimental feature check")
 
 		case strings.Contains(subver, "/MagicBean:"):
-			result, rpcErr := common.RawRequest("getexperimentalfeatures", []json.RawMessage{})
+			result, rpcErr := common.RawRequest(context.Background(), "getexperimentalfeatures", []json.RawMessage{})
 			if rpcErr != nil {
 				common.Log.Fatalf("zcashd backend detected but getexperimentalfeatures RPC failed: %s", rpcErr.Error())
 			}
@@ -453,6 +467,7 @@ func init() {
 	// Indirect functions for test mocking (so unit tests can talk to stub functions)
 	common.Time.Sleep = time.Sleep
 	common.Time.Now = time.Now
+	common.Time.After = time.After
 }
 
 // initConfig reads in config file and ENV variables if set.

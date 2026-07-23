@@ -8,9 +8,19 @@ The most recent changes are listed first.
 
 ## [Unreleased]
 
+### Fixed
+
+- Make `common.RawRequest` context-aware so cancelled `GetBlockRange` /
+  `GetBlockRangeNullifiers` streams abort in-flight zcashd JSON-RPC calls
+  instead of holding a goroutine and RPC connection until the request
+  completes.
+
 ### Added
 
 - Add debug logging to gRPC entry and exit points.
+
+- Add the `grpc_server_connections_current` Prometheus gauge for active gRPC
+  client connections.
 
 - Add smoke test
 
@@ -26,8 +36,20 @@ The most recent changes are listed first.
   shielded, or a combination) of blocks (`GetBlockRange`) and transactions
   (`GetMempoolTx`).
 
+- Add Ironwood (NU6.3) support: compact block, tree state, and subtree
+  root data for the Ironwood pool, and parsing of ZIP 229 v6 transactions
+  using the finalized NU6.3 consensus IDs. Empty `poolTypes` requests now
+  include Ironwood shielded data. The darkside test framework tracks
+  Ironwood commitment tree sizes and exposes
+  `startIronwoodCommitmentTreeSize` via `DarksideMetaState`.
+
 
 ### Changed
+
+- Update to [zcash/lightwallet-protocol v0.5.0](https://github.com/zcash/lightwallet-protocol/releases/tag/v0.5.0),
+  which adds the Ironwood fields and removes the (never used)
+  `CompactBlock.protoVersion` field; the field number and name are now
+  reserved.
 
 - The `RawTransaction` values returned from a call to `GetMempoolStream`
   now report a `Height` value of `0`, in order to be consistent with
@@ -45,6 +67,19 @@ The most recent changes are listed first.
 
 - Call `setLatestHash()` during startup, to ensure the chain is correct
   if a reorg occurred while we were down (#563).
+
+- `GetMempoolTx` no longer crashes when a transaction leaves the mempool
+  between the `getrawmempool` and `getrawtransaction` calls.
+
+- `GetBlockRangeNullifiers` no longer includes transparent inputs and
+  outputs (`vin`/`vout`), consistent with `GetBlockNullifiers` and with
+  the documented behavior of the nullifier RPCs.
+
+- Darkside: `ClearAllTreeStates` now also clears the by-hash index, so
+  cleared tree states are no longer retrievable by block hash;
+  `RemoveTreeState` no longer crashes when the requested tree state does
+  not exist; `GetSubtreeRoots` with `maxEntries` of 0 now returns all
+  remaining roots instead of none.
 
 - GetLatestBlock should report latest block hash in little-endian
   format, not big-endian.

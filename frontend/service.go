@@ -121,7 +121,7 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	}
 	params := []json.RawMessage{param}
 
-	result, rpcErr := common.RawRequest("getaddresstxids", params)
+	result, rpcErr := common.RawRequest(resp.Context(), "getaddresstxids", params)
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
@@ -179,13 +179,35 @@ func (s *lwdStreamer) GetBlock(ctx context.Context, id *walletrpc.BlockID) (*wal
 		return nil, status.Error(codes.InvalidArgument,
 			"GetBlock: Block hash specifier is not yet implemented")
 	}
-	cBlock, err := common.GetBlock(s.cache, int(id.Height))
+	cBlock, err := common.GetBlock(ctx, s.cache, int(id.Height))
 
 	if err != nil {
 		return nil, err
 	}
 	common.Log.Tracef("  return: %+v\n", cBlock)
 	return cBlock, err
+}
+
+// pruneCompactBlockToNullifiers prunes the compact block, in place, down to
+// the data needed by the nullifier RPCs: Sapling spends (which are already
+// nullifier-only) and the nullifiers of Orchard and Ironwood actions.
+// Sapling outputs, transparent inputs and outputs, and commitment tree
+// sizes are removed to save bandwidth.
+func pruneCompactBlockToNullifiers(cBlock *walletrpc.CompactBlock) {
+	for _, tx := range cBlock.Vtx {
+		for i, action := range tx.Actions {
+			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+		}
+		for i, action := range tx.IronwoodActions {
+			tx.IronwoodActions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
+		}
+		tx.Outputs = nil
+		tx.Vin = nil
+		tx.Vout = nil
+	}
+	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
+	cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+	cBlock.ChainMetadata.IronwoodCommitmentTreeSize = 0
 }
 
 // GetBlockNullifiers is the same as GetBlock except that it returns the compact block
@@ -204,22 +226,12 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 		return nil, status.Error(codes.InvalidArgument,
 			"GetBlockNullifiers: GetBlock by Hash is not yet implemented")
 	}
-	cBlock, err := common.GetBlock(s.cache, int(id.Height))
+	cBlock, err := common.GetBlock(ctx, s.cache, int(id.Height))
 	if err != nil {
 		// GetBlock() returns gRPC-compatible errors.
 		return nil, err
 	}
-	for _, tx := range cBlock.Vtx {
-		for i, action := range tx.Actions {
-			tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
-		}
-		tx.Outputs = nil
-		tx.Vin = nil
-		tx.Vout = nil
-	}
-	// these are not needed (we prefer to save bandwidth)
-	cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
-	cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+	pruneCompactBlockToNullifiers(cBlock)
 	common.Log.Tracef("  return: %+v\n", cBlock)
 	return cBlock, err
 }
@@ -229,16 +241,21 @@ func (s *lwdStreamer) GetBlockNullifiers(ctx context.Context, id *walletrpc.Bloc
 // 'end' inclusively.
 func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeServer) error {
 	common.Log.Debugf("gRPC GetBlockRange(%+v)\n", span)
-	blockChan := make(chan *walletrpc.CompactBlock)
 	if span.Start == nil || span.End == nil {
 		return status.Error(codes.InvalidArgument,
 			"GetBlockRange: must specify start and end heights")
 	}
+	ctx := resp.Context()
+	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, span)
+	go common.GetBlockRange(ctx, s.cache, blockChan, errChan, span)
 
 	for {
 		select {
+		case <-ctx.Done():
+			// Client cancelled / deadline exceeded; the producer's select-on-ctx
+			// will unblock its in-flight send and exit.
+			return ctx.Err()
 		case err := <-errChan:
 			// this will also catch context.DeadlineExceeded from the timeout
 			return err
@@ -255,7 +272,6 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 // the actions contain only nullifiers (a subset of the full compact block).
 func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp walletrpc.CompactTxStreamer_GetBlockRangeNullifiersServer) error {
 	common.Log.Debugf("gRPC GetBlockRangeNullifiers(%+v)\n", span)
-	blockChan := make(chan *walletrpc.CompactBlock)
 	if span.Start == nil || span.End == nil {
 		return status.Error(codes.InvalidArgument,
 			"GetBlockRangeNullifiers: must specify start and end heights")
@@ -269,24 +285,22 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 		}
 	}
 	span.PoolTypes = filtered
+	ctx := resp.Context()
+	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
-	go common.GetBlockRange(s.cache, blockChan, errChan, span)
+	go common.GetBlockRange(ctx, s.cache, blockChan, errChan, span)
 
 	for {
 		select {
+		case <-ctx.Done():
+			// Client cancelled / deadline exceeded; the producer's select-on-ctx
+			// will unblock its in-flight send and exit.
+			return ctx.Err()
 		case err := <-errChan:
 			// this will also catch context.DeadlineExceeded from the timeout
 			return err
 		case cBlock := <-blockChan:
-			for _, tx := range cBlock.Vtx {
-				for i, action := range tx.Actions {
-					tx.Actions[i] = &walletrpc.CompactOrchardAction{Nullifier: action.Nullifier}
-				}
-				tx.Outputs = nil
-			}
-			// these are not needed (we prefer to save bandwidth)
-			cBlock.ChainMetadata.SaplingCommitmentTreeSize = 0
-			cBlock.ChainMetadata.OrchardCommitmentTreeSize = 0
+			pruneCompactBlockToNullifiers(cBlock)
 			if err := resp.Send(cBlock); err != nil {
 				return err
 			}
@@ -327,7 +341,16 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 	}
 	var gettreestateReply common.ZcashdRpcReplyGettreestate
 	for {
-		result, rpcErr := common.RawRequest("z_gettreestate", params)
+		// Hygiene companion to PR #560: observe client cancel between
+		// RawRequest calls. In practice this loop terminates in one iteration
+		// on the active chain because zcashd's z_gettreestate hard-stops the
+		// SkipHash walk at the Sapling activation height (zcashd
+		// src/rpc/blockchain.cpp:1411). This check is for symmetry with the
+		// other streaming-RPC ctx-checks, not for DoS defense.
+		if err := ctx.Err(); err != nil {
+			return nil, status.FromContextError(err).Err()
+		}
+		result, rpcErr := common.RawRequest(ctx, "z_gettreestate", params)
 		if rpcErr != nil {
 			return nil, status.Errorf(codes.InvalidArgument,
 				"GetTreeState: z_gettreestate failed: %s", rpcErr.Error())
@@ -355,12 +378,13 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 			"GetTreeState: z_gettreestate did not return treestate")
 	}
 	r := &walletrpc.TreeState{
-		Network:     s.chainName,
-		Height:      uint64(gettreestateReply.Height),
-		Hash:        gettreestateReply.Hash,
-		Time:        gettreestateReply.Time,
-		SaplingTree: gettreestateReply.Sapling.Commitments.FinalState,
-		OrchardTree: gettreestateReply.Orchard.Commitments.FinalState,
+		Network:      s.chainName,
+		Height:       uint64(gettreestateReply.Height),
+		Hash:         gettreestateReply.Hash,
+		Time:         gettreestateReply.Time,
+		SaplingTree:  gettreestateReply.Sapling.Commitments.FinalState,
+		OrchardTree:  gettreestateReply.Orchard.Commitments.FinalState,
+		IronwoodTree: gettreestateReply.Ironwood.Commitments.FinalState,
 	}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
@@ -399,7 +423,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 		}
 
 		params := []json.RawMessage{txidJSON, json.RawMessage("1")}
-		result, rpcErr := common.RawRequest("getrawtransaction", params)
+		result, rpcErr := common.RawRequest(ctx, "getrawtransaction", params)
 		if rpcErr != nil {
 			// For some reason, the error responses are not JSON
 			return nil, status.Errorf(codes.NotFound,
@@ -454,7 +478,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 		return nil, status.Errorf(codes.InvalidArgument, "cannot marshal tx: %s", err.Error())
 	}
 	params[0] = txJSON
-	result, rpcErr := common.RawRequest("sendrawtransaction", params)
+	result, rpcErr := common.RawRequest(ctx, "sendrawtransaction", params)
 
 	var errCode int64
 	var errMsg string
@@ -489,7 +513,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	return r, nil
 }
 
-func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, error) {
+func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*walletrpc.Balance, error) {
 	for _, addr := range addressList {
 		if err := checkTaddress(addr); err != nil {
 			return nil, err
@@ -505,7 +529,7 @@ func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, erro
 	}
 	params[0] = param
 
-	result, rpcErr := common.RawRequest("getaddressbalance", params)
+	result, rpcErr := common.RawRequest(ctx, "getaddressbalance", params)
 	if rpcErr != nil {
 		var code codes.Code
 		switch {
@@ -529,7 +553,7 @@ func getTaddressBalanceZcashdRpc(addressList []string) (*walletrpc.Balance, erro
 // GetTaddressBalance returns the total balance for a list of taddrs
 func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
 	common.Log.Debugf("gRPC GetTaddressBalance(%+v)\n", addresses)
-	r, err := getTaddressBalanceZcashdRpc(addresses.Addresses)
+	r, err := getTaddressBalanceZcashdRpc(ctx, addresses.Addresses)
 	if err == nil {
 		common.Log.Tracef("  return: %+v\n", r)
 	}
@@ -550,7 +574,7 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 		}
 		addressList = append(addressList, addr.Address)
 	}
-	balance, err := getTaddressBalanceZcashdRpc(addressList)
+	balance, err := getTaddressBalanceZcashdRpc(addresses.Context(), addressList)
 	if err != nil {
 		return err
 	}
@@ -561,7 +585,7 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 
 func (s *lwdStreamer) GetMempoolStream(_empty *walletrpc.Empty, resp walletrpc.CompactTxStreamer_GetMempoolStreamServer) error {
 	common.Log.Debugf("gRPC GetMempoolStream()\n")
-	err := common.GetMempool(func(tx *walletrpc.RawTransaction) error {
+	err := common.GetMempool(resp.Context(), func(tx *walletrpc.RawTransaction) error {
 		return resp.Send(tx)
 	})
 	return err
@@ -589,20 +613,22 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
 	}
 	if len(exclude.PoolTypes) == 0 {
-		// legacy behavior: return only blocks containing shielded components.
+		// Return all shielded pools when no explicit pool filter is requested.
 		exclude.PoolTypes = []walletrpc.PoolType{
 			walletrpc.PoolType_SAPLING,
 			walletrpc.PoolType_ORCHARD,
+			walletrpc.PoolType_IRONWOOD,
 		}
 	}
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
+	streamCtx := resp.Context()
 	if time.Since(lastMempool).Seconds() >= 2 {
 		lastMempool = time.Now()
 		// Refresh our copy of the mempool.
 		params := make([]json.RawMessage, 0)
-		result, rpcErr := common.RawRequest("getrawmempool", params)
+		result, rpcErr := common.RawRequest(streamCtx, "getrawmempool", params)
 		if rpcErr != nil {
 			return status.Errorf(codes.Internal, "GetMempoolTx: getrawmempool error: %s", rpcErr.Error())
 		}
@@ -629,7 +655,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			// The "0" is because we only need the raw hex, which is returned as
 			// just a hex string, and not even a json string (with quotes).
 			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
-			result, rpcErr := common.RawRequest("getrawtransaction", params)
+			result, rpcErr := common.RawRequest(streamCtx, "getrawtransaction", params)
 			if rpcErr != nil {
 				// Not an error; mempool transactions can disappear
 				continue
@@ -678,7 +704,14 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		if ftx := common.FilterTxPool((*mempoolMap)[txid], exclude.PoolTypes); ftx != nil {
+		ctx, ok := (*mempoolMap)[txid]
+		if !ok {
+			// The transaction was in getrawmempool's reply but its
+			// getrawtransaction failed (it may have been mined or evicted
+			// in between); it will be picked up on the next refresh.
+			continue
+		}
+		if ftx := common.FilterTxPool(ctx, exclude.PoolTypes); ftx != nil {
 			err := resp.Send(ftx)
 			if err != nil {
 				return err
@@ -727,7 +760,7 @@ func MempoolFilter(items, exclude []string) []string {
 	return tosend
 }
 
-func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
+func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
 	for _, a := range arg.Addresses {
 		if err := checkTaddress(a); err != nil {
 			return err
@@ -742,7 +775,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 			"getAddressUtxos: failed to marshal addrList, error: %s", err.Error())
 	}
 	params := []json.RawMessage{param}
-	result, rpcErr := common.RawRequest("getaddressutxos", params)
+	result, rpcErr := common.RawRequest(ctx, "getaddressutxos", params)
 	if rpcErr != nil {
 		var code codes.Code
 		switch {
@@ -798,7 +831,7 @@ func getAddressUtxos(arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAdd
 func (s *lwdStreamer) GetAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg) (*walletrpc.GetAddressUtxosReplyList, error) {
 	common.Log.Debugf("gRPC GetAddressUtxos(%+v)\n", arg)
 	addressUtxos := make([]*walletrpc.GetAddressUtxosReply, 0)
-	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
+	err := getAddressUtxos(ctx, arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
 		addressUtxos = append(addressUtxos, utxo)
 		return nil
 	})
@@ -818,6 +851,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 	switch arg.ShieldedProtocol {
 	case walletrpc.ShieldedProtocol_sapling:
 	case walletrpc.ShieldedProtocol_orchard:
+	case walletrpc.ShieldedProtocol_ironwood:
 		break
 	default:
 		return errors.New("unrecognized shielded protocol")
@@ -844,7 +878,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 		}
 		params = append(params, maxEntriesJSON)
 	}
-	result, rpcErr := common.RawRequest("z_getsubtreesbyindex", params)
+	result, rpcErr := common.RawRequest(resp.Context(), "z_getsubtreesbyindex", params)
 	if rpcErr != nil {
 		return status.Errorf(codes.InvalidArgument,
 			"GetSubtreeRoots: z_getsubtreesbyindex, error: %s", rpcErr.Error())
@@ -856,8 +890,11 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 			"GetSubtreeRoots: failed to unmarshal z_getsubtreesbyindex reply, error: %s", err.Error())
 	}
 	for i := 0; i < len(reply.Subtrees); i++ {
+		if err := resp.Context().Err(); err != nil {
+			return status.FromContextError(err).Err()
+		}
 		subtree := reply.Subtrees[i]
-		block, err := common.GetBlock(s.cache, subtree.End_height)
+		block, err := common.GetBlock(resp.Context(), s.cache, subtree.End_height)
 		if block == nil {
 			// It may be worth trying to determine a more specific error code
 			return status.Error(codes.Internal, err.Error())
@@ -882,7 +919,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 
 func (s *lwdStreamer) GetAddressUtxosStream(arg *walletrpc.GetAddressUtxosArg, resp walletrpc.CompactTxStreamer_GetAddressUtxosStreamServer) error {
 	common.Log.Debugf("gRPC GetAddressUtxosStream(%+v)\n", arg)
-	err := getAddressUtxos(arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
+	err := getAddressUtxos(resp.Context(), arg, func(utxo *walletrpc.GetAddressUtxosReply) error {
 		return resp.Send(utxo)
 	})
 	if err != nil {
@@ -927,6 +964,7 @@ func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMeta
 		ms.ChainName,
 		ms.StartSaplingCommitmentTreeSize,
 		ms.StartOrchardCommitmentTreeSize,
+		ms.StartIronwoodCommitmentTreeSize,
 	)
 	if err != nil {
 		common.Log.Fatal("Reset failed, error: ", err.Error())
@@ -1078,12 +1116,13 @@ func (s *DarksideStreamer) ClearAddressTransactions(ctx context.Context, arg *wa
 // Adds a tree state to the cached tree states
 func (s *DarksideStreamer) AddTreeState(ctx context.Context, arg *walletrpc.TreeState) (*walletrpc.Empty, error) {
 	tree := common.DarksideTreeState{
-		Network:     arg.Network,
-		Height:      arg.Height,
-		Hash:        arg.Hash,
-		Time:        arg.Time,
-		SaplingTree: arg.SaplingTree,
-		OrchardTree: arg.OrchardTree,
+		Network:      arg.Network,
+		Height:       arg.Height,
+		Hash:         arg.Hash,
+		Time:         arg.Time,
+		SaplingTree:  arg.SaplingTree,
+		OrchardTree:  arg.OrchardTree,
+		IronwoodTree: arg.IronwoodTree,
 	}
 	err := common.DarksideAddTreeState(tree)
 

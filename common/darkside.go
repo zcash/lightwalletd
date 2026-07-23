@@ -2,6 +2,7 @@ package common
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -34,6 +35,8 @@ type darksideState struct {
 	startSaplingTreeSize uint32
 	// Size of the Orchard commitment tree as of `startHeight - 1`.
 	startOrchardTreeSize uint32
+	// Size of the Ironwood commitment tree as of `startHeight - 1`.
+	startIronwoodTreeSize uint32
 
 	// These blocks (up to and including tip) are presented by mock zcashd.
 	// activeBlocks[0] is the block at height startHeight.
@@ -67,7 +70,7 @@ type darksideState struct {
 	cacheBlockIndex int
 
 	// Cache of artificial z_getsubtreebyindex subtree entries,
-	// indexed by protocol (currently, sapling (0) or orchard (1)).
+	// indexed by protocol (sapling (0), orchard (1), or ironwood (2)).
 	subtrees map[walletrpc.ShieldedProtocol]darksideProtocolSubtreeRoots
 }
 
@@ -79,25 +82,28 @@ var state darksideState
 var mutex sync.Mutex
 
 type activeBlock struct {
-	bytes           []byte
-	saplingTreeSize uint32
-	orchardTreeSize uint32
+	bytes            []byte
+	saplingTreeSize  uint32
+	orchardTreeSize  uint32
+	ironwoodTreeSize uint32
 }
 
 type stagedTx struct {
-	height         int
-	saplingOutputs int
-	orchardActions int
-	bytes          []byte
+	height          int
+	saplingOutputs  int
+	orchardActions  int
+	ironwoodActions int
+	bytes           []byte
 }
 
 type DarksideTreeState struct {
-	Network     string
-	Height      uint64
-	Hash        string
-	Time        uint32
-	SaplingTree string
-	OrchardTree string
+	Network      string
+	Height       uint64
+	Hash         string
+	Time         uint32
+	SaplingTree  string
+	OrchardTree  string
+	IronwoodTree string
 }
 
 type darksideSubtree struct {
@@ -135,7 +141,12 @@ func DarksideInit(c *BlockCache, timeout int) {
 	Log.Info("Darkside mode running")
 	DarksideEnabled = true
 	state.cache = c
-	RawRequest = darksideRawRequest
+	RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return darksideRawRequest(method, params)
+	}
 	go func() {
 		time.Sleep(time.Duration(timeout) * time.Minute)
 		Log.Fatal("Shutting down darksidewalletd to prevent accidental deployment in production.")
@@ -144,7 +155,7 @@ func DarksideInit(c *BlockCache, timeout int) {
 
 // DarksideReset allows the wallet test code to specify values
 // that are returned by GetLightdInfo().
-func DarksideReset(sa int, bi, cn string, sst, sot uint32) error {
+func DarksideReset(sa int, bi, cn string, sst, sot, sit uint32) error {
 	Log.Info("DarksideReset(saplingActivation=", sa, ")")
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -157,6 +168,7 @@ func DarksideReset(sa int, bi, cn string, sst, sot uint32) error {
 		chainName:              cn,
 		startSaplingTreeSize:   sst,
 		startOrchardTreeSize:   sot,
+		startIronwoodTreeSize:  sit,
 		cache:                  state.cache,
 		activeBlocks:           make([]*activeBlock, 0),
 		stagedBlocks:           make([][]byte, 0),
@@ -190,7 +202,7 @@ func addBlockActive(blockBytes []byte) error {
 		return errors.New(fmt.Sprint("adding block at height ", blockHeight,
 			" is lower than Sapling activation height ", state.startHeight))
 	}
-	// Determine the Sapling and Orchard commitment tree sizes for the new block.
+	// Determine the Sapling, Orchard, and Ironwood commitment tree sizes for the new block.
 	countSaplingOutputs := func(block *parser.Block) uint32 {
 		var count = 0
 		for _, tx := range block.Transactions() {
@@ -205,24 +217,35 @@ func addBlockActive(blockBytes []byte) error {
 		}
 		return uint32(count)
 	}
+	countIronwoodActions := func(block *parser.Block) uint32 {
+		var count = 0
+		for _, tx := range block.Transactions() {
+			count += tx.IronwoodActionsCount()
+		}
+		return uint32(count)
+	}
 	var prevSaplingTreeSize uint32
 	var prevOrchardTreeSize uint32
+	var prevIronwoodTreeSize uint32
 	if blockHeight-state.startHeight > 0 {
 		// The new block connects to the previous one.
 		prevSaplingTreeSize = state.activeBlocks[blockHeight-state.startHeight-1].saplingTreeSize
 		prevOrchardTreeSize = state.activeBlocks[blockHeight-state.startHeight-1].orchardTreeSize
+		prevIronwoodTreeSize = state.activeBlocks[blockHeight-state.startHeight-1].ironwoodTreeSize
 	} else {
 		// This is the first block.
 		prevSaplingTreeSize = state.startSaplingTreeSize
 		prevOrchardTreeSize = state.startOrchardTreeSize
+		prevIronwoodTreeSize = state.startIronwoodTreeSize
 	}
 	// Drop the block that will be overwritten, and its children, then add block.
 	state.activeBlocks = state.activeBlocks[:blockHeight-state.startHeight]
 	state.activeBlocks = append(state.activeBlocks,
 		&activeBlock{
-			bytes:           blockBytes,
-			saplingTreeSize: prevSaplingTreeSize + countSaplingOutputs(block),
-			orchardTreeSize: prevOrchardTreeSize + countOrchardActions(block),
+			bytes:            blockBytes,
+			saplingTreeSize:  prevSaplingTreeSize + countSaplingOutputs(block),
+			orchardTreeSize:  prevOrchardTreeSize + countOrchardActions(block),
+			ironwoodTreeSize: prevIronwoodTreeSize + countIronwoodActions(block),
 		})
 	return nil
 }
@@ -232,6 +255,9 @@ func setPrevhash() {
 	prevhash := hash32.Nil
 	for _, activeBlock := range state.activeBlocks {
 		// Set this block's prevhash.
+		if prevhash != hash32.Nil {
+			copy(activeBlock.bytes[4:4+32], prevhash[:])
+		}
 		block := parser.NewBlock()
 		rest, err := block.ParseFromSlice(activeBlock.bytes)
 		if err != nil {
@@ -239,9 +265,6 @@ func setPrevhash() {
 		}
 		if len(rest) != 0 {
 			Log.Fatal(errors.New("block is too long"))
-		}
-		if prevhash != hash32.Nil {
-			copy(activeBlock.bytes[4:4+32], prevhash[:])
 		}
 		prevhash = block.GetEncodableHash()
 		Log.Info("Darkside active block height ", block.GetHeight(), " hash ",
@@ -321,6 +344,7 @@ func DarksideApplyStaged(height int) error {
 		for _, b := range state.activeBlocks[tx.height-state.startHeight:] {
 			b.saplingTreeSize += uint32(tx.saplingOutputs)
 			b.orchardTreeSize += uint32(tx.orchardActions)
+			b.ironwoodTreeSize += uint32(tx.ironwoodActions)
 		}
 	}
 	maxHeight := state.startHeight + len(state.activeBlocks) - 1
@@ -588,6 +612,9 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 					Orchard struct {
 						Size uint32
 					}
+					Ironwood struct {
+						Size uint32
+					}
 				}
 			}
 			r.Tx = make([]string, 0)
@@ -597,6 +624,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			r.Hash = block.GetDisplayHashString()
 			r.Trees.Sapling.Size = state.activeBlocks[blockIndex].saplingTreeSize
 			r.Trees.Orchard.Size = state.activeBlocks[blockIndex].orchardTreeSize
+			r.Trees.Ironwood.Size = state.activeBlocks[blockIndex].ironwoodTreeSize
 			state.cacheBlockHash = r.Hash
 			state.cacheBlockIndex = blockIndex
 			return json.Marshal(r)
@@ -735,6 +763,10 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 			zcashdTreeState.Orchard.Commitments.FinalState = treeState.OrchardTree
 		}
 
+		if treeState.IronwoodTree != "" {
+			zcashdTreeState.Ironwood.Commitments.FinalState = treeState.IronwoodTree
+		}
+
 		return json.Marshal(zcashdTreeState)
 
 	case "z_getsubtreesbyindex":
@@ -757,7 +789,7 @@ func DarksideGetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp walletrpc.C
 	}
 	sliceIndex := arg.StartIndex - subtrees.startIndex
 	var limit int = len(subtrees.subtrees) - int(sliceIndex)
-	if limit > int(arg.MaxEntries) {
+	if arg.MaxEntries > 0 && limit > int(arg.MaxEntries) {
 		limit = int(arg.MaxEntries)
 	}
 	for i := 0; i < limit; i++ {
@@ -882,10 +914,11 @@ func stageTransaction(height int, txBytes []byte) error {
 	}
 	state.stagedTransactions = append(state.stagedTransactions,
 		stagedTx{
-			height:         height,
-			saplingOutputs: tx.SaplingOutputsCount(),
-			orchardActions: tx.OrchardActionsCount(),
-			bytes:          txBytes,
+			height:          height,
+			saplingOutputs:  tx.SaplingOutputsCount(),
+			orchardActions:  tx.OrchardActionsCount(),
+			ironwoodActions: tx.IronwoodActionsCount(),
+			bytes:           txBytes,
 		})
 	return nil
 }
@@ -964,6 +997,7 @@ func DarksideClearAddressTransactions() error {
 func DarksideClearAllTreeStates() error {
 	mutex.Lock()
 	state.stagedTreeStates = make(map[uint64]*DarksideTreeState)
+	state.stagedTreeStatesByHash = make(map[string]*DarksideTreeState)
 	mutex.Unlock()
 	return nil
 }
@@ -986,16 +1020,18 @@ func DarksideRemoveTreeState(arg *walletrpc.BlockID) error {
 	if !state.resetted || state.stagedTreeStates == nil {
 		return errors.New("please call Reset first")
 	}
+	var treestate *DarksideTreeState
 	if arg.Height > 0 {
-		treestate := state.stagedTreeStates[arg.Height]
-		delete(state.stagedTreeStatesByHash, treestate.Hash)
-		delete(state.stagedTreeStates, treestate.Height)
+		treestate = state.stagedTreeStates[arg.Height]
 	} else {
 		h := hex.EncodeToString(arg.Hash)
-		treestate := state.stagedTreeStatesByHash[h]
-		delete(state.stagedTreeStatesByHash, treestate.Hash)
-		delete(state.stagedTreeStates, treestate.Height)
+		treestate = state.stagedTreeStatesByHash[h]
 	}
+	if treestate == nil {
+		return nil
+	}
+	delete(state.stagedTreeStatesByHash, treestate.Hash)
+	delete(state.stagedTreeStates, treestate.Height)
 	return nil
 }
 

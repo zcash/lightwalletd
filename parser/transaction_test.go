@@ -4,6 +4,7 @@
 package parser
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"os"
@@ -111,5 +112,141 @@ func TestV5TransactionParser(t *testing.T) {
 		if len(tx.orchardActions) != int(txtestdata.NActionsOrchard) {
 			t.Fatal("NActionsOrchard miscompare")
 		}
+	}
+}
+
+func TestZip229V6TransactionParser(t *testing.T) {
+	// header: fOverwintered | version 6
+	// nVersionGroupId: 0xD884B698 (NU6.3)
+	// nConsensusBranchId: 0x37A5165B (NU6.3)
+	// lock_time, nExpiryHeight: 0
+	// tx_in_count, tx_out_count: 0
+	// nShieldedSpend, nShieldedOutput: 0
+	// nActionsOrchard: 0
+	// nActionsIronwood: 0
+	rawTxData, err := hex.DecodeString("0600008098b684d85b16a5370000000000000000000000000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx := NewTransaction()
+	rest, err := tx.ParseFromSlice(rawTxData)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if len(rest) != 0 {
+		t.Fatalf("Test did not consume entire buffer, %d remaining", len(rest))
+	}
+	if tx.version != ZIP229_TX_VERSION {
+		t.Fatal("version miscompare")
+	}
+	if tx.nVersionGroupID != NU6_3_VERSION_GROUP_ID {
+		t.Fatal("nVersionGroupId miscompare")
+	}
+	if tx.consensusBranchID != NU6_3_CONSENSUS_BRANCH_ID {
+		t.Fatal("consensusBranchID miscompare")
+	}
+	if len(tx.transparentInputs) != 0 {
+		t.Fatal("tx_in_count miscompare")
+	}
+	if len(tx.transparentOutputs) != 0 {
+		t.Fatal("tx_out_count miscompare")
+	}
+	if len(tx.shieldedSpends) != 0 {
+		t.Fatal("NSpendsSapling miscompare")
+	}
+	if len(tx.shieldedOutputs) != 0 {
+		t.Fatal("NOutputsSapling miscompare")
+	}
+	if len(tx.orchardActions) != 0 {
+		t.Fatal("NActionsOrchard miscompare")
+	}
+	if len(tx.ironwoodActions) != 0 {
+		t.Fatal("NActionsIronwood miscompare")
+	}
+}
+
+func TestZip229V6TransactionParserAcceptsOtherConsensusBranchID(t *testing.T) {
+	// Same as above but with the consensus branch ID of some future
+	// network upgrade (0x4C89A1F3). nConsensusBranchId identifies the
+	// consensus epoch the transaction is mined in, not the epoch that
+	// introduced the v6 format, so the parser must accept v6
+	// transactions carrying branch IDs of upgrades after NU6.3.
+	rawTxData, err := hex.DecodeString("0600008098b684d8f3a1894c0000000000000000000000000000")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tx := NewTransaction()
+	rest, err := tx.ParseFromSlice(rawTxData)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if len(rest) != 0 {
+		t.Fatalf("Test did not consume entire buffer, %d remaining", len(rest))
+	}
+	if tx.consensusBranchID != 0x4C89A1F3 {
+		t.Fatal("consensusBranchID miscompare")
+	}
+}
+
+func TestZip229V6TransactionParserKeepsIronwoodBundle(t *testing.T) {
+	var raw bytes.Buffer
+	raw.Write([]byte{
+		0x06, 0x00, 0x00, 0x80, // fOverwintered | version 6
+		0x98, 0xb6, 0x84, 0xd8, // version group ID (NU6.3)
+		0x5b, 0x16, 0xa5, 0x37, // consensus branch ID (NU6.3)
+		0x00, 0x00, 0x00, 0x00, // lock time
+		0x00, 0x00, 0x00, 0x00, // expiry height
+		0x00, // tx_in_count
+		0x00, // tx_out_count
+		0x00, // nShieldedSpend
+		0x00, // nShieldedOutput
+	})
+	appendOrchardLikeBundle(&raw, 1) // Orchard bundle
+	appendOrchardLikeBundle(&raw, 1) // Ironwood bundle
+	raw.Write([]byte{0xaa, 0xbb})    // trailing bytes
+
+	tx := NewTransaction()
+	rest, err := tx.ParseFromSlice(raw.Bytes())
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if len(rest) != 2 {
+		t.Fatalf("expected two trailing bytes, got %d", len(rest))
+	}
+	if !bytes.Equal(rest, []byte{0xaa, 0xbb}) {
+		t.Fatal("trailing bytes miscompare")
+	}
+	if len(tx.orchardActions) != 1 {
+		t.Fatal("NActionsOrchard miscompare")
+	}
+	if len(tx.ironwoodActions) != 1 {
+		t.Fatal("NActionsIronwood miscompare")
+	}
+	compact := tx.ToCompact(0)
+	if len(compact.Actions) != 1 {
+		t.Fatal("compact orchard action count miscompare")
+	}
+	if len(compact.IronwoodActions) != 1 {
+		t.Fatal("compact ironwood action count miscompare")
+	}
+	if len(tx.rawBytes) != raw.Len()-len(rest) {
+		t.Fatal("raw transaction length miscompare")
+	}
+}
+
+func appendOrchardLikeBundle(raw *bytes.Buffer, actionsCount int) {
+	raw.WriteByte(byte(actionsCount))
+	for i := 0; i < actionsCount; i++ {
+		raw.Write(bytes.Repeat([]byte{byte(i + 1)}, 820))
+	}
+	if actionsCount > 0 {
+		raw.WriteByte(0x00)                      // flags
+		raw.Write(make([]byte, 8))               // value balance
+		raw.Write(make([]byte, 32))              // anchor
+		raw.WriteByte(0x00)                      // proofs length
+		raw.Write(make([]byte, 64*actionsCount)) // spend auth signatures
+		raw.Write(make([]byte, 64))              // binding signature
 	}
 }

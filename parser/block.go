@@ -109,7 +109,6 @@ func (b *Block) GetPrevHash() hash32.T {
 // ToCompact returns the compact representation of the full block.
 func (b *Block) ToCompact() *walletrpc.CompactBlock {
 	compactBlock := &walletrpc.CompactBlock{
-		//TODO ProtoVersion: 1,
 		Height:        uint64(b.GetHeight()),
 		PrevHash:      hash32.ToSlice(b.hdr.HashPrevBlock),
 		Hash:          hash32.ToSlice(b.GetEncodableHash()),
