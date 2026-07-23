@@ -65,6 +65,9 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- Call `setLatestHash()` during startup, to ensure the chain is correct
+  if a reorg occurred while we were down (#563).
+
 - `GetMempoolTx` no longer crashes when a transaction leaves the mempool
   between the `getrawmempool` and `getrawtransaction` calls.
 

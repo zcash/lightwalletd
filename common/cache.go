@@ -126,7 +126,8 @@ func (c *BlockCache) readBlock(height int) *walletrpc.CompactBlock {
 	return block
 }
 
-// Caller should hold c.mutex.Lock().
+// Caller should hold c.mutex.Lock() (unless being called from startServer()/NewBlockCache()
+// during startup, when the server is single-threaded).
 func (c *BlockCache) setLatestHash() {
 	c.latestHash = hash32.Nil
 	// There is at least one block; get the last block's hash
@@ -221,6 +222,12 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 		c.nextBlock++
 	}
 	Log.Info("Done reading ", c.nextBlock-c.firstBlock, " blocks from disk cache")
+
+	// Initialize latestHash from the last block on disk so that the first
+	// block ingested after a restart is checked against the cache tip.
+	// Otherwise, a reorg that occurred while the server was down would go
+	// undetected, permanently leaving orphan blocks in the cache.
+	c.setLatestHash()
 	return c
 }
 
