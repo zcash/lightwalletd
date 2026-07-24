@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -248,5 +249,189 @@ func appendOrchardLikeBundle(raw *bytes.Buffer, actionsCount int) {
 		raw.WriteByte(0x00)                      // proofs length
 		raw.Write(make([]byte, 64*actionsCount)) // spend auth signatures
 		raw.Write(make([]byte, 64))              // binding signature
+	}
+}
+
+func TestParseTransparentRejectsCountsThatCannotFit(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			name:    "transparent inputs",
+			data:    []byte{0x01},
+			wantErr: "tx_in_count 1 requires at least 41 bytes, but only 0 remain",
+		},
+		{
+			name:    "transparent outputs",
+			data:    []byte{0x00, 0x01},
+			wantErr: "tx_out_count 1 requires at least 9 bytes, but only 0 remain",
+		},
+		{
+			// A count far larger than one, with a non-trivial amount of input
+			// left, to exercise the division rather than the count==1 edge.
+			name:    "many transparent outputs",
+			data:    append([]byte{0x00, 0xfd, 0xe8, 0x03}, make([]byte, 100)...),
+			wantErr: "tx_out_count 1000 requires at least 9000 bytes, but only 100 remain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := NewTransaction()
+			_, err := tx.ParseTransparent(tt.data)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// The bounds checks must never reject input that would otherwise have parsed.
+// Feed each check a structure holding exactly its minimum-size elements, so a
+// bound that was tightened by even one byte would fail here.
+func TestBoundsChecksAcceptMinimallySizedElements(t *testing.T) {
+	var raw bytes.Buffer
+	raw.WriteByte(0x01)         // tx_in_count
+	raw.Write(make([]byte, 32)) // prevout hash
+	raw.Write(make([]byte, 4))  // prevout index
+	raw.WriteByte(0x00)         // script length (empty script)
+	raw.Write(make([]byte, 4))  // sequence
+	raw.WriteByte(0x01)         // tx_out_count
+	raw.Write(make([]byte, 8))  // value
+	raw.WriteByte(0x00)         // script length (empty script)
+
+	tx := NewTransaction()
+	rest, err := tx.ParseTransparent(raw.Bytes())
+	if err != nil {
+		t.Fatalf("minimally sized transparent elements rejected: %v", err)
+	}
+	if len(rest) != 0 {
+		t.Fatalf("did not consume entire buffer, %d remaining", len(rest))
+	}
+	if len(tx.transparentInputs) != 1 {
+		t.Fatal("tx_in_count miscompare")
+	}
+	if len(tx.transparentOutputs) != 1 {
+		t.Fatal("tx_out_count miscompare")
+	}
+}
+
+func requireErrorContains(t *testing.T, err error, want string) {
+	t.Helper()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), want) {
+		t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, want)
+	}
+}
+
+func saplingV4Prefix() []byte {
+	return []byte{
+		0x00,                   // tx_in_count
+		0x00,                   // tx_out_count
+		0x00, 0x00, 0x00, 0x00, // nLockTime
+		0x00, 0x00, 0x00, 0x00, // nExpiryHeight
+		0x00, 0x00, 0x00, 0x00, // valueBalanceSapling (int64)
+		0x00, 0x00, 0x00, 0x00,
+	}
+}
+
+func TestParsePreV5RejectsCountsThatCannotFit(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			name:    "sapling spends",
+			data:    append(saplingV4Prefix(), 0x01),
+			wantErr: "nShieldedSpend 1 requires at least 384 bytes, but only 0 remain",
+		},
+		{
+			name:    "sapling outputs",
+			data:    append(saplingV4Prefix(), 0x00, 0x01),
+			wantErr: "nShieldedOutput 1 requires at least 948 bytes, but only 0 remain",
+		},
+		{
+			name:    "join splits",
+			data:    append(saplingV4Prefix(), 0x00, 0x00, 0x01),
+			wantErr: "nJoinSplit 1 requires at least 1698 bytes, but only 0 remain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := NewTransaction()
+			tx.fOverwintered = true
+			tx.version = SAPLING_TX_VERSION
+			tx.nVersionGroupID = SAPLING_VERSION_GROUP_ID
+
+			_, err := tx.parsePreV5(tt.data)
+			requireErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+func zip225V5Prefix() []byte {
+	return []byte{
+		0x00, 0x00, 0x00, 0x00, // nConsensusBranchId
+		0x00, 0x00, 0x00, 0x00, // nLockTime
+		0x00, 0x00, 0x00, 0x00, // nExpiryHeight
+		0x00, // tx_in_count
+		0x00, // tx_out_count
+	}
+}
+
+func TestParseV5RejectsCountsThatCannotFit(t *testing.T) {
+	tests := []struct {
+		name    string
+		data    []byte
+		wantErr string
+	}{
+		{
+			name:    "sapling spends",
+			data:    append(zip225V5Prefix(), 0x01),
+			wantErr: "nShieldedSpend 1 requires at least 96 bytes, but only 0 remain",
+		},
+		{
+			name:    "sapling outputs",
+			data:    append(zip225V5Prefix(), 0x00, 0x01),
+			wantErr: "nShieldedOutput 1 requires at least 756 bytes, but only 0 remain",
+		},
+		{
+			name:    "orchard actions",
+			data:    append(zip225V5Prefix(), 0x00, 0x00, 0x01),
+			wantErr: "nActionsOrchard 1 requires at least 820 bytes, but only 0 remain",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := NewTransaction()
+			tx.fOverwintered = true
+			tx.version = ZIP225_TX_VERSION
+			tx.nVersionGroupID = ZIP225_VERSION_GROUP_ID
+
+			_, err := tx.parseV5(tt.data)
+			requireErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
+// The action bundle parser is shared between Orchard and Ironwood, so the
+// bound must name whichever pool it was called for.
+func TestParseOrchardActionShapeBundleNamesItsPool(t *testing.T) {
+	for _, pool := range []string{"Orchard", "Ironwood"} {
+		t.Run(pool, func(t *testing.T) {
+			_, _, err := parseOrchardActionShapeBundle([]byte{0x01}, pool)
+			requireErrorContains(t, err,
+				"nActions"+pool+" 1 requires at least 820 bytes, but only 0 remain")
+		})
 	}
 }

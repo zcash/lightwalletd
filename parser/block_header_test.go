@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/zcash/lightwalletd/hash32"
@@ -180,6 +181,24 @@ func TestBadBlockHeader(t *testing.T) {
 		if err == nil {
 			t.Errorf("unexpected success parsing bad block %d", i)
 		}
+	}
+}
+
+func TestBlockHeaderRejectsSolutionLengthThatCannotFit(t *testing.T) {
+	// 140-byte block header prefix followed by solution_length=1 and no
+	// solution bytes.
+	blockData := make([]byte, 140)
+	blockData[0] = 0x04
+	blockData = append(blockData, 0x01)
+
+	blockHeader := NewBlockHeader()
+	_, err := blockHeader.ParseFromSlice(blockData)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	wantErr := "solution_length 1 exceeds remaining input length 0"
+	if !strings.Contains(err.Error(), wantErr) {
+		t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, wantErr)
 	}
 }
 
