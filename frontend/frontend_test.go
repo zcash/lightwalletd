@@ -51,6 +51,18 @@ func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
 	return lwd, cache
 }
 
+// resetGlobals restores the package globals that tests replace -- the zcashd
+// RPC stub and the step counter those stubs sequence through -- to the values
+// they have at package initialization. Any test that installs a stub should
+// "defer resetGlobals()" so it doesn't leak into later tests, even if the test
+// exits early via t.Fatal. Restoring common.RawRequest to nil (rather than to
+// a working implementation) means that a test that forgets to install a stub
+// panics rather than silently running against a leftover one.
+func resetGlobals() {
+	common.RawRequest = nil
+	step = 0
+}
+
 func TestMain(m *testing.M) {
 	output, err := os.OpenFile("test-log", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
@@ -191,6 +203,7 @@ func getLatestBlockStub(ctx context.Context, method string, params []json.RawMes
 func TestGetLatestBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getLatestBlockStub
+	defer resetGlobals()
 	lwd, cache := testsetup()
 
 	// This argument is not used (it may be in the future)
@@ -214,7 +227,6 @@ func TestGetLatestBlock(t *testing.T) {
 	if string(blockID.Hash) != string(block.Hash) {
 		t.Fatal("unexpected blockID.hash")
 	}
-	step = 0
 }
 
 // A valid address starts with "t", followed by 34 alpha characters;
@@ -314,6 +326,7 @@ func getaddressbalanceStub(ctx context.Context, method string, params []json.Raw
 
 func TestGetTaddressBalanceStream(t *testing.T) {
 	testT = t
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	validAddr := "t1234567890123456789012345678901234"
@@ -368,6 +381,7 @@ func TestGetTaddressBalanceStream(t *testing.T) {
 
 func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
 	testT = t
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	// A request naming too many addresses must be rejected before zcashd is
@@ -411,6 +425,7 @@ func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
 func TestGetTaddressTransactions(t *testing.T) {
 	testT = t
 	common.RawRequest = zcashdrpcStub
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	addressBlockFilter := &walletrpc.TransparentAddressBlockFilter{
@@ -444,7 +459,6 @@ func TestGetTaddressTransactions(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetTaddressTransactions succeeded")
 	}
-	step = 0
 }
 
 func TestGetTaddressTransactionsNilArgs(t *testing.T) {
@@ -519,6 +533,7 @@ func getblockStub(ctx context.Context, method string, params []json.RawMessage) 
 func TestGetBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	_, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{})
@@ -553,7 +568,6 @@ func TestGetBlock(t *testing.T) {
 	if block != nil {
 		t.Fatal("GetBlock returned unexpected non-nil block")
 	}
-	step = 0
 }
 
 type testgetbrange struct {
@@ -571,7 +585,7 @@ func (tg *testgetbrange) Send(cb *walletrpc.CompactBlock) error {
 func TestGetBlockRange(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
-	common.RawRequest = getblockStub
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	blockrange := &walletrpc.BlockRange{
@@ -588,7 +602,6 @@ func TestGetBlockRange(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetBlockRange should have failed")
 	}
-	step = 0
 }
 
 func TestGetBlockRangeNilArgs(t *testing.T) {
@@ -638,6 +651,7 @@ func TestSendTransaction(t *testing.T) {
 	testT = t
 	lwd, _ := testsetup()
 	common.RawRequest = sendrawtransactionStub
+	defer resetGlobals()
 	rawtx := walletrpc.RawTransaction{Data: []byte{7}}
 	sendresult, err := lwd.SendTransaction(context.Background(), &rawtx)
 	if err != nil {
@@ -662,7 +676,6 @@ func TestSendTransaction(t *testing.T) {
 	if sendresult.ErrorMessage != "some error" {
 		t.Fatal("SendTransaction unexpected ErrorMessage return")
 	}
-	step = 0
 }
 
 func TestMempoolFilter(t *testing.T) {
