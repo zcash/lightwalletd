@@ -10,6 +10,14 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- Bound element counts in the block and transaction parser against the
+  remaining input before allocating. A malformed or truncated serialization
+  can declare far more elements (transaction inputs and outputs, Sapling
+  spends and outputs, Orchard actions, JoinSplits, and the block's
+  transaction count) than the input could possibly contain; sizing a slice
+  from such a count previously allocated gigabytes before the first element
+  failed to parse, exhausting memory (GHSA-ph5v-77v6-j498).
+
 - Make `common.RawRequest` context-aware so cancelled `GetBlockRange` /
   `GetBlockRangeNullifiers` streams abort in-flight zcashd JSON-RPC calls
   instead of holding a goroutine and RPC connection until the request
