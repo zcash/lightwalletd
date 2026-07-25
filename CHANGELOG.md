@@ -38,6 +38,17 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- Validate the size of client-supplied blobs before expanding them.
+  `GetTreeState` now rejects a block hash that isn't 32 bytes
+  (GHSA-q2c2-hpp9-58hm), and `SendTransaction` rejects a raw transaction
+  larger than the 2,000,000-byte Zcash block size limit
+  (GHSA-6ppp-r2gc-9q6v). Both previously hex-encoded the bytes (doubling
+  them) and JSON-marshalled the result before forwarding to zcashd, so an
+  unauthenticated client could force large allocations in lightwalletd, and
+  parsing work in the backend, using input that could only ever be rejected —
+  enough in concurrent requests to drive the process into an out-of-memory
+  kill.
+
 - Bound the transparent-address gRPC methods against unbounded per-request
   work (GHSA-x4m7-3gpp-xc36). `GetTaddressBalanceStream` now caps the number of
   streamed addresses and validates each one as it arrives, instead of buffering
