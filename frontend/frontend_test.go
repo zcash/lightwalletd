@@ -836,3 +836,43 @@ func TestPruneCompactBlockToNullifiers(t *testing.T) {
 		t.Fatalf("chain metadata tree sizes not zeroed: %+v", cb.ChainMetadata)
 	}
 }
+
+// An explicit End of height 0 must not be treated as "no bound": `End` carries
+// `json:",omitempty"`, so a zero value is dropped from the getaddresstxids
+// request and zcashd falls back to an open-ended scan — the exact behaviour
+// GHSA-x4m7-3gpp-xc36 F2 is meant to prevent.
+func TestGetTaddressTransactionsZeroEndIsBounded(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	const tip = 987654
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getblockchaininfo":
+			return json.Marshal(common.ZcashdRpcReplyGetblockchaininfo{Blocks: tip})
+		case "getaddresstxids":
+			var filter common.ZcashdRpcRequestGetaddresstxids
+			if err := json.Unmarshal(params[0], &filter); err != nil {
+				testT.Fatal("could not unmarshal getaddresstxids request")
+			}
+			if filter.End == 0 {
+				testT.Fatal("End=0 reached the backend as an unbounded scan")
+			}
+			return []byte("[]"), nil
+		}
+		testT.Fatal("unexpected method", method)
+		return nil, nil
+	}
+
+	filter := &walletrpc.TransparentAddressBlockFilter{
+		Address: "t1234567890123456789012345678901234",
+		Range: &walletrpc.BlockRange{
+			Start: &walletrpc.BlockID{Height: 100},
+			End:   &walletrpc.BlockID{Height: 0}, // non-nil, zero
+		},
+	}
+	if err := lwd.GetTaddressTransactions(filter, &testgettx{}); err != nil {
+		t.Fatal("GetTaddressTransactions failed:", err)
+	}
+}
