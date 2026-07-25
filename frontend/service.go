@@ -689,8 +689,26 @@ var mempoolList []string
 // Last time we pulled a copy of the mempool from zcashd.
 var lastMempool time.Time
 
+// maxExcludeTxidSuffixes bounds the exclude list a client may send to
+// GetMempoolTx. The list names transactions the caller already has, so it is
+// only ever useful up to the size of the mempool itself; this cap sits well
+// above the number of transactions zcashd's default mempool can hold.
+const maxExcludeTxidSuffixes = 20000
+
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
 	common.Log.Debugf("gRPC GetMempoolTx(%+v)\n", exclude)
+	// Each suffix is length-checked below, but the number of them was not
+	// bounded, so a client could submit a huge list and make the server
+	// allocate, hex-encode and sort all of it -- historically while holding
+	// s.mutex, and even when the mempool was empty and the response would be
+	// empty too (GHSA-4hp3-3494-3f2m). The cap is comfortably larger than the
+	// number of transactions zcashd's default mempool can hold, so an exclude
+	// list beyond it cannot describe a useful set in any case.
+	if len(exclude.ExcludeTxidSuffixes) > maxExcludeTxidSuffixes {
+		return status.Errorf(codes.InvalidArgument,
+			"GetMempoolTx: too many exclude txid suffixes: %d (limit %d)",
+			len(exclude.ExcludeTxidSuffixes), maxExcludeTxidSuffixes)
+	}
 	for i := 0; i < len(exclude.ExcludeTxidSuffixes); i++ {
 		if len(exclude.ExcludeTxidSuffixes[i]) > 32 {
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
@@ -707,6 +725,18 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			walletrpc.PoolType_IRONWOOD,
 		}
 	}
+	// Transform the exclude list before taking the mutex: it depends only on
+	// the request, so doing it in the critical section would let one caller's
+	// large list stall every other GetMempoolTx caller (GHSA-4hp3-3494-3f2m).
+	excludeHex := make([]string, len(exclude.ExcludeTxidSuffixes))
+	for i := range exclude.ExcludeTxidSuffixes {
+		rev := make([]byte, len(exclude.ExcludeTxidSuffixes[i]))
+		for j := range rev {
+			rev[j] = exclude.ExcludeTxidSuffixes[i][len(exclude.ExcludeTxidSuffixes[i])-j-1]
+		}
+		excludeHex[i] = hex.EncodeToString(rev)
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -781,14 +811,6 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
 		mempoolMap = &newmempoolMap
-	}
-	excludeHex := make([]string, len(exclude.ExcludeTxidSuffixes))
-	for i := range exclude.ExcludeTxidSuffixes {
-		rev := make([]byte, len(exclude.ExcludeTxidSuffixes[i]))
-		for j := range rev {
-			rev[j] = exclude.ExcludeTxidSuffixes[i][len(exclude.ExcludeTxidSuffixes[i])-j-1]
-		}
-		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
 		ctx, ok := (*mempoolMap)[txid]

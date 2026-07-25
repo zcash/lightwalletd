@@ -6,7 +6,7 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
-## [Unreleased]
+## [0.5.1] - 2026-07-27
 
 ### Added
 
@@ -14,6 +14,26 @@ The most recent changes are listed first.
 
 - Add the `--no-backend-check` option, which skips backend detection entirely
   so that lightwalletd can connect to any node that speaks the expected RPCs.
+
+### Fixed
+
+- Validate the size of client-supplied blobs before expanding them.
+  `GetTreeState` now rejects a block hash that isn't 32 bytes
+  (GHSA-q2c2-hpp9-58hm), and `SendTransaction` rejects a raw transaction
+  larger than the 2,000,000-byte Zcash block size limit
+  (GHSA-6ppp-r2gc-9q6v). Both previously hex-encoded the bytes (doubling
+  them) and JSON-marshalled the result before forwarding to zcashd, so an
+  unauthenticated client could force large allocations in lightwalletd, and
+  parsing work in the backend, using input that could only ever be rejected —
+  enough in concurrent requests to drive the process into an out-of-memory
+  kill.
+
+- Cap the `GetMempoolTx` exclude list, and build it before taking the method
+  mutex (GHSA-4hp3-3494-3f2m). Each excluded txid suffix was length-checked,
+  but the number of them was not, so a client could send a very large list and
+  make the server allocate, hex-encode and sort all of it — while holding the
+  mutex, so other `GetMempoolTx` callers stalled behind it, and even when the
+  mempool was empty and the response would be empty too.
 
 ## [0.5.0] - 2026-07-26
 
@@ -37,17 +57,6 @@ The most recent changes are listed first.
   reserved.
 
 ### Fixed
-
-- Validate the size of client-supplied blobs before expanding them.
-  `GetTreeState` now rejects a block hash that isn't 32 bytes
-  (GHSA-q2c2-hpp9-58hm), and `SendTransaction` rejects a raw transaction
-  larger than the 2,000,000-byte Zcash block size limit
-  (GHSA-6ppp-r2gc-9q6v). Both previously hex-encoded the bytes (doubling
-  them) and JSON-marshalled the result before forwarding to zcashd, so an
-  unauthenticated client could force large allocations in lightwalletd, and
-  parsing work in the backend, using input that could only ever be rejected —
-  enough in concurrent requests to drive the process into an out-of-memory
-  kill.
 
 - Bound the transparent-address gRPC methods against unbounded per-request
   work (GHSA-x4m7-3gpp-xc36). `GetTaddressBalanceStream` now caps the number of
