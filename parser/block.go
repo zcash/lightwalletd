@@ -139,6 +139,9 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	if !s.ReadCompactSize(&txCount) {
 		return nil, errors.New("could not read tx_count")
 	}
+	if err := rejectCountExceedingRemaining("tx_count", txCount, len(s), minTransactionWireBytes); err != nil {
+		return nil, err
+	}
 	data = []byte(s)
 
 	vtx := make([]*Transaction, 0, txCount)
