@@ -123,7 +123,11 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	// fan-out (GHSA-x4m7-3gpp-xc36, finding 2).
 	start := addressBlockFilter.Range.Start.Height
 	var end uint64
-	if addressBlockFilter.Range.End != nil {
+	// A zero End must be treated as unset, not as a bound: the getaddresstxids
+	// request field carries `json:",omitempty"`, so End=0 is dropped from the
+	// request entirely and zcashd falls back to the open-ended scan this is
+	// meant to prevent.
+	if addressBlockFilter.Range.End != nil && addressBlockFilter.Range.End.Height > 0 {
 		end = addressBlockFilter.Range.End.Height
 	} else {
 		info, err := common.GetBlockChainInfo()
