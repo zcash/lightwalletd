@@ -89,6 +89,15 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 	return r, nil
 }
 
+// maxTaddrTxBlockSpan bounds the height range a single GetTaddressTransactions
+// request may scan. It is deliberately generous -- well beyond a full-history
+// scan of the current chain -- so it never rejects a legitimate wallet request,
+// while still rejecting an absurd End (e.g. near uint64-max) that would
+// otherwise be forwarded to zcashd. Together with defaulting a missing End to
+// the chain tip, it keeps one request from requesting an unbounded
+// address-index scan (GHSA-x4m7-3gpp-xc36, finding 2).
+const maxTaddrTxBlockSpan = 10_000_000
+
 // GetTaddressTxids is a streaming RPC that returns transactions that have
 // the given transparent address (taddr) as either an input or output.
 // NB, this method is misnamed, it does not return txids.
@@ -106,12 +115,34 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 		return status.Error(codes.InvalidArgument, "GetTaddressTransactions: must specify a start block height")
 	}
 
+	// End is optional in the protocol. An unset End would make zcashd's
+	// getaddresstxids scan the address index all the way to the current chain
+	// tip, with no upper bound as the chain grows; default it to the current tip
+	// so the scan is always to a concrete, finite height. Bound the span so one
+	// request can't force an arbitrarily large index scan and per-txid fetch
+	// fan-out (GHSA-x4m7-3gpp-xc36, finding 2).
+	start := addressBlockFilter.Range.Start.Height
+	var end uint64
+	if addressBlockFilter.Range.End != nil {
+		end = addressBlockFilter.Range.End.Height
+	} else {
+		info, err := common.GetBlockChainInfo()
+		if err != nil {
+			return status.Errorf(codes.Unavailable,
+				"GetTaddressTransactions: could not determine chain tip: %s", err.Error())
+		}
+		end = uint64(info.Blocks)
+	}
+	if end > start && end-start > maxTaddrTxBlockSpan {
+		return status.Errorf(codes.InvalidArgument,
+			"GetTaddressTransactions: block range too wide (%d blocks, limit %d)",
+			end-start, maxTaddrTxBlockSpan)
+	}
+
 	request := &common.ZcashdRpcRequestGetaddresstxids{
 		Addresses: []string{addressBlockFilter.Address},
-		Start:     addressBlockFilter.Range.Start.Height,
-	}
-	if addressBlockFilter.Range.End != nil {
-		request.End = addressBlockFilter.Range.End.Height
+		Start:     start,
+		End:       end,
 	}
 
 	param, err := json.Marshal(request)
@@ -121,7 +152,14 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	}
 	params := []json.RawMessage{param}
 
-	result, rpcErr := common.RawRequest(resp.Context(), "getaddresstxids", params)
+	// Bound the total time -- and make the backend calls cancelable -- so a slow
+	// or abandoned scan doesn't hold a lightwalletd goroutine and a zcashd RPC
+	// connection open indefinitely. This deadline covers both the getaddresstxids
+	// index scan and the per-txid getrawtransaction fan-out below.
+	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
+	defer cancel()
+
+	result, rpcErr := common.RawRequest(timeout, "getaddresstxids", params)
 
 	// For some reason, the error responses are not JSON
 	if rpcErr != nil {
@@ -133,11 +171,8 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	err = json.Unmarshal(result, &txids)
 	if err != nil {
 		return status.Errorf(codes.Unknown,
-			"GetSubtreeRoots: error unmarshalling getaddresstxids reply: %s", err.Error())
+			"GetTaddressTransactions: error unmarshalling getaddresstxids reply: %s", err.Error())
 	}
-
-	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
-	defer cancel()
 
 	for _, txidstr := range txids {
 		txidBigEndian, _ := hex.DecodeString(txidstr)
@@ -560,6 +595,17 @@ func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletr
 	return r, err
 }
 
+// maxTaddrsPerRequest bounds the number of transparent addresses a single
+// request may cause lightwalletd to process, across the transparent-address
+// gRPC methods. Without a cap, an unauthenticated client can drive unbounded
+// memory growth and backend work: GetTaddressBalanceStream accumulates
+// streamed addresses until the process is OOM-killed, and GetAddressUtxos
+// forwards the whole list to zcashd and materializes the full result before
+// applying client-side limits. The unary GetTaddressBalance is already
+// implicitly bounded by gRPC's MaxRecvMsgSize; this gives the other methods an
+// equivalent bound, generous for any legitimate wallet (GHSA-x4m7-3gpp-xc36).
+const maxTaddrsPerRequest = 10000
+
 // GetTaddressBalanceStream returns the total balance for a list of taddrs
 func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer) error {
 	common.Log.Debugf("gRPC GetTaddressBalanceStream(%+v)\n", addresses)
@@ -571,6 +617,15 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 		}
 		if err != nil {
 			return status.Errorf(codes.Internal, "GetTaddressBalanceStream Recv error: %s", err.Error())
+		}
+		// Validate and bound each address as it arrives, rather than
+		// accumulating unbounded, unvalidated input (GHSA-x4m7-3gpp-xc36).
+		if err := checkTaddress(addr.Address); err != nil {
+			return err
+		}
+		if len(addressList) >= maxTaddrsPerRequest {
+			return status.Errorf(codes.ResourceExhausted,
+				"GetTaddressBalanceStream: too many addresses (limit %d)", maxTaddrsPerRequest)
 		}
 		addressList = append(addressList, addr.Address)
 	}
@@ -761,6 +816,15 @@ func MempoolFilter(items, exclude []string) []string {
 }
 
 func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
+	// Bound the address count before contacting zcashd: getaddressutxos cannot
+	// push down StartHeight/MaxEntries, so lightwalletd fetches and
+	// materializes the entire backend result before applying those limits.
+	// Capping the input keeps one request from forcing unbounded backend work
+	// and result materialization (GHSA-x4m7-3gpp-xc36).
+	if len(arg.Addresses) > maxTaddrsPerRequest {
+		return status.Errorf(codes.ResourceExhausted,
+			"getAddressUtxos: too many addresses (limit %d)", maxTaddrsPerRequest)
+	}
 	for _, a := range arg.Addresses {
 		if err := checkTaddress(a); err != nil {
 			return err

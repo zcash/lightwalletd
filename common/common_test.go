@@ -99,6 +99,29 @@ func afterStub(d time.Duration) <-chan time.Time {
 	return ch
 }
 
+// resetGlobals restores the package globals that tests replace -- the RPC and
+// time stubs, the state those stubs accumulate, and the mempool cache that
+// GetMempool maintains -- to the values they have at package initialization.
+// Any test that installs a stub or otherwise dirties this state should
+// "defer resetGlobals()" so it doesn't leak into later tests, even if the test
+// exits early via t.Fatal. Restoring the function pointers to nil (rather than
+// to a working implementation) means that a test that forgets to install a
+// stub panics rather than silently running against a leftover one.
+func resetGlobals() {
+	RawRequest = nil
+	Time.Sleep = nil
+	Time.Now = nil
+	Time.After = nil
+	step = 0
+	sleepCount = 0
+	sleepDuration = 0
+	DonationAddress = ""
+	g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{}
+	g_lastTime = time.Time{}
+	g_txidSeen = map[txid]struct{}{}
+	g_txList = nil
+}
+
 // ------------------------------------------ GetLightdInfo()
 
 func getLightdInfoStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
@@ -148,6 +171,7 @@ func getLightdInfoStub(ctx context.Context, method string, params []json.RawMess
 func TestGetLightdInfo(t *testing.T) {
 	testT = t
 	RawRequest = getLightdInfoStub
+	defer resetGlobals()
 	Time.Sleep = sleepStub
 	// This calls the getblockchaininfo rpc just to establish connectivity with zcashd
 	FirstRPC()
@@ -199,11 +223,6 @@ func TestGetLightdInfo(t *testing.T) {
 	if sleepCount != 1 || sleepDuration != 15*time.Second {
 		t.Error("unexpected sleeps", sleepCount, sleepDuration)
 	}
-
-	DonationAddress = ""
-	step = 0
-	sleepCount = 0
-	sleepDuration = 0
 }
 
 // ------------------------------------------ BlockIngestor()
@@ -398,6 +417,7 @@ func blockIngestorStub(ctx context.Context, method string, params []json.RawMess
 func TestBlockIngestor(t *testing.T) {
 	testT = t
 	RawRequest = blockIngestorStub
+	defer resetGlobals()
 	Time.Sleep = sleepStub
 	Time.Now = nowStub
 	os.RemoveAll(unitTestPath)
@@ -406,9 +426,6 @@ func TestBlockIngestor(t *testing.T) {
 	if step != 24 {
 		t.Error("unexpected final step", step)
 	}
-	step = 0
-	sleepCount = 0
-	sleepDuration = 0
 	os.RemoveAll(unitTestPath)
 }
 
@@ -458,6 +475,7 @@ func getblockStub(ctx context.Context, method string, params []json.RawMessage) 
 func TestGetBlockRange(t *testing.T) {
 	testT = t
 	RawRequest = getblockStub
+	defer resetGlobals()
 	os.RemoveAll(unitTestPath)
 	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 	blockChan := make(chan *walletrpc.CompactBlock)
@@ -504,7 +522,6 @@ func TestGetBlockRange(t *testing.T) {
 	if step != 5 {
 		t.Fatal("unexpected step:", step)
 	}
-	step = 0
 	os.RemoveAll(unitTestPath)
 }
 
@@ -513,6 +530,7 @@ func TestGetBlockRangeCancelsInFlightRPC(t *testing.T) {
 		<-ctx.Done()
 		return nil, ctx.Err()
 	}
+	defer resetGlobals()
 	os.RemoveAll(unitTestPath)
 	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -587,6 +605,7 @@ func getblockStubReverse(ctx context.Context, method string, params []json.RawMe
 func TestGetBlockRangeReverse(t *testing.T) {
 	testT = t
 	RawRequest = getblockStubReverse
+	defer resetGlobals()
 	os.RemoveAll(unitTestPath)
 	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
 	blockChan := make(chan *walletrpc.CompactBlock)
@@ -634,7 +653,6 @@ func TestGetBlockRangeReverse(t *testing.T) {
 	if step != 6 {
 		t.Fatal("unexpected step:", step)
 	}
-	step = 0
 	os.RemoveAll(unitTestPath)
 }
 
@@ -744,6 +762,7 @@ func mempoolStub(ctx context.Context, method string, params []json.RawMessage) (
 func TestMempoolStream(t *testing.T) {
 	testT = t
 	RawRequest = mempoolStub
+	defer resetGlobals()
 	Time.Sleep = sleepStub
 	Time.Now = nowStub
 	Time.After = afterStub
@@ -794,10 +813,6 @@ func TestMempoolStream(t *testing.T) {
 	if step != 8 {
 		t.Fatal("unexpected number of zebrad RPCs")
 	}
-
-	step = 0
-	sleepCount = 0
-	sleepDuration = 0
 }
 
 func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
@@ -880,6 +895,7 @@ func TestMempoolStreamCancelOnEmptyMempool(t *testing.T) {
 		}
 		return nil, errors.New("unexpected RPC: " + method)
 	}
+	defer resetGlobals()
 	// Real time for the cancel-aware sleep so ctx.Done has a real race with
 	// the 200ms timer. afterStub would fire instantly and the test would not
 	// exercise the cancel path deterministically.
@@ -917,14 +933,6 @@ func TestMempoolStreamCancelOnEmptyMempool(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("GetMempool did not return within 2s of cancel; the cancel-aware select is not effective")
 	}
-
-	// Reset shared state for any subsequent tests.
-	g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{}
-	g_lastTime = time.Time{}
-	g_txidSeen = map[txid]struct{}{}
-	g_txList = []*walletrpc.RawTransaction{}
-	sleepCount = 0
-	sleepDuration = 0
 }
 
 func TestFilterTxPoolIronwood(t *testing.T) {

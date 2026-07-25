@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -18,6 +19,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -46,6 +49,18 @@ func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
 		os.Exit(1)
 	}
 	return lwd, cache
+}
+
+// resetGlobals restores the package globals that tests replace -- the zcashd
+// RPC stub and the step counter those stubs sequence through -- to the values
+// they have at package initialization. Any test that installs a stub should
+// "defer resetGlobals()" so it doesn't leak into later tests, even if the test
+// exits early via t.Fatal. Restoring common.RawRequest to nil (rather than to
+// a working implementation) means that a test that forgets to install a stub
+// panics rather than silently running against a leftover one.
+func resetGlobals() {
+	common.RawRequest = nil
+	step = 0
 }
 
 func TestMain(m *testing.M) {
@@ -188,6 +203,7 @@ func getLatestBlockStub(ctx context.Context, method string, params []json.RawMes
 func TestGetLatestBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getLatestBlockStub
+	defer resetGlobals()
 	lwd, cache := testsetup()
 
 	// This argument is not used (it may be in the future)
@@ -211,7 +227,6 @@ func TestGetLatestBlock(t *testing.T) {
 	if string(blockID.Hash) != string(block.Hash) {
 		t.Fatal("unexpected blockID.hash")
 	}
-	step = 0
 }
 
 // A valid address starts with "t", followed by 34 alpha characters;
@@ -268,6 +283,127 @@ func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage)
 	return nil, nil
 }
 
+// testtaddrbalance is a mock client-streaming server for
+// GetTaddressBalanceStream. It feeds the handler a fixed list of addresses,
+// then EOF, and records the balance returned via SendAndClose.
+type testtaddrbalance struct {
+	walletrpc.CompactTxStreamer_GetTaddressBalanceStreamServer
+	addrs   []string
+	idx     int
+	balance *walletrpc.Balance
+}
+
+func (t *testtaddrbalance) Context() context.Context {
+	return context.Background()
+}
+
+func (t *testtaddrbalance) Recv() (*walletrpc.Address, error) {
+	if t.idx >= len(t.addrs) {
+		return nil, io.EOF
+	}
+	a := &walletrpc.Address{Address: t.addrs[t.idx]}
+	t.idx++
+	return a, nil
+}
+
+func (t *testtaddrbalance) SendAndClose(b *walletrpc.Balance) error {
+	t.balance = b
+	return nil
+}
+
+// getaddressbalanceStub returns a fixed balance and asserts that the request
+// only reaches zcashd with the expected (valid, bounded) address list.
+func getaddressbalanceStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method != "getaddressbalance" {
+		testT.Fatal("unexpected method", method)
+	}
+	var req common.ZcashdRpcRequestGetaddressbalance
+	if err := json.Unmarshal(params[0], &req); err != nil {
+		testT.Fatal("could not unmarshal getaddressbalance request")
+	}
+	return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 1234})
+}
+
+func TestGetTaddressBalanceStream(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	validAddr := "t1234567890123456789012345678901234"
+
+	// An invalid address must be rejected immediately, before any zcashd
+	// call, and before the whole (potentially unbounded) stream is buffered.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an invalid address")
+		return nil, nil
+	}
+	{
+		mock := &testtaddrbalance{addrs: []string{validAddr, "not-a-valid-address"}}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if err == nil {
+			t.Fatal("GetTaddressBalanceStream should have failed on bad address")
+		}
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatal("expected InvalidArgument on bad address, got:", err)
+		}
+	}
+
+	// Too many addresses must be rejected (GHSA-x4m7-3gpp-xc36), before the
+	// server accumulates or forwards them.
+	{
+		addrs := make([]string, maxTaddrsPerRequest+1)
+		for i := range addrs {
+			addrs[i] = validAddr
+		}
+		mock := &testtaddrbalance{addrs: addrs}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if err == nil {
+			t.Fatal("GetTaddressBalanceStream should have failed on too many addresses")
+		}
+		if status.Code(err) != codes.ResourceExhausted {
+			t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+		}
+	}
+
+	// A valid, bounded request succeeds and returns the balance from zcashd.
+	common.RawRequest = getaddressbalanceStub
+	{
+		mock := &testtaddrbalance{addrs: []string{validAddr, validAddr}}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if err != nil {
+			t.Fatal("GetTaddressBalanceStream failed:", err)
+		}
+		if mock.balance == nil || mock.balance.ValueZat != 1234 {
+			t.Fatal("unexpected balance:", mock.balance)
+		}
+	}
+}
+
+func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// A request naming too many addresses must be rejected before zcashd is
+	// contacted, so one request can't force unbounded backend work
+	// (GHSA-x4m7-3gpp-xc36).
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called when the address list is over the limit")
+		return nil, nil
+	}
+	addrs := make([]string, maxTaddrsPerRequest+1)
+	for i := range addrs {
+		addrs[i] = "t1234567890123456789012345678901234"
+	}
+	_, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{Addresses: addrs})
+	if err == nil {
+		t.Fatal("GetAddressUtxos should have failed on too many addresses")
+	}
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+	}
+}
+
 type testgettx struct {
 	walletrpc.CompactTxStreamer_GetTaddressTransactionsServer
 }
@@ -289,6 +425,7 @@ func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
 func TestGetTaddressTransactions(t *testing.T) {
 	testT = t
 	common.RawRequest = zcashdrpcStub
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	addressBlockFilter := &walletrpc.TransparentAddressBlockFilter{
@@ -322,7 +459,6 @@ func TestGetTaddressTransactions(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetTaddressTransactions succeeded")
 	}
-	step = 0
 }
 
 func TestGetTaddressTransactionsNilArgs(t *testing.T) {
@@ -363,6 +499,71 @@ func TestGetTaddressTransactionsNilArgs(t *testing.T) {
 	}
 }
 
+// A request that omits the range End must not become an open-ended index scan;
+// the handler defaults End to the current chain tip (GHSA-x4m7-3gpp-xc36 F2).
+func TestGetTaddressTransactionsDefaultsEndToTip(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	const tip = 987654
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getblockchaininfo":
+			return json.Marshal(common.ZcashdRpcReplyGetblockchaininfo{Blocks: tip})
+		case "getaddresstxids":
+			var filter common.ZcashdRpcRequestGetaddresstxids
+			if err := json.Unmarshal(params[0], &filter); err != nil {
+				testT.Fatal("could not unmarshal getaddresstxids request")
+			}
+			if filter.Start != 100 {
+				testT.Fatal("unexpected start", filter.Start)
+			}
+			if filter.End != tip {
+				testT.Fatal("End should default to the chain tip, got", filter.End)
+			}
+			return []byte("[]"), nil // no txids -> no fan-out
+		}
+		testT.Fatal("unexpected method", method)
+		return nil, nil
+	}
+
+	filter := &walletrpc.TransparentAddressBlockFilter{
+		Address: "t1234567890123456789012345678901234",
+		Range:   &walletrpc.BlockRange{Start: &walletrpc.BlockID{Height: 100}}, // End omitted
+	}
+	if err := lwd.GetTaddressTransactions(filter, &testgettx{}); err != nil {
+		t.Fatal("GetTaddressTransactions failed:", err)
+	}
+}
+
+// A range wider than maxTaddrTxBlockSpan must be rejected before zcashd is
+// contacted (GHSA-x4m7-3gpp-xc36 F2).
+func TestGetTaddressTransactionsRangeTooWide(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called when the range is too wide")
+		return nil, nil
+	}
+	filter := &walletrpc.TransparentAddressBlockFilter{
+		Address: "t1234567890123456789012345678901234",
+		Range: &walletrpc.BlockRange{
+			Start: &walletrpc.BlockID{Height: 0},
+			End:   &walletrpc.BlockID{Height: maxTaddrTxBlockSpan + 1},
+		},
+	}
+	err := lwd.GetTaddressTransactions(filter, &testgettx{})
+	if err == nil {
+		t.Fatal("GetTaddressTransactions should have failed on too-wide range")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument on too-wide range, got:", err)
+	}
+}
+
 func getblockStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	if method != "getblock" {
 		testT.Fatal("unexpected method:", method)
@@ -397,6 +598,7 @@ func getblockStub(ctx context.Context, method string, params []json.RawMessage) 
 func TestGetBlock(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	_, err := lwd.GetBlock(context.Background(), &walletrpc.BlockID{})
@@ -431,7 +633,6 @@ func TestGetBlock(t *testing.T) {
 	if block != nil {
 		t.Fatal("GetBlock returned unexpected non-nil block")
 	}
-	step = 0
 }
 
 type testgetbrange struct {
@@ -449,7 +650,7 @@ func (tg *testgetbrange) Send(cb *walletrpc.CompactBlock) error {
 func TestGetBlockRange(t *testing.T) {
 	testT = t
 	common.RawRequest = getblockStub
-	common.RawRequest = getblockStub
+	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	blockrange := &walletrpc.BlockRange{
@@ -466,7 +667,6 @@ func TestGetBlockRange(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetBlockRange should have failed")
 	}
-	step = 0
 }
 
 func TestGetBlockRangeNilArgs(t *testing.T) {
@@ -516,6 +716,7 @@ func TestSendTransaction(t *testing.T) {
 	testT = t
 	lwd, _ := testsetup()
 	common.RawRequest = sendrawtransactionStub
+	defer resetGlobals()
 	rawtx := walletrpc.RawTransaction{Data: []byte{7}}
 	sendresult, err := lwd.SendTransaction(context.Background(), &rawtx)
 	if err != nil {
@@ -540,7 +741,6 @@ func TestSendTransaction(t *testing.T) {
 	if sendresult.ErrorMessage != "some error" {
 		t.Fatal("SendTransaction unexpected ErrorMessage return")
 	}
-	step = 0
 }
 
 func TestMempoolFilter(t *testing.T) {
