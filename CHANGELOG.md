@@ -14,11 +14,14 @@ The most recent changes are listed first.
   work (GHSA-x4m7-3gpp-xc36). `GetTaddressBalanceStream` now caps the number of
   streamed addresses and validates each one as it arrives, instead of buffering
   the entire client stream before any validation; `GetAddressUtxos` and
-  `GetAddressUtxosStream` cap the number of requested addresses. Previously an
-  unauthenticated client could hold a stream open and send `Address` messages
-  indefinitely — growing the server's heap until the process was OOM-killed,
-  disconnecting all connected wallets — or name enough addresses to force
-  zcashd to materialize an unbounded result set.
+  `GetAddressUtxosStream` cap the number of requested addresses; and
+  `GetTaddressTransactions` defaults a missing range `End` to the current chain
+  tip instead of scanning open-endedly, bounds the range span, and applies a
+  deadline that also covers the backend calls. Previously an unauthenticated
+  client could hold a stream open and send `Address` messages indefinitely —
+  growing the server's heap until the process was OOM-killed, disconnecting all
+  connected wallets — or name enough addresses (or request an open-ended
+  address-index scan) to force zcashd into unbounded work.
 
 - Make `common.RawRequest` context-aware so cancelled `GetBlockRange` /
   `GetBlockRangeNullifiers` streams abort in-flight zcashd JSON-RPC calls

@@ -499,6 +499,71 @@ func TestGetTaddressTransactionsNilArgs(t *testing.T) {
 	}
 }
 
+// A request that omits the range End must not become an open-ended index scan;
+// the handler defaults End to the current chain tip (GHSA-x4m7-3gpp-xc36 F2).
+func TestGetTaddressTransactionsDefaultsEndToTip(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	const tip = 987654
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getblockchaininfo":
+			return json.Marshal(common.ZcashdRpcReplyGetblockchaininfo{Blocks: tip})
+		case "getaddresstxids":
+			var filter common.ZcashdRpcRequestGetaddresstxids
+			if err := json.Unmarshal(params[0], &filter); err != nil {
+				testT.Fatal("could not unmarshal getaddresstxids request")
+			}
+			if filter.Start != 100 {
+				testT.Fatal("unexpected start", filter.Start)
+			}
+			if filter.End != tip {
+				testT.Fatal("End should default to the chain tip, got", filter.End)
+			}
+			return []byte("[]"), nil // no txids -> no fan-out
+		}
+		testT.Fatal("unexpected method", method)
+		return nil, nil
+	}
+
+	filter := &walletrpc.TransparentAddressBlockFilter{
+		Address: "t1234567890123456789012345678901234",
+		Range:   &walletrpc.BlockRange{Start: &walletrpc.BlockID{Height: 100}}, // End omitted
+	}
+	if err := lwd.GetTaddressTransactions(filter, &testgettx{}); err != nil {
+		t.Fatal("GetTaddressTransactions failed:", err)
+	}
+}
+
+// A range wider than maxTaddrTxBlockSpan must be rejected before zcashd is
+// contacted (GHSA-x4m7-3gpp-xc36 F2).
+func TestGetTaddressTransactionsRangeTooWide(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called when the range is too wide")
+		return nil, nil
+	}
+	filter := &walletrpc.TransparentAddressBlockFilter{
+		Address: "t1234567890123456789012345678901234",
+		Range: &walletrpc.BlockRange{
+			Start: &walletrpc.BlockID{Height: 0},
+			End:   &walletrpc.BlockID{Height: maxTaddrTxBlockSpan + 1},
+		},
+	}
+	err := lwd.GetTaddressTransactions(filter, &testgettx{})
+	if err == nil {
+		t.Fatal("GetTaddressTransactions should have failed on too-wide range")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument on too-wide range, got:", err)
+	}
+}
+
 func getblockStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	if method != "getblock" {
 		testT.Fatal("unexpected method:", method)
