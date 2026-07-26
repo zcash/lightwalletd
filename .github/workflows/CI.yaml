@@ -61,18 +61,23 @@ jobs:
             electriccoinco/lightwalletd:${{ github.event.release.tag_name }}
             electriccoinco/lightwalletd:latest
 
-      - name: Log in to Docker Hub (zodlinc)
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.ZODLINC_DOCKERHUB_USERNAME }}
-          password: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
-
       - name: Push to zodlinc
+        # crane copy with explicit --src-creds and --dst-creds avoids the
+        # docker login session conflict (both registries are docker.io but
+        # different org credentials).
+        env:
+          SRC_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          SRC_PASS: ${{ secrets.DOCKERHUB_PASSWORD }}
+          DST_USER: ${{ secrets.ZODLINC_DOCKERHUB_USERNAME }}
+          DST_PASS: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          docker buildx imagetools create \
-            --tag zodlinc/lightwalletd:${TAG} \
-            electriccoinco/lightwalletd:${TAG}
-          docker buildx imagetools create \
-            --tag zodlinc/lightwalletd:latest \
-            electriccoinco/lightwalletd:latest
+          go install github.com/google/go-containerregistry/cmd/crane@latest
+          crane copy \
+            --src-creds "${SRC_USER}:${SRC_PASS}" \
+            --dst-creds "${DST_USER}:${DST_PASS}" \
+            electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
+          crane copy \
+            --src-creds "${SRC_USER}:${SRC_PASS}" \
+            --dst-creds "${DST_USER}:${DST_PASS}" \
+            electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
