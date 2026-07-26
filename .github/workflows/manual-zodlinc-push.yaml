@@ -1,0 +1,37 @@
+name: Manual zodlinc push
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to copy (e.g. v0.5.0)'
+        required: true
+        default: 'v0.5.0'
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '>=1.21'
+
+      - name: Copy to zodlinc
+        env:
+          SRC_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+          SRC_PASS: ${{ secrets.DOCKERHUB_PASSWORD }}
+          DST_USER: ${{ secrets.ZODLINC_DOCKERHUB_USERNAME }}
+          DST_PASS: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          go install github.com/google/go-containerregistry/cmd/crane@latest
+          crane copy \
+            --src-creds "${SRC_USER}:${SRC_PASS}" \
+            --dst-creds "${DST_USER}:${DST_PASS}" \
+            electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
+          crane copy \
+            --src-creds "${SRC_USER}:${SRC_PASS}" \
+            --dst-creds "${DST_USER}:${DST_PASS}" \
+            electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
+          echo "Done: zodlinc/lightwalletd:${TAG} and :latest published"
