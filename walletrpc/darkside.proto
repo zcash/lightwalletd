@@ -60,7 +60,7 @@ message DarksideAddressTransaction {
 
 // Darksidewalletd maintains two staging areas, blocks and transactions. The
 // Stage*() gRPCs add items to the staging area; ApplyStaged() "applies" everything
-// in the staging area to the working (operational) state that the mock zcashd
+// in the staging area to the working (operational) state that the mock Zcash node
 // serves; transactions are placed into their corresponding blocks (by height).
 service DarksideStreamer {
     // Reset reverts all darksidewalletd state (active block range, latest height,
@@ -74,7 +74,7 @@ service DarksideStreamer {
 
     // StageBlocksStream accepts a list of blocks and saves them into the blocks
     // staging area until ApplyStaged() is called; there is no immediate effect on
-    // the mock zcashd. Blocks are hex-encoded. Order is important, see ApplyStaged.
+    // the mock Zcash node. Blocks are hex-encoded. Order is important, see ApplyStaged.
     rpc StageBlocksStream(stream DarksideBlock) returns (Empty) {}
 
     // StageBlocks is the same as StageBlocksStream() except the blocks are fetched
@@ -92,7 +92,7 @@ service DarksideStreamer {
     // staging area until ApplyStaged() is called. Note that these transactions
     // are not returned by the production GetTransaction() gRPC until they
     // appear in a "mined" block (contained in the active blockchain presented
-    // by the mock zcashd).
+    // by the mock Zcash node).
     rpc StageTransactionsStream(stream RawTransaction) returns (Empty) {}
 
     // StageTransactions is the same except the transactions are fetched from
@@ -102,7 +102,7 @@ service DarksideStreamer {
 
     // ApplyStaged iterates the list of blocks that were staged by the
     // StageBlocks*() gRPCs, in the order they were staged, and "merges" each
-    // into the active, working blocks list that the mock zcashd is presenting
+    // into the active, working blocks list that the mock Zcash node is presenting
     // to lightwalletd. Even as each block is applied, the active list can't
     // have gaps; if the active block range is 1000-1006, and the staged block
     // range is 1003-1004, the resulting range is 1000-1004, with 1000-1002
@@ -112,10 +112,10 @@ service DarksideStreamer {
     // the order received) into each one's corresponding (by height) block
     // The staging area is then cleared.
     //
-    // The argument specifies the latest block height that mock zcashd reports
+    // The argument specifies the latest block height that mock Zcash node reports
     // (i.e. what's returned by GetLatestBlock). Note that ApplyStaged() can
     // also be used to simply advance the latest block height presented by mock
-    // zcashd. That is, there doesn't need to be anything in the staging area.
+    // node. That is, there doesn't need to be anything in the staging area.
     rpc ApplyStaged(DarksideHeight) returns (Empty) {}
 
     // Calls to the production gRPC SendTransaction() store the transaction in

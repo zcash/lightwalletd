@@ -33,23 +33,26 @@ Documentation for lightwalletd clients (the gRPC interface) is in `docs/rtd/inde
 
 # Local/Developer Usage
 
-## Zcashd
+## Zcash node
 
-You must start a local instance of `zcashd`, and its `.zcash/zcash.conf` file must include the following entries
-(set the user and password strings accordingly):
-```
-txindex=1
-lightwalletd=1
-experimentalfeatures=1
-rpcuser=xxxxx
-rpcpassword=xxxxx
+You must have access to a Zcash full node (such as [zebrad](https://zebra.zfnd.org/)
+or zakura) with its JSON-RPC interface enabled. For zebrad, the `zebrad.toml` configuration
+file must enable the RPC listener, for example:
+```toml
+[rpc]
+listen_addr = "127.0.0.1:8232"
 ```
 
-The `zcashd` can be configured to run `mainnet` or `testnet` (or `regtest`). If you stop `zcashd` and restart it on a different network (switch from `testnet` to `mainnet`, for example), you must also stop and restart lightwalletd.
+Then point lightwalletd at the node's RPC endpoint using the `--rpchost`,
+`--rpcport`, `--rpcuser`, and `--rpcpassword` options (all four must be given;
+if the node does not check RPC credentials, any values work). Note that the
+node's own configuration file (such as `zebrad.toml`) is not a suitable
+argument for `--zcash-conf-path`: its RPC address is the node's *bind* address,
+which is not necessarily an address that lightwalletd can reach.
 
-It's necessary to run `zcashd --reindex` one time for these options to take effect. This typically takes several hours, and requires more space in the `.zcash` data directory.
+The node can be configured to run on mainnet or testnet. If you stop the node and restart it on a different network, you must also stop and restart lightwalletd.
 
-Lightwalletd uses the following `zcashd` RPCs:
+Lightwalletd uses the following node RPCs:
 - `getinfo`
 - `getblockchaininfo`
 - `getbestblockhash`
@@ -74,13 +77,13 @@ your `$GOPATH` (`$HOME/go` by default), then build the lightwalletd server binar
 Assuming you used `make` to build the server, here's a typical developer invocation:
 
 ```
-./lightwalletd --no-tls-very-insecure --zcash-conf-path ~/.zcash/zcash.conf --data-dir . --log-file /dev/stdout
+./lightwalletd --no-tls-very-insecure --rpchost 127.0.0.1 --rpcport 8232 --rpcuser x --rpcpassword x --data-dir . --log-file /dev/stdout
 ```
 Type `./lightwalletd help` to see the full list of options and arguments.
 
 # Production Usage
 
-Run a local instance of `zcashd` (see above), except do _not_ specify `--no-tls-very-insecure`.
+Run a local Zcash node (see above), except do _not_ specify `--no-tls-very-insecure`.
 Ensure [Go](https://golang.org/dl/#stable) version 1.17 or later is installed.
 
 **x509 Certificates**
@@ -112,7 +115,7 @@ certbot certonly --standalone --preferred-challenges http -d some.forward.dns.co
 Example using server binary built from Makefile:
 
 ```
-./lightwalletd --tls-cert cert.pem --tls-key key.pem --zcash-conf-path /home/zcash/.zcash/zcash.conf --log-file /logs/server.log
+./lightwalletd --tls-cert cert.pem --tls-key key.pem --rpchost 127.0.0.1 --rpcport 8232 --rpcuser x --rpcpassword x --log-file /logs/server.log
 ```
 
 ## Block cache
@@ -129,7 +132,7 @@ the `--data-dir` command-line option).
 lightwalletd checks the consistency of these files at startup and during
 operation as these files may be damaged by, for example, an unclean shutdown.
 If the server detects corruption, it will automatically re-downloading blocks
-from `zcashd` from that height, requiring up to an hour again (no manual
+from the node from that height, requiring up to an hour again (no manual
 intervention is required). But this should occur rarely.
 
 If lightwalletd detects corruption in these cache files, it will log

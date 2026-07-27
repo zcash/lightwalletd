@@ -58,7 +58,7 @@ func TestContextRawRequestSuccess(t *testing.T) {
 }
 
 // TestContextRawRequestCancel verifies that cancelling the context aborts an
-// in-flight request promptly, rather than blocking until the zcashd RPC returns.
+// in-flight request promptly, rather than blocking until the node RPC returns.
 // This is the core guarantee of the fix for GHSA-5h96-xw2v-jxgq.
 func TestContextRawRequestCancel(t *testing.T) {
 	var once sync.Once

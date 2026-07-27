@@ -113,7 +113,7 @@ function compare {
 if $start_server
 then
   echo starting the server, this takes a few seconds ...
-  go run main.go --donation-address udonationaddr --zcash-conf-path ~/.zcash/zcash.conf --no-tls-very-insecure --darkside-timeout 999999 --darkside-very-insecure &
+  go run main.go --donation-address udonationaddr --no-tls-very-insecure --darkside-timeout 999999 --darkside-very-insecure &
   sleep 8
 fi
 
@@ -130,7 +130,7 @@ gt StageTransactions '{"height":663190,"url":"https://raw.githubusercontent.com/
 echo -n test: ApplyStaged to block 663210 ...
 gt ApplyStaged '{"height":663210}'
 
-# the block ingestor needs time to receive the block from the (fake) zcashd
+# the block ingestor needs time to receive the block from the (fake) node
 wait_height 663190
 
 # The transaction in this block is on mainnet, but in block 663229.

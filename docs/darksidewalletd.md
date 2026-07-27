@@ -3,7 +3,7 @@
 Darksidewalletd is a feature included in lightwalletd, enabled by the
 `--darkside-very-insecure` flag, which can serve arbitrary blocks to a Zcash
 light client wallet. This is useful for security and reorg testing. It includes
-a minimally-functional mock zcashd which comes with a gRPC API for controlling
+a minimally-functional mock Zcash node which comes with a gRPC API for controlling
 which blocks it will serve.
 
 This means that you can use darksidewalletd to control the blocks and
@@ -26,8 +26,8 @@ mitigates these risks, but users should still be cautious.
 ## Dependencies 
 
 Lightwalletd and most dependencies of lightwalletd, including Go version 1.11 or
-later, but not zcashd. Since Darksidewalletd mocks zcashd, it can run standalone
-and does not use zcashd to get blocks or send and receive transactions.
+later. Since Darksidewalletd mocks the backend node, it can run standalone
+and does not use a Zcash node to get blocks or send and receive transactions.
 
 For the tutorial the `grpcurl` tool is needed to call the `darksidewalletd`
 gRPC API.

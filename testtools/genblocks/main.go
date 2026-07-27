@@ -4,7 +4,7 @@
 //
 // This tool reads a set of files, each containing a list of transactions
 // (one per line, can be empty), and writes to stdout a list of blocks,
-// one per input file, in hex format (same as zcash-cli getblock 12345 0),
+// one per input file, in hex format (same as the getblock RPC with verbose=0),
 // each on a separate line. Each fake block contains a fake coinbase
 // transaction and all of the transactions in the corresponding file.
 

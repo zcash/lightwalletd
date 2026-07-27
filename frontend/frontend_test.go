@@ -52,7 +52,7 @@ func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
 	return lwd, cache
 }
 
-// resetGlobals restores the package globals that tests replace -- the zcashd
+// resetGlobals restores the package globals that tests replace -- the node
 // RPC stub and the step counter those stubs sequence through -- to the values
 // they have at package initialization. Any test that installs a stub should
 // "defer resetGlobals()" so it doesn't leak into later tests, even if the test
@@ -215,7 +215,7 @@ func TestGetLatestBlock(t *testing.T) {
 	// This argument is not used (it may be in the future)
 	req := &walletrpc.ChainSpec{}
 
-	// This does zcashd rpc "getblock", calls getLatestBlockStub() above
+	// This does the node rpc "getblock", calls getLatestBlockStub() above
 	block, err := common.GetBlock(context.Background(), cache, 380640)
 	if err != nil {
 		t.Fatal("getBlockFromRPC failed", err)
@@ -250,11 +250,11 @@ var addressTests = []string{
 	"t1234567890123456789012345678901234\n", // newline after
 }
 
-func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+func nodeRPCStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	step++
 	switch method {
 	case "getaddresstxids":
-		var filter common.ZcashdRpcRequestGetaddresstxids
+		var filter common.RpcRequestGetaddresstxids
 		err := json.Unmarshal(params[0], &filter)
 		if err != nil {
 			testT.Fatal("could not unmarshal block filter")
@@ -275,7 +275,7 @@ func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage)
 	case "getrawtransaction":
 		switch step {
 		case 2:
-			tx := &common.ZcashdRpcReplyGetrawtransaction{
+			tx := &common.RpcReplyGetrawtransaction{
 				Hex:    hex.EncodeToString(rawTxData[0]),
 				Height: 1234567,
 			}
@@ -285,7 +285,7 @@ func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage)
 			return []byte(""), errors.New("-5: test getrawtransaction error")
 		}
 	}
-	testT.Fatal("unexpected call to zcashdrpcStub")
+	testT.Fatal("unexpected call to nodeRPCStub")
 	return nil, nil
 }
 
@@ -318,16 +318,16 @@ func (t *testtaddrbalance) SendAndClose(b *walletrpc.Balance) error {
 }
 
 // getaddressbalanceStub returns a fixed balance and asserts that the request
-// only reaches zcashd with the expected (valid, bounded) address list.
+// only reaches the node with the expected (valid, bounded) address list.
 func getaddressbalanceStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 	if method != "getaddressbalance" {
 		testT.Fatal("unexpected method", method)
 	}
-	var req common.ZcashdRpcRequestGetaddressbalance
+	var req common.RpcRequestGetaddressbalance
 	if err := json.Unmarshal(params[0], &req); err != nil {
 		testT.Fatal("could not unmarshal getaddressbalance request")
 	}
-	return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 1234})
+	return json.Marshal(common.RpcReplyGetaddressbalance{Balance: 1234})
 }
 
 func TestGetTaddressBalanceStream(t *testing.T) {
@@ -337,10 +337,10 @@ func TestGetTaddressBalanceStream(t *testing.T) {
 
 	validAddr := "t1234567890123456789012345678901234"
 
-	// An invalid address must be rejected immediately, before any zcashd
+	// An invalid address must be rejected immediately, before any node
 	// call, and before the whole (potentially unbounded) stream is buffered.
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
-		testT.Fatal("zcashd must not be called for an invalid address")
+		testT.Fatal("the node must not be called for an invalid address")
 		return nil, nil
 	}
 	{
@@ -371,7 +371,7 @@ func TestGetTaddressBalanceStream(t *testing.T) {
 		}
 	}
 
-	// A valid, bounded request succeeds and returns the balance from zcashd.
+	// A valid, bounded request succeeds and returns the balance from the node.
 	common.RawRequest = getaddressbalanceStub
 	{
 		mock := &testtaddrbalance{addrs: []string{validAddr, validAddr}}
@@ -390,11 +390,11 @@ func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
 	defer resetGlobals()
 	lwd, _ := testsetup()
 
-	// A request naming too many addresses must be rejected before zcashd is
+	// A request naming too many addresses must be rejected before the node is
 	// contacted, so one request can't force unbounded backend work
 	// (GHSA-x4m7-3gpp-xc36).
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
-		testT.Fatal("zcashd must not be called when the address list is over the limit")
+		testT.Fatal("the node must not be called when the address list is over the limit")
 		return nil, nil
 	}
 	addrs := make([]string, maxTaddrsPerRequest+1)
@@ -430,7 +430,7 @@ func (tg *testgettx) Send(tx *walletrpc.RawTransaction) error {
 
 func TestGetTaddressTransactions(t *testing.T) {
 	testT = t
-	common.RawRequest = zcashdrpcStub
+	common.RawRequest = nodeRPCStub
 	defer resetGlobals()
 	lwd, _ := testsetup()
 
@@ -516,9 +516,9 @@ func TestGetTaddressTransactionsDefaultsEndToTip(t *testing.T) {
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 		switch method {
 		case "getblockchaininfo":
-			return json.Marshal(common.ZcashdRpcReplyGetblockchaininfo{Blocks: tip})
+			return json.Marshal(common.RpcReplyGetblockchaininfo{Blocks: tip})
 		case "getaddresstxids":
-			var filter common.ZcashdRpcRequestGetaddresstxids
+			var filter common.RpcRequestGetaddresstxids
 			if err := json.Unmarshal(params[0], &filter); err != nil {
 				testT.Fatal("could not unmarshal getaddresstxids request")
 			}
@@ -543,7 +543,7 @@ func TestGetTaddressTransactionsDefaultsEndToTip(t *testing.T) {
 	}
 }
 
-// A range wider than maxTaddrTxBlockSpan must be rejected before zcashd is
+// A range wider than maxTaddrTxBlockSpan must be rejected before the node is
 // contacted (GHSA-x4m7-3gpp-xc36 F2).
 func TestGetTaddressTransactionsRangeTooWide(t *testing.T) {
 	testT = t
@@ -551,7 +551,7 @@ func TestGetTaddressTransactionsRangeTooWide(t *testing.T) {
 	lwd, _ := testsetup()
 
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
-		testT.Fatal("zcashd must not be called when the range is too wide")
+		testT.Fatal("the node must not be called when the range is too wide")
 		return nil, nil
 	}
 	filter := &walletrpc.TransparentAddressBlockFilter{
@@ -845,7 +845,7 @@ func TestPruneCompactBlockToNullifiers(t *testing.T) {
 
 // An explicit End of height 0 must not be treated as "no bound": `End` carries
 // `json:",omitempty"`, so a zero value is dropped from the getaddresstxids
-// request and zcashd falls back to an open-ended scan — the exact behaviour
+// request and the node falls back to an open-ended scan — the exact behaviour
 // GHSA-x4m7-3gpp-xc36 F2 is meant to prevent.
 func TestGetTaddressTransactionsZeroEndIsBounded(t *testing.T) {
 	testT = t
@@ -856,9 +856,9 @@ func TestGetTaddressTransactionsZeroEndIsBounded(t *testing.T) {
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 		switch method {
 		case "getblockchaininfo":
-			return json.Marshal(common.ZcashdRpcReplyGetblockchaininfo{Blocks: tip})
+			return json.Marshal(common.RpcReplyGetblockchaininfo{Blocks: tip})
 		case "getaddresstxids":
-			var filter common.ZcashdRpcRequestGetaddresstxids
+			var filter common.RpcRequestGetaddresstxids
 			if err := json.Unmarshal(params[0], &filter); err != nil {
 				testT.Fatal("could not unmarshal getaddresstxids request")
 			}
@@ -885,14 +885,14 @@ func TestGetTaddressTransactionsZeroEndIsBounded(t *testing.T) {
 
 // An invalid-length block hash must be rejected before it is hex-expanded and
 // forwarded, so a client can't force large allocations here or parsing work in
-// zcashd with input that can only ever be rejected (GHSA-q2c2-hpp9-58hm).
+// the node with input that can only ever be rejected (GHSA-q2c2-hpp9-58hm).
 func TestGetTreeStateInvalidHashLength(t *testing.T) {
 	testT = t
 	defer resetGlobals()
 	lwd, _ := testsetup()
 
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
-		testT.Fatal("zcashd must not be called for an invalid-length block hash")
+		testT.Fatal("the node must not be called for an invalid-length block hash")
 		return nil, nil
 	}
 	for _, n := range []int{1, 31, 33, 64, 4 << 20} {
@@ -906,7 +906,7 @@ func TestGetTreeStateInvalidHashLength(t *testing.T) {
 		}
 	}
 
-	// A correctly-sized hash must still reach zcashd -- the guard must not
+	// A correctly-sized hash must still reach the node -- the guard must not
 	// reject valid input.
 	forwarded := false
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
@@ -922,7 +922,7 @@ func TestGetTreeStateInvalidHashLength(t *testing.T) {
 		t.Fatal("expected the stubbed backend error")
 	}
 	if !forwarded {
-		t.Fatal("a 32-byte hash should have been forwarded to zcashd")
+		t.Fatal("a 32-byte hash should have been forwarded to the node")
 	}
 }
 
@@ -934,9 +934,9 @@ func TestSendTransactionOversized(t *testing.T) {
 	defer resetGlobals()
 	lwd, _ := testsetup()
 
-	// Over the limit: rejected locally, zcashd never contacted.
+	// Over the limit: rejected locally, the node never contacted.
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
-		testT.Fatal("zcashd must not be called for an oversized transaction")
+		testT.Fatal("the node must not be called for an oversized transaction")
 		return nil, nil
 	}
 	_, err := lwd.SendTransaction(context.Background(),
@@ -948,7 +948,7 @@ func TestSendTransactionOversized(t *testing.T) {
 		t.Fatal("expected InvalidArgument on oversized transaction, got:", err)
 	}
 
-	// Exactly at the limit: forwarded to zcashd.
+	// Exactly at the limit: forwarded to the node.
 	forwarded := false
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 		forwarded = true
@@ -989,9 +989,9 @@ func TestGetMempoolTxExcludeListCap(t *testing.T) {
 		suffixes[i] = []byte{1, 2, 3, 4}
 	}
 
-	// Over the cap: rejected locally, zcashd never contacted.
+	// Over the cap: rejected locally, the node never contacted.
 	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
-		testT.Fatal("zcashd must not be called for an oversized exclude list")
+		testT.Fatal("the node must not be called for an oversized exclude list")
 		return nil, nil
 	}
 	err := lwd.GetMempoolTx(

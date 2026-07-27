@@ -140,7 +140,7 @@ func TestDarksideClearAllTreeStatesClearsHashIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var treeState ZcashdRpcReplyGettreestate
+	var treeState RpcReplyGettreestate
 	if err := json.Unmarshal(result, &treeState); err != nil {
 		t.Fatal(err)
 	}

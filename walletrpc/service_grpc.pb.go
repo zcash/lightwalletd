@@ -92,7 +92,7 @@ type CompactTxStreamerClient interface {
 	// Note: this method is deprecated; use `GetBlockRange` with the
 	// appropriate `poolTypes` instead.
 	GetBlockRangeNullifiers(ctx context.Context, in *BlockRange, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CompactBlock], error)
-	// Return the requested full (not compact) transaction (as from zcashd)
+	// Return the requested full (not compact) transaction (as from the node)
 	GetTransaction(ctx context.Context, in *TxFilter, opts ...grpc.CallOption) (*RawTransaction, error)
 	// Submit the given transaction to the Zcash network
 	SendTransaction(ctx context.Context, in *RawTransaction, opts ...grpc.CallOption) (*SendResponse, error)
@@ -471,7 +471,7 @@ type CompactTxStreamerServer interface {
 	// Note: this method is deprecated; use `GetBlockRange` with the
 	// appropriate `poolTypes` instead.
 	GetBlockRangeNullifiers(*BlockRange, grpc.ServerStreamingServer[CompactBlock]) error
-	// Return the requested full (not compact) transaction (as from zcashd)
+	// Return the requested full (not compact) transaction (as from the node)
 	GetTransaction(context.Context, *TxFilter) (*RawTransaction, error)
 	// Submit the given transaction to the Zcash network
 	SendTransaction(context.Context, *RawTransaction) (*SendResponse, error)

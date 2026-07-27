@@ -30,7 +30,6 @@ var (
 	Branch          = ""
 	BuildDate       = ""
 	BuildUser       = ""
-	NodeName        = "zebrad"
 	DonationAddress = ""
 )
 
@@ -59,9 +58,9 @@ type Options struct {
 	DarksideTimeout     uint64 `json:"darkside_timeout"`
 }
 
-// RawRequest points to the function to send an RPC request to zcashd;
+// RawRequest points to the function to send an RPC request to the Zcash node;
 // in production, it points to frontend.NewContextRawRequest();
-// in unit tests it points to a function to mock RPCs to zcashd.
+// in unit tests it points to a function to mock RPCs to the node.
 var RawRequest func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error)
 
 // Time allows time-related functions to be mocked for testing,
@@ -79,9 +78,10 @@ var Time struct {
 // Log as a global variable simplifies logging
 var Log *logrus.Entry
 
-// The following are JSON zcashd rpc requests and replies.
+// The following are the JSON-RPC requests and replies exchanged
+// with the backend Zcash node.
 type (
-	// zcashd rpc "getblockchaininfo"
+	// rpc "getblockchaininfo"
 	Upgradeinfo struct {
 		// unneeded fields can be omitted
 		Name             string
@@ -92,7 +92,7 @@ type (
 		Nextblock string // example: "e9ff75a6" (canopy)
 		Chaintip  string // example: "e9ff75a6" (canopy)
 	}
-	ZcashdRpcReplyGetblockchaininfo struct {
+	RpcReplyGetblockchaininfo struct {
 		Chain           string
 		Upgrades        map[string]Upgradeinfo
 		Blocks          int
@@ -101,22 +101,22 @@ type (
 		EstimatedHeight int
 	}
 
-	// zcashd rpc "getinfo"
-	// Note, this rpc should not be depended on in the future (being deprecated).
-	ZcashdRpcReplyGetinfo struct {
+	// rpc "getinfo", which supplies the backend build and subversion
+	// strings reported by the LightdInfo gRPC.
+	RpcReplyGetinfo struct {
 		Build      string
 		Subversion string
 	}
 
-	// zcashd rpc "getaddresstxids"
-	ZcashdRpcRequestGetaddresstxids struct {
+	// rpc "getaddresstxids"
+	RpcRequestGetaddresstxids struct {
 		Addresses []string `json:"addresses"`
 		Start     uint64   `json:"start"`
 		End       uint64   `json:"end,omitempty"`
 	}
 
-	// zcashd rpc "z_gettreestate"
-	ZcashdRpcReplyGettreestate struct {
+	// rpc "z_gettreestate"
+	RpcReplyGettreestate struct {
 		Height  int
 		Hash    string
 		Time    uint32
@@ -140,26 +140,26 @@ type (
 		}
 	}
 
-	// zcashd rpc "getrawtransaction txid 1" (1 means verbose), there are
+	// rpc "getrawtransaction txid 1" (1 means verbose), there are
 	// many more fields but these are the only ones we current need.
-	ZcashdRpcReplyGetrawtransaction struct {
+	RpcReplyGetrawtransaction struct {
 		Hex    string
 		Height int64
 	}
 
-	// zcashd rpc "getaddressbalance"
-	ZcashdRpcRequestGetaddressbalance struct {
+	// rpc "getaddressbalance"
+	RpcRequestGetaddressbalance struct {
 		Addresses []string `json:"addresses"`
 	}
-	ZcashdRpcReplyGetaddressbalance struct {
+	RpcReplyGetaddressbalance struct {
 		Balance int64
 	}
 
-	// zcashd rpc "getaddressutxos"
-	ZcashdRpcRequestGetaddressutxos struct {
+	// rpc "getaddressutxos"
+	RpcRequestGetaddressutxos struct {
 		Addresses []string `json:"addresses"`
 	}
-	ZcashdRpcReplyGetaddressutxos struct {
+	RpcReplyGetaddressutxos struct {
 		Address     string
 		Txid        string
 		OutputIndex int64
@@ -169,7 +169,7 @@ type (
 	}
 
 	// reply to getblock verbose=1 (json includes txid list)
-	ZcashRpcReplyGetblock1 struct {
+	RpcReplyGetblock1 struct {
 		Hash  string
 		Tx    []string
 		Trees struct {
@@ -203,7 +203,7 @@ type (
 	//
 	// Here is that example, except return (up to) 2 entries:
 	//
-	// $ zcash-cli z_getsubtreesbyindex sapling 0 2
+	// $ z_getsubtreesbyindex sapling 0 2
 	// {
 	//  "pool": "sapling",
 	//  "start_index": 0,
@@ -224,12 +224,12 @@ type (
 		End_height int
 	}
 
-	ZcashdRpcReplyGetsubtreebyindex struct {
+	RpcReplyGetsubtreebyindex struct {
 		Subtrees []Subtree
 	}
 )
 
-// FirstRPC tests that we can successfully reach zcashd through the RPC
+// FirstRPC tests that we can successfully reach the Zcash node through the RPC
 // interface. The specific RPC used here is not important.
 func FirstRPC() {
 	retryCount := 0
@@ -245,7 +245,7 @@ func FirstRPC() {
 		if retryCount > 10 {
 			Log.WithFields(logrus.Fields{
 				"timeouts": retryCount,
-			}).Fatal("unable to issue getblockchaininfo RPC call to zebrad or zcashd node")
+			}).Fatal("unable to issue getblockchaininfo RPC call to the Zcash node")
 		}
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
@@ -255,12 +255,12 @@ func FirstRPC() {
 	}
 }
 
-func GetBlockChainInfo() (*ZcashdRpcReplyGetblockchaininfo, error) {
+func GetBlockChainInfo() (*RpcReplyGetblockchaininfo, error) {
 	result, rpcErr := RawRequest(context.Background(), "getblockchaininfo", []json.RawMessage{})
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getblockchaininfoReply ZcashdRpcReplyGetblockchaininfo
+	var getblockchaininfoReply RpcReplyGetblockchaininfo
 	err := json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
 		return nil, err
@@ -273,7 +273,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getinfoReply ZcashdRpcReplyGetinfo
+	var getinfoReply RpcReplyGetinfo
 	err := json.Unmarshal(result, &getinfoReply)
 	if err != nil {
 		return nil, err
@@ -283,7 +283,7 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
-	var getblockchaininfoReply ZcashdRpcReplyGetblockchaininfo
+	var getblockchaininfoReply RpcReplyGetblockchaininfo
 	err = json.Unmarshal(result, &getblockchaininfoReply)
 	if err != nil {
 		return nil, err
@@ -351,13 +351,13 @@ func getBlockFromRPC(ctx context.Context, height int) (*walletrpc.CompactBlock, 
 	params := []json.RawMessage{heightJSON, json.RawMessage("1")}
 	result, rpcErr := RawRequest(ctx, "getblock", params)
 	if rpcErr != nil {
-		// Check to see if we are requesting a height the zcashd doesn't have yet
+		// Check to see if we are requesting a height the node doesn't have yet
 		if (strings.Split(rpcErr.Error(), ":"))[0] == "-8" {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("error requesting verbose block: %w", rpcErr)
 	}
-	var block1 ZcashRpcReplyGetblock1
+	var block1 RpcReplyGetblock1
 	err = json.Unmarshal(result, &block1)
 	if err != nil {
 		Log.Fatal("getBlockFromRPC: Can't unmarshal block:", err)
@@ -433,7 +433,7 @@ func stopIngestor() {
 	}
 }
 
-// BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
+// BlockIngestor runs as a goroutine and polls the Zcash node for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
 	lastLog := Time.Now()
@@ -452,7 +452,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if err != nil {
 			Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("error " + NodeName + " getbestblockhash rpc")
+			}).Fatal("error getbestblockhash rpc")
 		}
 		var hashHex string
 		err = json.Unmarshal(result, &hashHex)
@@ -496,7 +496,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 		}
 		if height == c.GetFirstHeight() {
 			c.Sync()
-			Log.Info("Waiting for "+NodeName+" height to reach Sapling activation height ",
+			Log.Info("Waiting for the node height to reach Sapling activation height ",
 				"(", c.GetFirstHeight(), ")...")
 			Time.Sleep(120 * time.Second)
 			continue
@@ -507,7 +507,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 }
 
 // GetBlock returns the compact block at the requested height, first by querying
-// the cache, then, if not found, will request the block from zcashd. It returns
+// the cache, then, if not found, will request the block from the node. It returns
 // nil if no block exists at this height.
 // This returns gRPC-compatible errors.
 func GetBlock(ctx context.Context, cache *BlockCache, height int) (*walletrpc.CompactBlock, error) {
@@ -642,15 +642,15 @@ func GetBlockRange(ctx context.Context, cache *BlockCache, blockOut chan<- *wall
 	}
 }
 
-// ParseRawTransaction converts between the JSON result of a `zcashd`
+// ParseRawTransaction converts between the JSON result of a
 // `getrawtransaction` call and the `RawTransaction` protobuf type.
 //
 // Due to an error in the original protobuf definition, it is necessary to
-// reinterpret the result of the `getrawtransaction` RPC call. Zcashd will
-// return the int64 value `-1` for the height of transactions that appear in
+// reinterpret the result of the `getrawtransaction` RPC call. The backend
+// returns the int64 value `-1` for the height of transactions that appear in
 // the block index, but which are not mined in the main chain. `service.proto`
 // defines the height field of `RawTransaction` to be a `uint64`, and as such
-// we must map the response from the zcashd RPC API to be representable within
+// we must map the response from the RPC API to be representable within
 // this space. Additionally, the `height` field will be absent for transactions
 // in the mempool, resulting in the default value of `0` being set. Therefore,
 // the meanings of the `Height` field of the `RawTransaction` type are as
@@ -663,7 +663,7 @@ func GetBlockRange(ctx context.Context, cache *BlockCache, blockOut chan<- *wall
 //     given height
 func ParseRawTransaction(message json.RawMessage) (*walletrpc.RawTransaction, error) {
 	// Many other fields are returned, but we need only these two.
-	var txinfo ZcashdRpcReplyGetrawtransaction
+	var txinfo RpcReplyGetrawtransaction
 	err := json.Unmarshal(message, &txinfo)
 	if err != nil {
 		return nil, err

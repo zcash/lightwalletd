@@ -96,26 +96,6 @@ lwd-api.html: walletrpc/compact_formats.proto walletrpc/service.proto
 docker_img:
 	docker build -t zcash_lwd_base .
 
-# Run the above docker image in a container
-docker_img_run:
-	docker run -i --name zcashdlwd zcash_lwd_base
-
-# Execute a bash process on zcashdlwdcontainer
-docker_img_bash:
-	docker exec -it zcashdlwd bash
-
-# Start the zcashd process in the zcashdlwd container
-docker_img_run_zcashd:
-	docker exec -i zcashdlwd zcashd -printtoconsole
-
-# Stop the zcashd process in the zcashdlwd container
-docker_img_stop_zcashd:
-	docker exec -i zcashdlwd zcash-cli stop
-
-# Start the lightwalletd server in the zcashdlwd container
-docker_img_run_lightwalletd_insecure_server:
-	docker exec -i zcashdlwd server --no-tls-very-insecure=true --conf-file /home/zcash/.zcash/zcash.conf --log-file /logs/server.log --bind-addr 127.0.0.1:18232
-
 # Remove and delete ALL images and containers in Docker; assumes containers are stopped
 docker_remove_all:
 	docker system prune -f

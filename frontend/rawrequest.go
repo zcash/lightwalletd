@@ -69,11 +69,11 @@ func newContextHTTPClient(cfg *rpcclient.ConnConfig) (*http.Client, error) {
 	}, nil
 }
 
-// NewContextRawRequest returns a context-aware JSON-RPC function for zcashd and
-// zebrad. It is a port of btcsuite/btcd/rpcclient's HTTP POST path (same retry
+// NewContextRawRequest returns a context-aware JSON-RPC function for
+// the Zcash node. It is a port of btcsuite/btcd/rpcclient's HTTP POST path (same retry
 // count, backoff schedule, and per-request connection handling) with ctx threaded
 // through via http.NewRequestWithContext, so that a cancelled gRPC stream aborts
-// the in-flight request instead of leaking a goroutine and a zcashd RPC slot.
+// the in-flight request instead of leaking a goroutine and a node RPC slot.
 //
 // This wrapper exists only because btcd's rpcclient does not yet expose a
 // context-aware request method. Once btcsuite/btcd#2506 (RawRequestWithContext)

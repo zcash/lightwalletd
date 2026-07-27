@@ -10,7 +10,7 @@ A **compact block** is a collection of compact transactions along with certain m
 
 ```
 +----------+
-|  zcashd  |                       +----------+    +-------+
+|   node   |                       +----------+    +-------+
 +----+-----+              +------->+ frontend +--->+       |
      |                    |        +----------+    |  L    +<----Client
      | raw blocks    +----+----+                   |  O B  |
@@ -29,7 +29,7 @@ A **compact block** is a collection of compact transactions along with certain m
 
 The ingester is the component responsible for transforming raw Zcash block data into a compact block.
 
-The ingester is a modular component. Anything that can retrieve the necessary data and put it into storage can fulfill this role. Currently, the only ingester available communicated to zcashd through RPCs and parses that raw block data. 
+The ingester is a modular component. Anything that can retrieve the necessary data and put it into storage can fulfill this role. Currently, the only ingester available communicates to the Zcash node through RPCs and parses that raw block data. 
 
 **How do I run it?**
 
@@ -44,7 +44,7 @@ Now clone this repo and start the ingester. The first run will start slow as Go 
 ```
 $ git clone https://github.com/zcash/lightwalletd
 $ cd lightwalletd
-$ go run cmd/ingest/main.go --conf-file <path_to_zcash.conf> --db-path <path_to_sqllightdb>
+$ go run cmd/ingest/main.go --conf-file <path_to_node_conf> --db-path <path_to_sqllightdb>
 ```
 
 To see the other command line options, run `go run cmd/ingest/main.go --help`.
@@ -79,7 +79,7 @@ x509 Certificates! This software relies on the confidentiality and integrity of 
 
 Otherwise, not much! This is a very simple piece of software. Make sure you point it at the same storage as the ingester. See the "Production" section for some caveats.
 
-Support for users sending transactions will require the ability to make JSON-RPC calls to a zcashd instance. By default the frontend tries to pull RPC credentials from your zcashd.conf file, but you can specify other credentials via command line flag. In the future, it should be possible to do this with environment variables [(#2)](https://github.com/zcash/lightwalletd/issues/2).
+Support for users sending transactions will require the ability to make JSON-RPC calls to a Zcash node. By default the frontend tries to pull the RPC address and credentials from your node's config file, but you can specify other credentials via command line flag. In the future, it should be possible to do this with environment variables [(#2)](https://github.com/zcash/lightwalletd/issues/2).
 
 ## Storage
 
