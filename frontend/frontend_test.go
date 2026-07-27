@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/common"
@@ -61,6 +62,11 @@ func testsetup() (walletrpc.CompactTxStreamerServer, *common.BlockCache) {
 func resetGlobals() {
 	common.RawRequest = nil
 	step = 0
+	// The GetMempoolTx cache is package state too; a test that refreshes it
+	// would otherwise leave the next test looking at a stale mempool.
+	mempoolMap = nil
+	mempoolList = nil
+	lastMempool = time.Time{}
 }
 
 func TestMain(m *testing.M) {
@@ -874,5 +880,144 @@ func TestGetTaddressTransactionsZeroEndIsBounded(t *testing.T) {
 	}
 	if err := lwd.GetTaddressTransactions(filter, &testgettx{}); err != nil {
 		t.Fatal("GetTaddressTransactions failed:", err)
+	}
+}
+
+// An invalid-length block hash must be rejected before it is hex-expanded and
+// forwarded, so a client can't force large allocations here or parsing work in
+// zcashd with input that can only ever be rejected (GHSA-q2c2-hpp9-58hm).
+func TestGetTreeStateInvalidHashLength(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an invalid-length block hash")
+		return nil, nil
+	}
+	for _, n := range []int{1, 31, 33, 64, 4 << 20} {
+		_, err := lwd.GetTreeState(context.Background(),
+			&walletrpc.BlockID{Hash: make([]byte, n)})
+		if err == nil {
+			t.Fatal("GetTreeState should have failed on hash length", n)
+		}
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatal("expected InvalidArgument for hash length", n, "got:", err)
+		}
+	}
+
+	// A correctly-sized hash must still reach zcashd -- the guard must not
+	// reject valid input.
+	forwarded := false
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		forwarded = true
+		if method != "z_gettreestate" {
+			testT.Fatal("unexpected method", method)
+		}
+		return nil, errors.New("-8: block not found")
+	}
+	_, err := lwd.GetTreeState(context.Background(),
+		&walletrpc.BlockID{Hash: make([]byte, blockHashLen)})
+	if err == nil {
+		t.Fatal("expected the stubbed backend error")
+	}
+	if !forwarded {
+		t.Fatal("a 32-byte hash should have been forwarded to zcashd")
+	}
+}
+
+// An oversized raw transaction must be rejected before it is hex-expanded and
+// forwarded (GHSA-6ppp-r2gc-9q6v). A transaction at exactly the limit is still
+// accepted, so the bound is not off by one.
+func TestSendTransactionOversized(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// Over the limit: rejected locally, zcashd never contacted.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an oversized transaction")
+		return nil, nil
+	}
+	_, err := lwd.SendTransaction(context.Background(),
+		&walletrpc.RawTransaction{Data: make([]byte, maxRawTxSize+1)})
+	if err == nil {
+		t.Fatal("SendTransaction should have failed on an oversized transaction")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument on oversized transaction, got:", err)
+	}
+
+	// Exactly at the limit: forwarded to zcashd.
+	forwarded := false
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		forwarded = true
+		return json.Marshal("sometxid")
+	}
+	if _, err := lwd.SendTransaction(context.Background(),
+		&walletrpc.RawTransaction{Data: make([]byte, maxRawTxSize)}); err != nil {
+		t.Fatal("SendTransaction at the size limit failed:", err)
+	}
+	if !forwarded {
+		t.Fatal("a transaction at the size limit should have been forwarded")
+	}
+}
+
+type testmempooltx struct {
+	walletrpc.CompactTxStreamer_GetMempoolTxServer
+	sent int
+}
+
+func (t *testmempooltx) Context() context.Context { return context.Background() }
+
+func (t *testmempooltx) Send(tx *walletrpc.CompactTx) error {
+	t.sent++
+	return nil
+}
+
+// An oversized exclude list must be rejected before the server allocates,
+// hex-encodes and sorts it -- work that used to happen while holding the
+// method mutex, stalling other callers (GHSA-4hp3-3494-3f2m). A list at the
+// cap is still accepted, so the bound is not off by one.
+func TestGetMempoolTxExcludeListCap(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	suffixes := make([][]byte, maxExcludeTxidSuffixes+1)
+	for i := range suffixes {
+		suffixes[i] = []byte{1, 2, 3, 4}
+	}
+
+	// Over the cap: rejected locally, zcashd never contacted.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an oversized exclude list")
+		return nil, nil
+	}
+	err := lwd.GetMempoolTx(
+		&walletrpc.GetMempoolTxRequest{ExcludeTxidSuffixes: suffixes}, &testmempooltx{})
+	if err == nil {
+		t.Fatal("GetMempoolTx should have failed on an oversized exclude list")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument on oversized exclude list, got:", err)
+	}
+
+	// Exactly at the cap: accepted, and the mempool refresh happens.
+	refreshed := false
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getrawmempool" {
+			testT.Fatal("unexpected method", method)
+		}
+		refreshed = true
+		return []byte("[]"), nil
+	}
+	if err := lwd.GetMempoolTx(
+		&walletrpc.GetMempoolTxRequest{ExcludeTxidSuffixes: suffixes[:maxExcludeTxidSuffixes]},
+		&testmempooltx{}); err != nil {
+		t.Fatal("GetMempoolTx at the exclude-list cap failed:", err)
+	}
+	if !refreshed {
+		t.Fatal("a request at the cap should have reached the backend")
 	}
 }

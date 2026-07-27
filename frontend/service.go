@@ -350,6 +350,9 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 // GetTreeState returns the note commitment tree state corresponding to the given block.
 // See section 3.7 of the Zcash protocol specification. It returns several other useful
 // values also (even though they can be obtained using GetBlock).
+// blockHashLen is the length in bytes of a Zcash block hash.
+const blockHashLen = len(hash32.T{})
+
 // The block can be specified by either height or hash.
 func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (*walletrpc.TreeState, error) {
 	if id.Height == 0 && id.Hash == nil {
@@ -368,6 +371,15 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		common.Log.Debugf("gRPC GetTreeState(height=%+v)\n", id.Height)
 		params[0] = heightJSON
 	} else {
+		// Reject a wrong-length hash before expanding it: the bytes below are
+		// hex-encoded (doubling them) and JSON-marshalled before zcashd ever
+		// sees them, so without this an unauthenticated client can force large
+		// allocations here and parsing work in the backend with input that can
+		// only ever be rejected (GHSA-q2c2-hpp9-58hm).
+		if len(id.Hash) != blockHashLen {
+			return nil, status.Errorf(codes.InvalidArgument,
+				"GetTreeState: block hash has invalid length: %d", len(id.Hash))
+		}
 		// id.Hash is big-endian, keep in big-endian for the rpc
 		hash := hex.EncodeToString(id.Hash)
 		common.Log.Debugf("gRPC GetTreeState(hash=%+v)\n", hash)
@@ -495,6 +507,12 @@ func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 	return lightdinfo, err
 }
 
+// maxRawTxSize bounds the raw transaction bytes lightwalletd will forward to
+// zcashd. A Zcash transaction cannot exceed the 2,000,000-byte block size
+// limit, so anything larger is unminable by definition and there is no reason
+// to spend memory expanding it or to make the backend parse it.
+const maxRawTxSize = 2000000
+
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
 func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	common.Log.Debugf("gRPC SendTransaction(%+v)\n", rawtx)
@@ -508,6 +526,16 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	// Verify rawtx
 	if rawtx == nil || rawtx.Data == nil {
 		return nil, status.Error(codes.InvalidArgument, "bad transaction data")
+	}
+	// Reject an oversized transaction before expanding it: the bytes below are
+	// hex-encoded (doubling them) and JSON-marshalled before zcashd ever sees
+	// them, so without this an unauthenticated client can force large
+	// allocations here and parsing work in the backend with a transaction that
+	// can never be mined (GHSA-6ppp-r2gc-9q6v).
+	if len(rawtx.Data) > maxRawTxSize {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"SendTransaction: transaction is too large: %d bytes (limit %d)",
+			len(rawtx.Data), maxRawTxSize)
 	}
 
 	// Construct raw JSON-RPC params
@@ -661,8 +689,26 @@ var mempoolList []string
 // Last time we pulled a copy of the mempool from zcashd.
 var lastMempool time.Time
 
+// maxExcludeTxidSuffixes bounds the exclude list a client may send to
+// GetMempoolTx. The list names transactions the caller already has, so it is
+// only ever useful up to the size of the mempool itself; this cap sits well
+// above the number of transactions zcashd's default mempool can hold.
+const maxExcludeTxidSuffixes = 20000
+
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
 	common.Log.Debugf("gRPC GetMempoolTx(%+v)\n", exclude)
+	// Each suffix is length-checked below, but the number of them was not
+	// bounded, so a client could submit a huge list and make the server
+	// allocate, hex-encode and sort all of it -- historically while holding
+	// s.mutex, and even when the mempool was empty and the response would be
+	// empty too (GHSA-4hp3-3494-3f2m). The cap is comfortably larger than the
+	// number of transactions zcashd's default mempool can hold, so an exclude
+	// list beyond it cannot describe a useful set in any case.
+	if len(exclude.ExcludeTxidSuffixes) > maxExcludeTxidSuffixes {
+		return status.Errorf(codes.InvalidArgument,
+			"GetMempoolTx: too many exclude txid suffixes: %d (limit %d)",
+			len(exclude.ExcludeTxidSuffixes), maxExcludeTxidSuffixes)
+	}
 	for i := 0; i < len(exclude.ExcludeTxidSuffixes); i++ {
 		if len(exclude.ExcludeTxidSuffixes[i]) > 32 {
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
@@ -679,6 +725,18 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			walletrpc.PoolType_IRONWOOD,
 		}
 	}
+	// Transform the exclude list before taking the mutex: it depends only on
+	// the request, so doing it in the critical section would let one caller's
+	// large list stall every other GetMempoolTx caller (GHSA-4hp3-3494-3f2m).
+	excludeHex := make([]string, len(exclude.ExcludeTxidSuffixes))
+	for i := range exclude.ExcludeTxidSuffixes {
+		rev := make([]byte, len(exclude.ExcludeTxidSuffixes[i]))
+		for j := range rev {
+			rev[j] = exclude.ExcludeTxidSuffixes[i][len(exclude.ExcludeTxidSuffixes[i])-j-1]
+		}
+		excludeHex[i] = hex.EncodeToString(rev)
+	}
+
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -753,14 +811,6 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
 		mempoolMap = &newmempoolMap
-	}
-	excludeHex := make([]string, len(exclude.ExcludeTxidSuffixes))
-	for i := range exclude.ExcludeTxidSuffixes {
-		rev := make([]byte, len(exclude.ExcludeTxidSuffixes[i]))
-		for j := range rev {
-			rev[j] = exclude.ExcludeTxidSuffixes[i][len(exclude.ExcludeTxidSuffixes[i])-j-1]
-		}
-		excludeHex[i] = hex.EncodeToString(rev)
 	}
 	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
 		ctx, ok := (*mempoolMap)[txid]
