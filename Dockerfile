@@ -21,10 +21,10 @@ RUN apk add --no-cache ca-certificates \
 
 COPY --from=builder /go/src/github.com/zcash/lightwalletd/lightwalletd /usr/local/bin/
 
-# NB: the container still runs as root, matching the previous image. The
-# lightwalletd user exists and owns the db directory, but switching to it
-# would break existing deployments whose data directories were written as
-# root, so that change is deliberately left separate.
+# Run unprivileged. Existing deployments whose data directory was written by
+# an earlier root-running image must chown it to 2002:2002 (or run the
+# container with --user 0:0) before upgrading; see CHANGELOG.md.
+USER lightwalletd
 WORKDIR /srv/lightwalletd
 
 ENTRYPOINT ["lightwalletd"]
