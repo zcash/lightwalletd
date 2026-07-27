@@ -6,6 +6,15 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Added
+
+- Recognize `zakura` as a supported backend node.
+
+- Add the `--no-backend-check` option, which skips backend detection entirely
+  so that lightwalletd can connect to any node that speaks the expected RPCs.
+
 ## [0.5.0] - 2026-07-26
 
 ### Added

@@ -47,6 +47,7 @@ type Options struct {
 	RPCPassword         string `json:"rpcpassword"`
 	RPCHost             string `json:"rpchost"`
 	RPCPort             string `json:"rpcport"`
+	NoBackendCheck      bool   `json:"no_backend_check,omitempty"`
 	NoTLSVeryInsecure   bool   `json:"no_tls_very_insecure,omitempty"`
 	GenCertVeryInsecure bool   `json:"gen_cert_very_insecure,omitempty"`
 	Redownload          bool   `json:"redownload"`

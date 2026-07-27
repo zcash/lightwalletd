@@ -58,6 +58,7 @@ var rootCmd = &cobra.Command{
 			RPCPassword:         viper.GetString("rpcpassword"),
 			RPCHost:             viper.GetString("rpchost"),
 			RPCPort:             viper.GetString("rpcport"),
+			NoBackendCheck:      viper.GetBool("no-backend-check"),
 			NoTLSVeryInsecure:   viper.GetBool("no-tls-very-insecure"),
 			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
 			DataDir:             viper.GetString("data-dir"),
@@ -236,41 +237,60 @@ func startServer(opts *common.Options) error {
 			" chain ", getLightdInfo.ChainName,
 			" branchID ", getLightdInfo.ConsensusBranchId)
 		chainName = getLightdInfo.ChainName
-		if strings.Contains(getLightdInfo.ZcashdSubversion, "MagicBean") {
-			// The default is zebrad
-			common.NodeName = "zcashd"
+
+		// Detect the backend from its subversion string. zakura is checked
+		// first because a BIP 14 user agent can carry more than one token
+		// (zakura composes things like "/Zakura:x.y.z/MagicBean:6.3.0/" when
+		// advertising compatibility), and the leading token is the real node.
+		subver := getLightdInfo.ZcashdSubversion
+		backend := ""
+		switch {
+		case strings.Contains(subver, "/Zakura:"):
+			backend = "zakura"
+		case strings.Contains(subver, "/Zebra:"):
+			backend = "zebrad"
+		case strings.Contains(subver, "/MagicBean:"):
+			backend = "zcashd"
+		}
+		if backend != "" {
+			common.NodeName = backend
 		}
 
-		// Detect backend from subversion and, for zcashd, ensure the
-		// required experimental features are enabled.
-		subver := getLightdInfo.ZcashdSubversion
+		// Verify that the backend is one we know how to talk to and, for
+		// zcashd, that the required experimental features are enabled.
+		// --no-backend-check skips all of this, allowing lightwalletd to
+		// connect to any node that speaks the expected RPCs.
+		if opts.NoBackendCheck {
+			common.Log.Warn("--no-backend-check given; not verifying the backend, subversion ", subver)
+		} else {
+			switch backend {
+			case "zebrad", "zakura":
+				common.Log.Info("Detected ", backend, " backend; skipping experimental feature check")
 
-		switch {
-		case strings.Contains(subver, "/Zebra:"):
-			common.Log.Info("Detected zebrad backend; skipping experimental feature check")
+			case "zcashd":
+				result, rpcErr := common.RawRequest(context.Background(), "getexperimentalfeatures", []json.RawMessage{})
+				if rpcErr != nil {
+					common.Log.Fatalf("zcashd backend detected but getexperimentalfeatures RPC failed: %s", rpcErr.Error())
+				}
 
-		case strings.Contains(subver, "/MagicBean:"):
-			result, rpcErr := common.RawRequest(context.Background(), "getexperimentalfeatures", []json.RawMessage{})
-			if rpcErr != nil {
-				common.Log.Fatalf("zcashd backend detected but getexperimentalfeatures RPC failed: %s", rpcErr.Error())
-			}
+				var feats []string
+				if err := json.Unmarshal(result, &feats); err != nil {
+					common.Log.Info("failed to decode getexperimentalfeatures reply: %w", err)
+				}
 
-			var feats []string
-			if err := json.Unmarshal(result, &feats); err != nil {
-				common.Log.Info("failed to decode getexperimentalfeatures reply: %w", err)
-			}
+				switch {
+				case slices.Contains(feats, "lightwalletd"):
+				case slices.Contains(feats, "insightexplorer"):
+				default:
+					common.Log.Fatal(
+						"zcashd is running without the required experimental feature enabled; " +
+							"enable 'lightwalletd' or 'insightexplorer'")
+				}
 
-			switch {
-			case slices.Contains(feats, "lightwalletd"):
-			case slices.Contains(feats, "insightexplorer"):
 			default:
-				common.Log.Fatal(
-					"zcashd is running without the required experimental feature enabled; " +
-						"enable 'lightwalletd' or 'insightexplorer'")
+				common.Log.Fatalf("unsupported backend subversion %q (expected zebrad, zakura, or the "+
+					"deprecated zcashd); use --no-backend-check to connect anyway", subver)
 			}
-
-		default:
-			common.Log.Fatalf("unsupported backend subversion %q (expected zcashd or zebrad)", subver)
 		}
 	}
 
@@ -397,6 +417,7 @@ func init() {
 	rootCmd.Flags().String("rpcpassword", "", "RPC password")
 	rootCmd.Flags().String("rpchost", "", "RPC host")
 	rootCmd.Flags().String("rpcport", "", "RPC host port")
+	rootCmd.Flags().Bool("no-backend-check", false, "don't verify that the backend node is zebrad, zakura or zcashd; connect to any node")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zebrad or zcashd; reinitialize local cache files")
@@ -428,6 +449,8 @@ func init() {
 	viper.BindPFlag("rpcpassword", rootCmd.Flags().Lookup("rpcpassword"))
 	viper.BindPFlag("rpchost", rootCmd.Flags().Lookup("rpchost"))
 	viper.BindPFlag("rpcport", rootCmd.Flags().Lookup("rpcport"))
+	viper.BindPFlag("no-backend-check", rootCmd.Flags().Lookup("no-backend-check"))
+	viper.SetDefault("no-backend-check", false)
 	viper.BindPFlag("no-tls-very-insecure", rootCmd.Flags().Lookup("no-tls-very-insecure"))
 	viper.SetDefault("no-tls-very-insecure", false)
 	viper.BindPFlag("gen-cert-very-insecure", rootCmd.Flags().Lookup("gen-cert-very-insecure"))
