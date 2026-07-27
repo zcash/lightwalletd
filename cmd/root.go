@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -37,6 +38,22 @@ import (
 
 var cfgFile string
 var logger = logrus.New()
+
+// ingestRPCPoolSize returns the max number of pooled HTTP connections to the
+// backend RPC. It defaults to the ingest worker count (LWD_INGEST_WORKERS, 8)
+// plus headroom for concurrent frontend gRPC traffic, and can be overridden
+// directly with LWD_RPC_POOL.
+func ingestRPCPoolSize() int {
+	workers := 8
+	if v, err := strconv.Atoi(os.Getenv("LWD_INGEST_WORKERS")); err == nil && v > 0 {
+		workers = v
+	}
+	pool := workers + 16
+	if v, err := strconv.Atoi(os.Getenv("LWD_RPC_POOL")); err == nil && v > 0 {
+		pool = v
+	}
+	return pool
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -216,7 +233,10 @@ func startServer(opts *common.Options) error {
 			}).Fatal("setting up RPC connection to zebrad or zcashd")
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
-		common.RawRequest, err = frontend.NewContextRawRequest(connCfg)
+		// The connection pool is sized to track ingest concurrency with headroom
+		// for frontend gRPC traffic, so the parallel block ingestor's workers
+		// reuse keep-alive connections instead of opening one per request.
+		common.RawRequest, err = frontend.NewContextRawRequest(connCfg, ingestRPCPoolSize())
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
