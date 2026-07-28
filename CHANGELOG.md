@@ -77,7 +77,9 @@ The most recent changes are listed first.
   spends and outputs, Orchard actions, JoinSplits, and the block's
   transaction count) than the input could possibly contain; sizing a slice
   from such a count previously allocated gigabytes before the first element
-  failed to parse, exhausting memory (GHSA-ph5v-77v6-j498).
+  failed to parse. The parser only consumes data supplied by the configured
+  backend node (or by the opt-in darkside testing facility), so this is
+  defensive hardening rather than a remotely reachable defect (#562).
 
 - Make `common.RawRequest` context-aware so cancelled `GetBlockRange` /
   `GetBlockRangeNullifiers` streams abort in-flight zcashd JSON-RPC calls
