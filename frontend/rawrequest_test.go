@@ -12,10 +12,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/zcash/lightwalletd/common"
 )
 
 func TestContextRawRequestSuccess(t *testing.T) {
@@ -110,5 +112,47 @@ func TestContextRawRequestCancel(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("rawRequest did not return promptly after cancellation")
+	}
+}
+
+// An HTTP-level rejection must surface as a typed *common.BackendResponseError
+// rather than an opaque error, so that FirstRPC can stop waiting on credentials
+// that will never be accepted. A 401 also must not be retried internally --
+// retrying cannot change the outcome.
+func TestContextRawRequestUnauthorizedIsTyped(t *testing.T) {
+	var attempts int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&attempts, 1)
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("Unauthorized"))
+	}))
+	defer server.Close()
+
+	cfg := &rpcclient.ConnConfig{
+		Host:         server.Listener.Addr().String(),
+		User:         "user",
+		Pass:         "wrong",
+		HTTPPostMode: true,
+		DisableTLS:   true,
+	}
+	rawRequest, err := NewContextRawRequest(cfg)
+	if err != nil {
+		t.Fatalf("NewContextRawRequest failed: %v", err)
+	}
+
+	_, err = rawRequest(context.Background(), "getblockchaininfo", nil)
+	if err == nil {
+		t.Fatal("expected an error for a 401 response")
+	}
+
+	var respErr *common.BackendResponseError
+	if !errors.As(err, &respErr) {
+		t.Fatalf("error is %T (%v), want *common.BackendResponseError", err, err)
+	}
+	if respErr.StatusCode != http.StatusUnauthorized {
+		t.Errorf("StatusCode = %d, want %d", respErr.StatusCode, http.StatusUnauthorized)
+	}
+	if n := atomic.LoadInt32(&attempts); n != 1 {
+		t.Errorf("server saw %d attempts, want 1 (a 401 must not be retried)", n)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"strconv"
 	"strings"
@@ -229,6 +230,36 @@ type (
 	}
 )
 
+// BackendResponseError reports that the backend replied with something that
+// isn't a JSON-RPC response, such as an HTTP authentication failure. Unlike a
+// transport error, it means the backend was reachable and rejected the
+// request, so the two cases can be told apart by callers that retry.
+type BackendResponseError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *BackendResponseError) Error() string {
+	return fmt.Sprintf("status code: %d, response: %q", e.StatusCode, e.Body)
+}
+
+// backendRejectedCredentials reports whether err means the backend refused our
+// credentials. That is a configuration error rather than an outage, so waiting
+// for it to clear is pointless.
+//
+// Only authentication statuses count. Other HTTP failures (a 502 from a proxy
+// while the node restarts, say) are transient, and a JSON-RPC error is not
+// treated as fatal either, because zcashd answers with one (code -28) while
+// it is still warming up -- precisely the case we want to keep waiting for.
+func backendRejectedCredentials(err error) bool {
+	var respErr *BackendResponseError
+	if !errors.As(err, &respErr) {
+		return false
+	}
+	return respErr.StatusCode == http.StatusUnauthorized ||
+		respErr.StatusCode == http.StatusForbidden
+}
+
 // FirstRPC tests that we can successfully reach zcashd through the RPC
 // interface. The specific RPC used here is not important.
 func FirstRPC() {
@@ -241,17 +272,32 @@ func FirstRPC() {
 			}
 			break
 		}
-		retryCount++
-		if retryCount > 10 {
+		// Distinguish "the backend isn't up yet" from "the backend is up and
+		// refusing us". Only the former is worth waiting on; bad credentials
+		// will never start working, and retrying forever would turn a typo in
+		// the config into a server that looks merely slow to start.
+		if backendRejectedCredentials(err) {
 			Log.WithFields(logrus.Fields{
-				"timeouts": retryCount,
-			}).Fatal("unable to issue getblockchaininfo RPC call to zebrad or zcashd node")
+				"error": err.Error(),
+			}).Fatal("the " + NodeName + " node rejected our RPC credentials; " +
+				"check rpcuser/rpcpassword (or the cookie file) in the zcash conf")
+		}
+		retryCount++
+		// Otherwise retry indefinitely instead of exiting, so lightwalletd waits for
+		// the backend (zebrad/zcashd) to become reachable rather than crash-looping
+		// when the node is temporarily unavailable — e.g. catching up, or behind a
+		// readiness gate that has emptied its Service. The gRPC server only starts
+		// after FirstRPC returns, so the pod stays not-ready (out of rotation) until
+		// the backend is serving, then comes up cleanly — no CrashLoopBackOff.
+		backoff := 10 + retryCount*5
+		if backoff > 60 {
+			backoff = 60 // cap backoff at 60s
 		}
 		Log.WithFields(logrus.Fields{
 			"error": err.Error(),
 			"retry": retryCount,
 		}).Warn("error with getblockchaininfo rpc, retrying...")
-		Time.Sleep(time.Duration(10+retryCount*5) * time.Second) // backoff
+		Time.Sleep(time.Duration(backoff) * time.Second)
 	}
 }
 
@@ -450,9 +496,14 @@ func BlockIngestor(c *BlockCache, rep int) {
 
 		result, err := RawRequest(context.Background(), "getbestblockhash", []json.RawMessage{})
 		if err != nil {
+			// Retry instead of exiting, so the ingestor tolerates the backend
+			// being temporarily unreachable — it keeps serving cached blocks and
+			// resumes when the backend is back, instead of crash-looping.
 			Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("error " + NodeName + " getbestblockhash rpc")
+			}).Warn("error " + NodeName + " getbestblockhash rpc, will retry")
+			Time.Sleep(8 * time.Second)
+			continue
 		}
 		var hashHex string
 		err = json.Unmarshal(result, &hashHex)

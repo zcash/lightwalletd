@@ -19,6 +19,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
+	"github.com/zcash/lightwalletd/common"
 )
 
 const (
@@ -152,8 +153,12 @@ func NewContextRawRequest(cfg *rpcclient.ConnConfig) (func(context.Context, stri
 			}
 			var resp jsonRPCResponse
 			if err := json.Unmarshal(respBytes, &resp); err != nil {
-				return nil, fmt.Errorf("status code: %d, response: %q",
-					httpResp.StatusCode, string(respBytes))
+				// Typed, so callers can tell a reachable-but-rejecting backend
+				// (e.g. an HTTP 401) from one that isn't listening at all.
+				return nil, &common.BackendResponseError{
+					StatusCode: httpResp.StatusCode,
+					Body:       string(respBytes),
+				}
 			}
 			if resp.Error != nil {
 				return nil, resp.Error

@@ -6,6 +6,24 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Changed
+
+- Wait for the backend node instead of exiting when it is unreachable.
+  `FirstRPC` now retries indefinitely with a capped backoff rather than
+  giving up after ten attempts, and the block ingestor warns and retries on
+  a failed `getbestblockhash` instead of treating it as fatal. This avoids a
+  crash loop when the node is temporarily unavailable, and keeps cached
+  blocks being served while it is away.
+
+  Waiting applies only when the backend cannot be reached. If it answers and
+  rejects our credentials (HTTP 401 or 403), lightwalletd still exits
+  immediately with a message naming the setting to check, since no amount of
+  waiting will fix a bad `rpcuser`/`rpcpassword`. A node that is merely still
+  starting up — zcashd replies to RPCs with error `-28` while it loads the
+  block index — is treated as unreachable, and waited for.
+
 ## [0.5.1] - 2026-07-27
 
 ### Added
