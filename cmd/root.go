@@ -374,13 +374,31 @@ func startServer(opts *common.Options) error {
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		s := <-signals
+		common.Log.WithFields(logrus.Fields{
+			"signal": s.String(),
+		}).Info("caught signal, stopping gRPC server gracefully")
+
+		// Give in-flight RPCs 30 seconds to complete
+		done := make(chan struct{})
+		go func() {
+			server.GracefulStop()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			common.Log.Info("gRPC server stopped gracefully")
+		case <-time.After(30 * time.Second):
+			common.Log.Warn("graceful shutdown timed out, forcing stop")
+			server.Stop()
+		}
+
+		// Flush after the server has stopped, so that blocks ingested by
+		// in-flight RPCs are included. Reached on both the graceful and the
+		// forced path. cache is nil when the block cache is disabled.
 		if cache != nil {
 			cache.Sync()
 		}
-		common.Log.WithFields(logrus.Fields{
-			"signal": s.String(),
-		}).Info("caught signal, stopping gRPC server")
-		os.Exit(1)
 	}()
 
 	err = server.Serve(listener)

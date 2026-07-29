@@ -6,6 +6,15 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Changed
+
+- On `SIGINT`/`SIGTERM`, stop the gRPC server gracefully so in-flight RPCs can
+  complete, falling back to a forced stop after 30 seconds, instead of exiting
+  immediately. The block cache is now flushed after the server has stopped, so
+  blocks ingested by in-flight requests are included.
+
 ## [0.5.1] - 2026-07-27
 
 ### Added
