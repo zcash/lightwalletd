@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -435,7 +437,159 @@ func stopIngestor() {
 
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
+//
+// zr7: in production (rep == 0, non-darkside) it uses a parallel prefetch path
+// (blockIngestorParallel) that fetches a window of blocks concurrently and
+// commits them to the cache in strict height order. During bulk catch-up this
+// saturates the backend instead of being bottlenecked on serial per-block RPC
+// latency. Unit tests and darkside mode require deterministic, single-threaded
+// RPC ordering, so they keep the original serial path (blockIngestorSerial).
 func BlockIngestor(c *BlockCache, rep int) {
+	if rep != 0 || DarksideEnabled {
+		blockIngestorSerial(c, rep)
+		return
+	}
+	blockIngestorParallel(c)
+}
+
+// ingestWindow is how many blocks ahead of the commit point we prefetch, and
+// ingestWorkers is the max number of concurrent getblock RPCs. Both are tunable
+// at runtime via env vars so fetch concurrency can be adjusted without a rebuild.
+func ingestWindow() int {
+	if v, err := strconv.Atoi(os.Getenv("LWD_INGEST_WINDOW")); err == nil && v > 0 {
+		return v
+	}
+	return 64
+}
+
+func ingestWorkers() int {
+	if v, err := strconv.Atoi(os.Getenv("LWD_INGEST_WORKERS")); err == nil && v > 0 {
+		return v
+	}
+	return 8
+}
+
+// blockIngestorParallel fetches blocks [next, next+batch) concurrently and
+// commits them to the cache in strict height order. The cache requires in-order
+// Add(), so only the (latency-dominated) fetch+parse is parallelized; the commit
+// stays sequential and performs the same prev-hash chain / reorg checks as the
+// serial path. (#1)
+//
+// It also stops polling the backend's tip on every block: the tip height is
+// refreshed only once we've caught up to the last known tip, eliminating one RPC
+// round-trip per block during bulk sync. (#2)
+func blockIngestorParallel(c *BlockCache) {
+	lastLog := Time.Now()
+	lastHeightLogged := 0
+	window := ingestWindow()
+	workers := ingestWorkers()
+	if workers > window {
+		workers = window
+	}
+	Log.Info("block ingestor: parallel prefetch enabled (workers=", workers, ", window=", window, ")")
+
+	tipHeight := -1 // last known backend tip height; -1 forces a refresh
+
+	for {
+		// stop if requested
+		select {
+		case <-stopIngestorChan:
+			return
+		default:
+		}
+
+		next := c.GetNextHeight()
+
+		// (#2) Only ask the backend for its tip when we've reached the last
+		// known tip. During bulk catch-up this avoids an RPC per block.
+		if next > tipHeight {
+			ci, err := GetBlockChainInfo()
+			if err != nil {
+				Log.WithFields(logrus.Fields{
+					"error": err,
+				}).Warn("error " + NodeName + " getblockchaininfo rpc, will retry")
+				Time.Sleep(8 * time.Second)
+				continue
+			}
+			tipHeight = int(ci.Blocks)
+		}
+
+		if next > tipHeight {
+			// Caught up; nothing new. Mirror the serial path's behaviour.
+			c.Sync()
+			if lastHeightLogged != next-1 {
+				lastHeightLogged = next - 1
+				Log.Info("Waiting for block: ", next)
+			}
+			Time.Sleep(2 * time.Second)
+			continue
+		}
+
+		// (#1) Fetch [next, next+batch) concurrently.
+		batch := tipHeight - next + 1
+		if batch > window {
+			batch = window
+		}
+		blocks := make([]*walletrpc.CompactBlock, batch)
+		errs := make([]error, batch)
+		sem := make(chan struct{}, workers)
+		var wg sync.WaitGroup
+		for j := 0; j < batch; j++ {
+			wg.Add(1)
+			sem <- struct{}{}
+			go func(j int) {
+				defer wg.Done()
+				defer func() { <-sem }()
+				blocks[j], errs[j] = getBlockFromRPC(context.Background(), next+j)
+			}(j)
+		}
+		wg.Wait()
+
+		// Commit in strict height order. Any error, missing block, or chain
+		// mismatch stops this batch; the outer loop re-evaluates from the
+		// (possibly rewound) nextBlock and re-fetches as needed.
+		for j := 0; j < batch; j++ {
+			height := next + j
+			if errs[j] != nil {
+				Log.Info("getblock ", height, " failed, will retry: ", errs[j])
+				Time.Sleep(8 * time.Second)
+				break
+			}
+			block := blocks[j]
+			if block == nil {
+				// Backend doesn't have this height yet (e.g. a reorg shrank the
+				// chain since we read the tip). Force a tip refresh and retry.
+				tipHeight = -1
+				break
+			}
+			if !c.HashMatch(hash32.T(block.PrevHash)) {
+				if height == c.GetFirstHeight() {
+					c.Sync()
+					Log.Info("Waiting for "+NodeName+" height to reach Sapling activation height ",
+						"(", c.GetFirstHeight(), ")...")
+					Time.Sleep(120 * time.Second)
+					break
+				}
+				Log.Info("REORG: dropping block ", height-1, " ", displayHash(c.GetLatestHash()))
+				c.Reorg(height - 1)
+				break
+			}
+			if err := c.Add(height, block); err != nil {
+				Log.Fatal("Cache add failed:", err)
+			}
+			// Don't log these too often.
+			if Time.Now().Sub(lastLog).Seconds() >= 4 {
+				lastLog = Time.Now()
+				Log.Info("Adding block to cache ", height, " ", displayHash(hash32.T(block.Hash)))
+			}
+		}
+	}
+}
+
+// blockIngestorSerial is the original one-block-at-a-time ingestor, preserved
+// verbatim for unit tests (rep != 0) and darkside mode, which depend on
+// deterministic single-threaded RPC ordering.
+func blockIngestorSerial(c *BlockCache, rep int) {
 	lastLog := Time.Now()
 	lastHeightLogged := 0
 

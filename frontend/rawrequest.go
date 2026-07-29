@@ -43,7 +43,12 @@ func rpcHTTPURL(cfg *rpcclient.ConnConfig) string {
 // settings on cfg, mirroring btcsuite/btcd/rpcclient's newHTTPClient. This keeps
 // NewContextRawRequest a faithful drop-in for rpcclient.RawRequest rather than
 // silently dropping proxy or custom-CA configuration when TLS is enabled.
-func newContextHTTPClient(cfg *rpcclient.ConnConfig) (*http.Client, error) {
+//
+// maxConns bounds the keep-alive connection pool to the backend. The parallel
+// block ingestor issues many concurrent requests, so the pool must be at least
+// as large as the ingest worker count or the workers serialize on connection
+// setup.
+func newContextHTTPClient(cfg *rpcclient.ConnConfig, maxConns int) (*http.Client, error) {
 	var proxyFunc func(*http.Request) (*url.URL, error)
 	if cfg.Proxy != "" {
 		proxyURL, err := url.Parse(cfg.Proxy)
@@ -60,11 +65,19 @@ func newContextHTTPClient(cfg *rpcclient.ConnConfig) (*http.Client, error) {
 		tlsConfig = &tls.Config{RootCAs: pool}
 	}
 
+	if maxConns < 1 {
+		maxConns = 1
+	}
+
 	return &http.Client{
 		Timeout: defaultHTTPTimeout,
 		Transport: &http.Transport{
-			Proxy:           proxyFunc,
-			TLSClientConfig: tlsConfig,
+			Proxy:               proxyFunc,
+			TLSClientConfig:     tlsConfig,
+			MaxIdleConns:        maxConns,
+			MaxIdleConnsPerHost: maxConns,
+			MaxConnsPerHost:     maxConns,
+			IdleConnTimeout:     90 * time.Second,
 		},
 	}, nil
 }
@@ -79,8 +92,10 @@ func newContextHTTPClient(cfg *rpcclient.ConnConfig) (*http.Client, error) {
 // context-aware request method. Once btcsuite/btcd#2506 (RawRequestWithContext)
 // is merged and released, bump the btcd dependency and replace this with a direct
 // delegation to it: https://github.com/btcsuite/btcd/pull/2506
-func NewContextRawRequest(cfg *rpcclient.ConnConfig) (func(context.Context, string, []json.RawMessage) (json.RawMessage, error), error) {
-	httpClient, err := newContextHTTPClient(cfg)
+//
+// maxConns sizes the keep-alive connection pool; see newContextHTTPClient.
+func NewContextRawRequest(cfg *rpcclient.ConnConfig, maxConns int) (func(context.Context, string, []json.RawMessage) (json.RawMessage, error), error) {
+	httpClient, err := newContextHTTPClient(cfg, maxConns)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +133,9 @@ func NewContextRawRequest(cfg *rpcclient.ConnConfig) (func(context.Context, stri
 			if err != nil {
 				return nil, err
 			}
-			httpReq.Close = true
+			// Deliberately not setting httpReq.Close: btcd's rpcclient closes the
+			// connection after every request, which would force a fresh TCP (and
+			// TLS) handshake per RPC and negate the pool configured above.
 			httpReq.Header.Set("Content-Type", "application/json")
 			for key, value := range cfg.ExtraHeaders {
 				httpReq.Header.Set(key, value)

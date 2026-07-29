@@ -6,6 +6,23 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Changed
+
+- Speed up initial sync by fetching blocks concurrently during bulk catch-up
+  instead of one at a time, committing them to the cache in strict height
+  order. Worker count and window size are configurable via
+  `LWD_INGEST_WORKERS` (default 8) and `LWD_INGEST_WINDOW` (default 64). The
+  tip is now refreshed only once the last known tip is reached, rather than
+  once per block.
+
+- Reuse pooled keep-alive connections for backend JSON-RPC calls instead of
+  closing the connection after every request, so the concurrent block
+  ingestor is bounded by the backend's throughput rather than by connection
+  setup. Pool size is derived from the ingest worker count and can be
+  overridden with `LWD_RPC_POOL`.
+
 ## [0.5.1] - 2026-07-27
 
 ### Added
