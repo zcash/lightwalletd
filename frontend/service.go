@@ -66,25 +66,40 @@ func checkTaddress(taddr string) error {
 	return nil
 }
 
-// GetLatestBlock returns the height and hash of the best chain, according to zcashd.
+// GetLatestBlock returns the height and hash of the best chain.
+// Uses the locally-cached chain tip rather than querying zcashd for every request.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	common.Log.Debugf("gRPC GetLatestBlock(%+v)\n", placeholder)
 
-	blockChainInfo, err := common.GetBlockChainInfo()
-	if err != nil {
-		return nil, status.Errorf(codes.Unavailable,
-			"GetLatestBlock: GetBlockChainInfo failed: %s", err.Error())
+	// Use the cached chain tip, which BlockIngestor keeps up to date. Fall back
+	// to the RPC when the cache is disabled (--nocache, so s.cache is nil and no
+	// ingestor is running) or still empty during initial sync.
+	latestHeight := -1
+	if s.cache != nil {
+		latestHeight = s.cache.GetLatestHeight()
 	}
-	bestBlockHashBigEndian, err := hash32.Decode(blockChainInfo.BestBlockHash)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal,
-			"GetLatestBlock: decode block hash %s failed: %s", blockChainInfo.BestBlockHash, err.Error())
+	if latestHeight < 0 {
+		blockChainInfo, err := common.GetBlockChainInfo()
+		if err != nil {
+			return nil, status.Errorf(codes.Unavailable,
+				"GetLatestBlock: GetBlockChainInfo failed: %s", err.Error())
+		}
+		bestBlockHashBE, err := hash32.Decode(blockChainInfo.BestBlockHash)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"GetLatestBlock: decode block hash %s failed: %s", blockChainInfo.BestBlockHash, err.Error())
+		}
+		return &walletrpc.BlockID{
+			Height: uint64(blockChainInfo.Blocks),
+			Hash:   hash32.ToSlice(hash32.Reverse(bestBlockHashBE)),
+		}, nil
 	}
-	// Binary block hash should always be in little-endian format
-	bestBlockHash := hash32.Reverse(bestBlockHashBigEndian)
+
+	latestHash := s.cache.GetLatestHash()
 	r := &walletrpc.BlockID{
-		Height: uint64(blockChainInfo.Blocks),
-		Hash:   hash32.ToSlice(bestBlockHash)}
+		Height: uint64(latestHeight),
+		Hash:   hash32.ToSlice(latestHash),
+	}
 	common.Log.Tracef("  return: %+v\n", r)
 	return r, nil
 }
@@ -443,12 +458,22 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 
 func (s *lwdStreamer) GetLatestTreeState(ctx context.Context, in *walletrpc.Empty) (*walletrpc.TreeState, error) {
 	common.Log.Debugf("gRPC GetLatestTreeState()\n")
-	blockChainInfo, err := common.GetBlockChainInfo()
-	if err != nil {
-		return nil, status.Errorf(codes.Unavailable,
-			"GetLatestTreeState: getblockchaininfo failed, error: %s", err.Error())
+
+	// As in GetLatestBlock: prefer the cached height, fall back to the RPC when
+	// the cache is disabled or still empty.
+	latestHeight := -1
+	if s.cache != nil {
+		latestHeight = s.cache.GetLatestHeight()
 	}
-	latestHeight := blockChainInfo.Blocks
+	if latestHeight < 0 {
+		blockChainInfo, err := common.GetBlockChainInfo()
+		if err != nil {
+			return nil, status.Errorf(codes.Unavailable,
+				"GetLatestTreeState: getblockchaininfo failed, error: %s", err.Error())
+		}
+		latestHeight = blockChainInfo.Blocks
+	}
+
 	r, err := s.GetTreeState(ctx, &walletrpc.BlockID{Height: uint64(latestHeight)})
 	if err == nil {
 		common.Log.Tracef("  return: %+v\n", r)
