@@ -6,6 +6,29 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Added
+
+- Add Kubernetes-style health endpoints on the existing HTTP port
+  (`--http-bind-addr`, localhost by default), alongside `/metrics`:
+
+  - `GET /livez` reports only that the process is running, and never fails
+    because of the backend node. Restarting lightwalletd cannot fix an
+    unreachable node, so a liveness probe that tracked the backend would turn
+    a backend outage into a restart loop.
+  - `GET /readyz` reports whether the backend node is reachable, returning 503
+    when it is not, so that an instance which cannot serve is taken out of
+    rotation rather than restarted.
+
+- Register the standard `grpc.health.v1.Health` service on the gRPC port, so
+  gRPC-aware load balancers can health-check the port that actually serves
+  traffic.
+
+  Both the readiness probe and the gRPC health service are driven by a single
+  background poll of the backend, so they cannot disagree, and neither issues
+  a backend RPC per request.
+
 ## [0.5.1] - 2026-07-27
 
 ### Added

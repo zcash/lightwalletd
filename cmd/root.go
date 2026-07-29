@@ -27,6 +27,8 @@ import (
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/zcash/lightwalletd/common"
@@ -182,6 +184,13 @@ func startServer(opts *common.Options) error {
 	}
 	grpc_prometheus.EnableHandlingTimeHistogram()
 	grpc_prometheus.Register(server)
+
+	// The standard gRPC health service, so that gRPC-aware load balancers can
+	// check the port that actually serves traffic. Its status is driven by the
+	// same poller as the HTTP readiness probe, so the two always agree.
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(server, healthServer)
+
 	go startHTTPServer(opts)
 
 	// Enable reflection for debugging
@@ -358,6 +367,11 @@ func startServer(opts *common.Options) error {
 		walletrpc.RegisterDarksideStreamerServer(server, service)
 	}
 
+	// Started once the RPC client is wired up, so the first poll can reach the
+	// backend. Until it completes, readiness reports not-ready, which is the
+	// safe default for an instance that hasn't yet confirmed it can serve.
+	go pollBackendHealth(healthServer)
+
 	common.Log.Infof("Starting gRPC server on %s", opts.GRPCBindAddr)
 
 	// Start listening
@@ -529,7 +543,13 @@ func initConfig() {
 	}
 }
 
+// startHTTPServer serves the operational endpoints -- Prometheus metrics and
+// the Kubernetes probes -- on HTTPBindAddr, which defaults to localhost. These
+// are deliberately kept off the gRPC port so that none of them is reachable by
+// wallet clients.
 func startHTTPServer(opts *common.Options) {
 	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/livez", livezHandler)
+	http.HandleFunc("/readyz", readyzHandler)
 	http.ListenAndServe(opts.HTTPBindAddr, nil)
 }
