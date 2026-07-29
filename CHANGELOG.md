@@ -6,6 +6,35 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Changed
+
+- **Breaking (Docker):** the container now runs as the unprivileged
+  `lightwalletd` user (uid/gid 2002) instead of as root. The uid and gid are
+  unchanged — previous images created this user but never switched to it.
+
+  Operators upgrading an existing deployment must make the data directory
+  writable by that user, because it was created by a root-running container:
+
+  ```
+  chown -R 2002:2002 /path/to/lightwalletd/data
+  ```
+
+  Without this, lightwalletd fails with "permission denied" on its block
+  cache. Deployments using a fresh volume need no action, as a new volume
+  inherits the image's 2002:2002 ownership. Operators who need the old
+  behaviour can run the container with `--user 0:0`.
+
+- Build the Docker image in two stages on Alpine, shipping only the compiled
+  binary and its runtime dependencies instead of the full Go toolchain and
+  source tree. This takes the image from about 1.9 GB to about 50 MB, and
+  dependency downloads are cached in their own layer so they are not repeated
+  on every source change. The container still runs as root and the
+  `lightwalletd` user still has uid/gid 2002, so no migration is required.
+  Note that the image is now Alpine-based and so has no `bash`; use `sh` for
+  interactive shells into the container.
+
 ## [0.5.1] - 2026-07-27
 
 ### Added
