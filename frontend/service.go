@@ -737,29 +737,41 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		excludeHex[i] = hex.EncodeToString(rev)
 	}
 
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
+	// Hold the mutex only long enough to decide whether this call refreshes
+	// the cache, and to snapshot it and update lastMempool to prevent another
+	// thread from refreshing while our thread is doing that.
 	streamCtx := resp.Context()
-	if time.Since(lastMempool).Seconds() >= 2 {
+	s.mutex.Lock()
+	refresh := time.Since(lastMempool).Seconds() >= 2
+	if refresh {
 		lastMempool = time.Now()
+	}
+	cachedList := mempoolList
+	var cachedMap map[string]*walletrpc.CompactTx
+	if mempoolMap != nil {
+		cachedMap = *mempoolMap
+	}
+	s.mutex.Unlock()
+
+	if refresh {
 		// Refresh our copy of the mempool.
 		params := make([]json.RawMessage, 0)
 		result, rpcErr := common.RawRequest(streamCtx, "getrawmempool", params)
 		if rpcErr != nil {
 			return status.Errorf(codes.Internal, "GetMempoolTx: getrawmempool error: %s", rpcErr.Error())
 		}
-		err := json.Unmarshal(result, &mempoolList)
+		var newmempoolList []string
+		err := json.Unmarshal(result, &newmempoolList)
 		if err != nil {
 			return status.Errorf(codes.Unknown,
 				"GetMempoolTx: failed to unmarshal getrawmempool reply, error: %s", err.Error())
 		}
 		newmempoolMap := make(map[string]*walletrpc.CompactTx)
-		if mempoolMap == nil {
-			mempoolMap = &newmempoolMap
-		}
-		for _, txidstr := range mempoolList {
-			if ctx, ok := (*mempoolMap)[txidstr]; ok {
+		for _, txidstr := range newmempoolList {
+			if err := streamCtx.Err(); err != nil {
+				return status.FromContextError(err).Err()
+			}
+			if ctx, ok := cachedMap[txidstr]; ok {
 				// This ctx has already been fetched, copy pointer to it.
 				newmempoolMap[txidstr] = ctx
 				continue
@@ -810,10 +822,14 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
+		s.mutex.Lock()
+		mempoolList = newmempoolList
 		mempoolMap = &newmempoolMap
+		s.mutex.Unlock()
+		cachedList, cachedMap = newmempoolList, newmempoolMap
 	}
-	for _, txid := range MempoolFilter(mempoolList, excludeHex) {
-		ctx, ok := (*mempoolMap)[txid]
+	for _, txid := range MempoolFilter(cachedList, excludeHex) {
+		ctx, ok := cachedMap[txid]
 		if !ok {
 			// The transaction was in getrawmempool's reply but its
 			// getrawtransaction failed (it may have been mined or evicted

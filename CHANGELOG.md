@@ -6,6 +6,31 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- Narrow the `GetMempoolTx` mutex to the cache snapshot it protects, instead
+  of holding it across the whole handler (GHSA-f9pw-q493-7qvh,
+  GHSA-9p9r-mggr-8q9g). The mempool refresh issues one `getrawmempool` plus a
+  `getrawtransaction` per new txid, and the response loop streams to the
+  client; both ran inside the critical section, so a single caller's backend
+  round-trips — or one client that simply stopped reading its stream — stalled
+  every other `GetMempoolTx` caller. The backend calls and the streaming sends
+  now run outside the lock, which is taken only to claim a refresh, snapshot
+  the cache, and publish the new one.
+
+- A `GetMempoolTx` refresh now stops when the client that triggered it
+  disconnects, instead of running to completion. Since the backend calls
+  observe the request context, every remaining fetch would otherwise fail and
+  be treated as a transaction that had left the mempool, publishing a cache
+  missing nearly all of its entries and degrading it for other callers until
+  the next refresh.
+
+- A `GetMempoolTx` refresh that fails part-way no longer leaves the cached
+  txid list updated while the transaction map still holds the previous
+  contents; the two are now published together.
+
 ## [0.5.1] - 2026-07-27
 
 ### Added

@@ -1021,3 +1021,141 @@ func TestGetMempoolTxExcludeListCap(t *testing.T) {
 		t.Fatal("a request at the cap should have reached the backend")
 	}
 }
+
+// testmempoolslow is a GetMempoolTx stream whose Send blocks until released,
+// standing in for a client that has stopped reading its stream.
+type testmempoolslow struct {
+	walletrpc.CompactTxStreamer_GetMempoolTxServer
+	sending chan struct{}
+	release chan struct{}
+	once    bool
+}
+
+func (t *testmempoolslow) Context() context.Context { return context.Background() }
+
+func (t *testmempoolslow) Send(tx *walletrpc.CompactTx) error {
+	if !t.once {
+		t.once = true
+		close(t.sending)
+		<-t.release
+	}
+	return nil
+}
+
+// A client that stops reading its stream must not stall other GetMempoolTx
+// callers. resp.Send blocks on the client's flow control, so holding s.mutex
+// across it serialized every caller behind the slowest one
+// (GHSA-9p9r-mggr-8q9g). The same applies to the refresh RPCs
+// (GHSA-f9pw-q493-7qvh) -- neither may run inside the critical section.
+func TestGetMempoolTxSlowClientDoesNotBlockOthers(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// Seed a fresh cache holding one Orchard tx, so neither caller triggers a
+	// refresh and both reach the send loop.
+	txid := strings.Repeat("ab", 32)
+	tx := &walletrpc.CompactTx{
+		Actions: []*walletrpc.CompactOrchardAction{{Nullifier: make([]byte, 32)}},
+	}
+	m := map[string]*walletrpc.CompactTx{txid: tx}
+	mempoolList = []string{txid}
+	mempoolMap = &m
+	lastMempool = time.Now()
+
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("no mempool refresh expected; the cache was seeded fresh")
+		return nil, nil
+	}
+
+	req := &walletrpc.GetMempoolTxRequest{}
+
+	// Caller A parks inside Send, as a stalled client would.
+	slow := &testmempoolslow{sending: make(chan struct{}), release: make(chan struct{})}
+	slowDone := make(chan error, 1)
+	go func() { slowDone <- lwd.GetMempoolTx(req, slow) }()
+	select {
+	case <-slow.sending:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the slow caller never reached Send")
+	}
+
+	// Caller B must finish while A is still parked. If the mutex were still
+	// held across Send, this would block until the test timed out.
+	fastDone := make(chan error, 1)
+	go func() { fastDone <- lwd.GetMempoolTx(req, &testmempooltx{}) }()
+	select {
+	case err := <-fastDone:
+		if err != nil {
+			t.Fatal("second caller failed:", err)
+		}
+	case <-time.After(10 * time.Second):
+		close(slow.release)
+		t.Fatal("second caller blocked behind the stalled client -- the mutex is still held across resp.Send")
+	}
+
+	close(slow.release)
+	if err := <-slowDone; err != nil {
+		t.Fatal("slow caller failed:", err)
+	}
+}
+
+// testmempoolcancel is a GetMempoolTx stream whose context is cancelled after
+// the refresh has started, standing in for a client that hangs up mid-refresh.
+type testmempoolcancel struct {
+	walletrpc.CompactTxStreamer_GetMempoolTxServer
+	ctx context.Context
+}
+
+func (t *testmempoolcancel) Context() context.Context        { return t.ctx }
+func (t *testmempoolcancel) Send(*walletrpc.CompactTx) error { return nil }
+
+// If the client that triggered a refresh disconnects, the refresh must abort
+// rather than run to completion. RawRequest observes the context, so every
+// remaining per-txid fetch would fail and be swallowed by the "mempool
+// transactions can disappear" path, publishing a cache missing nearly every
+// transaction and degrading it for other callers (GHSA-f9pw-q493-7qvh).
+func TestGetMempoolTxAbortsRefreshOnClientCancel(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// A mempool of 50 txids, none of them already cached, so the refresh has
+	// plenty of per-txid fetches left to do after the cancel.
+	var txids []string
+	for i := 0; i < 50; i++ {
+		txids = append(txids, fmt.Sprintf("%064x", i))
+	}
+	listJSON, _ := json.Marshal(txids)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	fetches := 0
+	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getrawmempool":
+			return listJSON, nil
+		case "getrawtransaction":
+			fetches++
+			cancel() // the client hangs up after the first fetch
+			return nil, errors.New("context canceled")
+		}
+		testT.Fatal("unexpected method", method)
+		return nil, nil
+	}
+
+	err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempoolcancel{ctx: ctx})
+	if err == nil {
+		t.Fatal("expected a context error once the client cancelled")
+	}
+	if status.Code(err) != codes.Canceled {
+		t.Fatal("expected Canceled, got:", status.Code(err), err)
+	}
+	// The refresh must have stopped early rather than grinding through all 50.
+	if fetches > 2 {
+		t.Fatalf("refresh kept fetching after cancel: %d fetches for 50 txids", fetches)
+	}
+	// And it must not have published a degraded cache.
+	if mempoolMap != nil && len(*mempoolMap) > 0 {
+		t.Fatalf("a partial cache was published: %d entries", len(*mempoolMap))
+	}
+}
