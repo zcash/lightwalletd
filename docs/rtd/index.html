@@ -1187,21 +1187,21 @@ relevant to the shielded (Sapling, Orchard, and Ironwood) pools. </p></td>
                   <td>estimatedHeight</td>
                   <td><a href="#uint64">uint64</a></td>
                   <td></td>
-                  <td><p>less than tip height if zcashd is syncing </p></td>
+                  <td><p>less than tip height if the node is syncing </p></td>
                 </tr>
               
                 <tr>
                   <td>zcashdBuild</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>example: &#34;v4.1.1-877212414&#34; </p></td>
+                  <td><p>the backend node build string, e.g. &#34;2.5.0&#34; </p></td>
                 </tr>
               
                 <tr>
                   <td>zcashdSubversion</td>
                   <td><a href="#string">string</a></td>
                   <td></td>
-                  <td><p>example: &#34;/MagicBean:4.1.1/&#34; </p></td>
+                  <td><p>example: &#34;/Zebra:2.5.0/&#34; </p></td>
                 </tr>
               
                 <tr>
@@ -1294,11 +1294,11 @@ relevant to the shielded (Sapling, Orchard, and Ironwood) pools. </p></td>
                   <td><p>The height at which the transaction is mined, or a sentinel value.
 
 Due to an error in the original protobuf definition, it is necessary to
-reinterpret the result of the `getrawtransaction` RPC call. Zcashd will
+reinterpret the result of the `getrawtransaction` RPC call. The node will
 return the int64 value `-1` for the height of transactions that appear
 in the block index, but which are not mined in the main chain. Here, the
 height field of `RawTransaction` was erroneously created as a `uint64`,
-and as such we must map the response from the zcashd RPC API to be
+and as such we must map the response from the node&#39;s RPC API to be
 representable within this space. Additionally, the `height` field will
 be absent for transactions in the mempool, resulting in the default
 value of `0` being set. Therefore, the meanings of the `height` field of
@@ -1676,7 +1676,7 @@ appropriate `poolTypes` instead.</p></td>
                 <td>GetTransaction</td>
                 <td><a href="#cash.z.wallet.sdk.rpc.TxFilter">TxFilter</a></td>
                 <td><a href="#cash.z.wallet.sdk.rpc.RawTransaction">RawTransaction</a></td>
-                <td><p>Return the requested full (not compact) transaction (as from zcashd)</p></td>
+                <td><p>Return the requested full (not compact) transaction (as from the node)</p></td>
               </tr>
             
               <tr>

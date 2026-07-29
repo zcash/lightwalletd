@@ -13,7 +13,7 @@ type txid string
 
 var (
 	// Set of mempool txids that have been seen during the current block interval.
-	// The zcashd RPC `getrawmempool` returns the entire mempool each time, so
+	// The `getrawmempool` RPC returns the entire mempool each time, so
 	// this allows us to ignore the txids that we've already seen.
 	g_txidSeen map[txid]struct{} = map[txid]struct{}{}
 
@@ -27,9 +27,9 @@ var (
 	// (tip) block hash (so we know when a new block has been mined).
 	g_lastTime time.Time
 
-	// The most recent zcashd getblockchaininfo reply, for height and best block
+	// The most recent getblockchaininfo reply, for height and best block
 	// hash (tip) which is used to detect when a new block arrives.
-	g_lastBlockChainInfo *ZcashdRpcReplyGetblockchaininfo = &ZcashdRpcReplyGetblockchaininfo{}
+	g_lastBlockChainInfo *RpcReplyGetblockchaininfo = &RpcReplyGetblockchaininfo{}
 
 	// Mutex to protect the above variables.
 	g_lock sync.Mutex

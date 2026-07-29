@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-// Package parser deserializes (full) transactions (zcashd).
+// Package parser deserializes (full) transactions.
 package parser
 
 import (
@@ -365,7 +365,7 @@ func (p *action) ToCompact() *walletrpc.CompactOrchardAction {
 	}
 }
 
-// Transaction encodes a full (zcashd) transaction.
+// Transaction encodes a full Zcash transaction.
 type Transaction struct {
 	*rawTransaction
 	rawBytes []byte

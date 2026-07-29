@@ -116,7 +116,7 @@ func resetGlobals() {
 	sleepCount = 0
 	sleepDuration = 0
 	DonationAddress = ""
-	g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{}
+	g_lastBlockChainInfo = &RpcReplyGetblockchaininfo{}
 	g_lastTime = time.Time{}
 	g_txidSeen = map[txid]struct{}{}
 	g_txList = nil
@@ -128,7 +128,7 @@ func getLightdInfoStub(ctx context.Context, method string, params []json.RawMess
 	step++
 	switch method {
 	case "getinfo":
-		r, _ := json.Marshal(&ZcashdRpcReplyGetinfo{})
+		r, _ := json.Marshal(&RpcReplyGetinfo{})
 		return r, nil
 
 	case "getblockchaininfo":
@@ -141,7 +141,7 @@ func getLightdInfoStub(ctx context.Context, method string, params []json.RawMess
 				testT.Error("unexpected sleeps", sleepCount, sleepDuration)
 			}
 		}
-		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+		r, _ := json.Marshal(&RpcReplyGetblockchaininfo{
 			Blocks:    9977,
 			Chain:     "bugsbunny",
 			Consensus: ConsensusInfo{Chaintip: "someid"},
@@ -173,7 +173,7 @@ func TestGetLightdInfo(t *testing.T) {
 	RawRequest = getLightdInfoStub
 	defer resetGlobals()
 	Time.Sleep = sleepStub
-	// This calls the getblockchaininfo rpc just to establish connectivity with zcashd
+	// This calls the getblockchaininfo rpc just to establish connectivity with the node
 	FirstRPC()
 
 	DonationAddress = "ua1234test"
@@ -664,7 +664,7 @@ func TestGenerateCerts(t *testing.T) {
 
 // ------------------------------------------ GetMempoolStream
 
-// Note that in mocking zcashd's RPC replies here, we don't really need
+// Note that in mocking the node's RPC replies here, we don't really need
 // actual txids or transactions, or even strings with the correct format
 // for those, except that a transaction must be a hex string.
 func mempoolStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
@@ -675,7 +675,7 @@ func mempoolStub(ctx context.Context, method string, params []json.RawMessage) (
 		if method != "getblockchaininfo" {
 			testT.Fatal("expecting blockchaininfo")
 		}
-		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+		r, _ := json.Marshal(&RpcReplyGetblockchaininfo{
 			BestBlockHash: "010203",
 			Blocks:        200,
 		})
@@ -685,7 +685,7 @@ func mempoolStub(ctx context.Context, method string, params []json.RawMessage) (
 		if method != "getblockchaininfo" {
 			testT.Fatal("expecting blockchaininfo")
 		}
-		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+		r, _ := json.Marshal(&RpcReplyGetblockchaininfo{
 			BestBlockHash: "010203",
 			Blocks:        200,
 		})
@@ -717,7 +717,7 @@ func mempoolStub(ctx context.Context, method string, params []json.RawMessage) (
 		if method != "getblockchaininfo" {
 			testT.Fatal("expecting blockchaininfo")
 		}
-		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+		r, _ := json.Marshal(&RpcReplyGetblockchaininfo{
 			BestBlockHash: "010203",
 			Blocks:        200,
 		})
@@ -749,7 +749,7 @@ func mempoolStub(ctx context.Context, method string, params []json.RawMessage) (
 		if method != "getblockchaininfo" {
 			testT.Fatal("expecting blockchaininfo")
 		}
-		r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+		r, _ := json.Marshal(&RpcReplyGetblockchaininfo{
 			BestBlockHash: "d1d2d3",
 			Blocks:        201,
 		})
@@ -811,12 +811,12 @@ func TestMempoolStream(t *testing.T) {
 		t.Fatal("unexpected end time")
 	}
 	if step != 8 {
-		t.Fatal("unexpected number of zebrad RPCs")
+		t.Fatal("unexpected number of node RPCs")
 	}
 }
 
-func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
-	var txinfo0 ZcashdRpcReplyGetrawtransaction
+func TestRpcReplyUnmarshalling(t *testing.T) {
+	var txinfo0 RpcReplyGetrawtransaction
 	err0 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\", \"height\": 123456}"), &txinfo0)
 	if err0 != nil {
 		t.Fatal("Failed to unmarshal tx with known height.")
@@ -825,7 +825,7 @@ func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
 		t.Errorf("Unmarshalled incorrect height: got: %d, want: 123456.", txinfo0.Height)
 	}
 
-	var txinfo1 ZcashdRpcReplyGetrawtransaction
+	var txinfo1 RpcReplyGetrawtransaction
 	err1 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\", \"height\": -1}"), &txinfo1)
 	if err1 != nil {
 		t.Fatal("failed to unmarshal tx not in main chain")
@@ -834,7 +834,7 @@ func TestZcashdRpcReplyUnmarshalling(t *testing.T) {
 		t.Errorf("Unmarshalled incorrect height: got: %d, want: -1.", txinfo1.Height)
 	}
 
-	var txinfo2 ZcashdRpcReplyGetrawtransaction
+	var txinfo2 RpcReplyGetrawtransaction
 	err2 := json.Unmarshal([]byte("{\"hex\": \"deadbeef\"}"), &txinfo2)
 	if err2 != nil {
 		t.Fatal("failed to unmarshal reply lacking height data")
@@ -885,7 +885,7 @@ func TestMempoolStreamCancelOnEmptyMempool(t *testing.T) {
 	RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 		switch method {
 		case "getblockchaininfo":
-			r, _ := json.Marshal(&ZcashdRpcReplyGetblockchaininfo{
+			r, _ := json.Marshal(&RpcReplyGetblockchaininfo{
 				BestBlockHash: "stable-hash",
 				Blocks:        100,
 			})
@@ -906,7 +906,7 @@ func TestMempoolStreamCancelOnEmptyMempool(t *testing.T) {
 	// Pre-populate the package-global tip cache so the first refresh matches
 	// the stubbed tip and does NOT trigger the tip-changed branch (which
 	// would break out of the loop immediately).
-	g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{BestBlockHash: "stable-hash"}
+	g_lastBlockChainInfo = &RpcReplyGetblockchaininfo{BestBlockHash: "stable-hash"}
 	g_lastTime = time.Time{}
 	g_txidSeen = map[txid]struct{}{}
 	g_txList = []*walletrpc.RawTransaction{}

@@ -332,11 +332,11 @@ type RawTransaction struct {
 	// The height at which the transaction is mined, or a sentinel value.
 	//
 	// Due to an error in the original protobuf definition, it is necessary to
-	// reinterpret the result of the `getrawtransaction` RPC call. Zcashd will
+	// reinterpret the result of the `getrawtransaction` RPC call. The node will
 	// return the int64 value `-1` for the height of transactions that appear
 	// in the block index, but which are not mined in the main chain. Here, the
 	// height field of `RawTransaction` was erroneously created as a `uint64`,
-	// and as such we must map the response from the zcashd RPC API to be
+	// and as such we must map the response from the node's RPC API to be
 	// representable within this space. Additionally, the `height` field will
 	// be absent for transactions in the mempool, resulting in the default
 	// value of `0` being set. Therefore, the meanings of the `height` field of
@@ -540,9 +540,9 @@ type LightdInfo struct {
 	Branch                     string                 `protobuf:"bytes,9,opt,name=branch,proto3" json:"branch,omitempty"`
 	BuildDate                  string                 `protobuf:"bytes,10,opt,name=buildDate,proto3" json:"buildDate,omitempty"`
 	BuildUser                  string                 `protobuf:"bytes,11,opt,name=buildUser,proto3" json:"buildUser,omitempty"`
-	EstimatedHeight            uint64                 `protobuf:"varint,12,opt,name=estimatedHeight,proto3" json:"estimatedHeight,omitempty"`                      // less than tip height if zcashd is syncing
-	ZcashdBuild                string                 `protobuf:"bytes,13,opt,name=zcashdBuild,proto3" json:"zcashdBuild,omitempty"`                               // example: "v4.1.1-877212414"
-	ZcashdSubversion           string                 `protobuf:"bytes,14,opt,name=zcashdSubversion,proto3" json:"zcashdSubversion,omitempty"`                     // example: "/MagicBean:4.1.1/"
+	EstimatedHeight            uint64                 `protobuf:"varint,12,opt,name=estimatedHeight,proto3" json:"estimatedHeight,omitempty"`                      // less than tip height if the node is syncing
+	ZcashdBuild                string                 `protobuf:"bytes,13,opt,name=zcashdBuild,proto3" json:"zcashdBuild,omitempty"`                               // the backend node build string, e.g. "2.5.0"
+	ZcashdSubversion           string                 `protobuf:"bytes,14,opt,name=zcashdSubversion,proto3" json:"zcashdSubversion,omitempty"`                     // example: "/Zebra:2.5.0/"
 	DonationAddress            string                 `protobuf:"bytes,15,opt,name=donationAddress,proto3" json:"donationAddress,omitempty"`                       // Zcash donation UA address
 	UpgradeName                string                 `protobuf:"bytes,16,opt,name=upgradeName,proto3" json:"upgradeName,omitempty"`                               // name of next pending network upgrade, empty if none scheduled
 	UpgradeHeight              uint64                 `protobuf:"varint,17,opt,name=upgradeHeight,proto3" json:"upgradeHeight,omitempty"`                          // height of next pending upgrade, zero if none is scheduled

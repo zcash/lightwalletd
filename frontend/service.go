@@ -66,7 +66,7 @@ func checkTaddress(taddr string) error {
 	return nil
 }
 
-// GetLatestBlock returns the height and hash of the best chain, according to zcashd.
+// GetLatestBlock returns the height and hash of the best chain, according to the node.
 func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc.ChainSpec) (*walletrpc.BlockID, error) {
 	common.Log.Debugf("gRPC GetLatestBlock(%+v)\n", placeholder)
 
@@ -93,7 +93,7 @@ func (s *lwdStreamer) GetLatestBlock(ctx context.Context, placeholder *walletrpc
 // request may scan. It is deliberately generous -- well beyond a full-history
 // scan of the current chain -- so it never rejects a legitimate wallet request,
 // while still rejecting an absurd End (e.g. near uint64-max) that would
-// otherwise be forwarded to zcashd. Together with defaulting a missing End to
+// otherwise be forwarded to the node. Together with defaulting a missing End to
 // the chain tip, it keeps one request from requesting an unbounded
 // address-index scan (GHSA-x4m7-3gpp-xc36, finding 2).
 const maxTaddrTxBlockSpan = 10_000_000
@@ -115,7 +115,7 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 		return status.Error(codes.InvalidArgument, "GetTaddressTransactions: must specify a start block height")
 	}
 
-	// End is optional in the protocol. An unset End would make zcashd's
+	// End is optional in the protocol. An unset End would make the node's
 	// getaddresstxids scan the address index all the way to the current chain
 	// tip, with no upper bound as the chain grows; default it to the current tip
 	// so the scan is always to a concrete, finite height. Bound the span so one
@@ -125,7 +125,7 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	var end uint64
 	// A zero End must be treated as unset, not as a bound: the getaddresstxids
 	// request field carries `json:",omitempty"`, so End=0 is dropped from the
-	// request entirely and zcashd falls back to the open-ended scan this is
+	// request entirely and the node falls back to the open-ended scan this is
 	// meant to prevent.
 	if addressBlockFilter.Range.End != nil && addressBlockFilter.Range.End.Height > 0 {
 		end = addressBlockFilter.Range.End.Height
@@ -143,7 +143,7 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 			end-start, maxTaddrTxBlockSpan)
 	}
 
-	request := &common.ZcashdRpcRequestGetaddresstxids{
+	request := &common.RpcRequestGetaddresstxids{
 		Addresses: []string{addressBlockFilter.Address},
 		Start:     start,
 		End:       end,
@@ -157,7 +157,7 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	params := []json.RawMessage{param}
 
 	// Bound the total time -- and make the backend calls cancelable -- so a slow
-	// or abandoned scan doesn't hold a lightwalletd goroutine and a zcashd RPC
+	// or abandoned scan doesn't hold a lightwalletd goroutine and a node RPC
 	// connection open indefinitely. This deadline covers both the getaddresstxids
 	// index scan and the per-txid getrawtransaction fan-out below.
 	timeout, cancel := context.WithTimeout(resp.Context(), 30*time.Second)
@@ -372,7 +372,7 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		params[0] = heightJSON
 	} else {
 		// Reject a wrong-length hash before expanding it: the bytes below are
-		// hex-encoded (doubling them) and JSON-marshalled before zcashd ever
+		// hex-encoded (doubling them) and JSON-marshalled before the node ever
 		// sees them, so without this an unauthenticated client can force large
 		// allocations here and parsing work in the backend with input that can
 		// only ever be rejected (GHSA-q2c2-hpp9-58hm).
@@ -390,13 +390,13 @@ func (s *lwdStreamer) GetTreeState(ctx context.Context, id *walletrpc.BlockID) (
 		}
 		params[0] = hashJSON
 	}
-	var gettreestateReply common.ZcashdRpcReplyGettreestate
+	var gettreestateReply common.RpcReplyGettreestate
 	for {
 		// Hygiene companion to PR #560: observe client cancel between
 		// RawRequest calls. In practice this loop terminates in one iteration
-		// on the active chain because zcashd's z_gettreestate hard-stops the
-		// SkipHash walk at the Sapling activation height (zcashd
-		// src/rpc/blockchain.cpp:1411). This check is for symmetry with the
+		// on the active chain because the node's z_gettreestate hard-stops the
+		// SkipHash walk at the Sapling activation height. This check is for
+		// symmetry with the
 		// other streaming-RPC ctx-checks, not for DoS defense.
 		if err := ctx.Err(); err != nil {
 			return nil, status.FromContextError(err).Err()
@@ -457,7 +457,7 @@ func (s *lwdStreamer) GetLatestTreeState(ctx context.Context, in *walletrpc.Empt
 }
 
 // GetTransaction returns the raw transaction bytes that are returned
-// by the zcashd 'getrawtransaction' RPC.
+// by the node's 'getrawtransaction' RPC.
 func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilter) (*walletrpc.RawTransaction, error) {
 	common.Log.Debugf("gRPC GetTransaction(%+v)\n", txf)
 	if txf.Hash != nil {
@@ -498,7 +498,7 @@ func (s *lwdStreamer) GetTransaction(ctx context.Context, txf *walletrpc.TxFilte
 }
 
 // GetLightdInfo gets the LightWalletD (this server) info, and includes information
-// it gets from its backend zcashd.
+// it gets from its backend Zcash node.
 func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*walletrpc.LightdInfo, error) {
 	lightdinfo, err := common.GetLightdInfo()
 	if err != nil {
@@ -508,12 +508,12 @@ func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 }
 
 // maxRawTxSize bounds the raw transaction bytes lightwalletd will forward to
-// zcashd. A Zcash transaction cannot exceed the 2,000,000-byte block size
-// limit, so anything larger is unminable by definition and there is no reason
-// to spend memory expanding it or to make the backend parse it.
+// the Zcash node. A Zcash transaction cannot exceed the 2,000,000-byte block
+// size limit, so anything larger is unminable by definition and there is no
+// reason to spend memory expanding it or to make the backend parse it.
 const maxRawTxSize = 2000000
 
-// SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
+// SendTransaction forwards raw transaction bytes to the Zcash node over JSON-RPC
 func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
 	common.Log.Debugf("gRPC SendTransaction(%+v)\n", rawtx)
 	// sendrawtransaction "hexstring" ( allowhighfees )
@@ -528,7 +528,7 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 		return nil, status.Error(codes.InvalidArgument, "bad transaction data")
 	}
 	// Reject an oversized transaction before expanding it: the bytes below are
-	// hex-encoded (doubling them) and JSON-marshalled before zcashd ever sees
+	// hex-encoded (doubling them) and JSON-marshalled before the node ever sees
 	// them, so without this an unauthenticated client can force large
 	// allocations here and parsing work in the backend with a transaction that
 	// can never be mined (GHSA-6ppp-r2gc-9q6v).
@@ -580,14 +580,14 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 	return r, nil
 }
 
-func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*walletrpc.Balance, error) {
+func getTaddressBalanceRpc(ctx context.Context, addressList []string) (*walletrpc.Balance, error) {
 	for _, addr := range addressList {
 		if err := checkTaddress(addr); err != nil {
 			return nil, err
 		}
 	}
 	params := make([]json.RawMessage, 1)
-	addrList := &common.ZcashdRpcRequestGetaddressbalance{
+	addrList := &common.RpcRequestGetaddressbalance{
 		Addresses: addressList,
 	}
 	param, err := json.Marshal(addrList)
@@ -606,13 +606,13 @@ func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*wa
 			code = codes.NotFound
 		}
 		return nil, status.Errorf(code,
-			"getTaddressBalanceZcashdRpc: getaddressbalance error: %s", rpcErr.Error())
+			"getTaddressBalanceRpc: getaddressbalance error: %s", rpcErr.Error())
 	}
-	var balanceReply common.ZcashdRpcReplyGetaddressbalance
+	var balanceReply common.RpcReplyGetaddressbalance
 	err = json.Unmarshal(result, &balanceReply)
 	if err != nil {
 		return nil, status.Errorf(codes.Unknown,
-			"getTaddressBalanceZcashdRpc: failed to unmarshal getaddressbalance reply, error: %s", err.Error())
+			"getTaddressBalanceRpc: failed to unmarshal getaddressbalance reply, error: %s", err.Error())
 	}
 	return &walletrpc.Balance{ValueZat: balanceReply.Balance}, nil
 }
@@ -620,7 +620,7 @@ func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*wa
 // GetTaddressBalance returns the total balance for a list of taddrs
 func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletrpc.AddressList) (*walletrpc.Balance, error) {
 	common.Log.Debugf("gRPC GetTaddressBalance(%+v)\n", addresses)
-	r, err := getTaddressBalanceZcashdRpc(ctx, addresses.Addresses)
+	r, err := getTaddressBalanceRpc(ctx, addresses.Addresses)
 	if err == nil {
 		common.Log.Tracef("  return: %+v\n", r)
 	}
@@ -632,7 +632,7 @@ func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletr
 // gRPC methods. Without a cap, an unauthenticated client can drive unbounded
 // memory growth and backend work: GetTaddressBalanceStream accumulates
 // streamed addresses until the process is OOM-killed, and GetAddressUtxos
-// forwards the whole list to zcashd and materializes the full result before
+// forwards the whole list to the node and materializes the full result before
 // applying client-side limits. The unary GetTaddressBalance is already
 // implicitly bounded by gRPC's MaxRecvMsgSize; this gives the other methods an
 // equivalent bound, generous for any legitimate wallet (GHSA-x4m7-3gpp-xc36).
@@ -661,7 +661,7 @@ func (s *lwdStreamer) GetTaddressBalanceStream(addresses walletrpc.CompactTxStre
 		}
 		addressList = append(addressList, addr.Address)
 	}
-	balance, err := getTaddressBalanceZcashdRpc(addresses.Context(), addressList)
+	balance, err := getTaddressBalanceRpc(addresses.Context(), addressList)
 	if err != nil {
 		return err
 	}
@@ -686,13 +686,13 @@ var mempoolMap *map[string]*walletrpc.CompactTx
 // Txids in big-endian hex (from the backend)
 var mempoolList []string
 
-// Last time we pulled a copy of the mempool from zcashd.
+// Last time we pulled a copy of the mempool from the node.
 var lastMempool time.Time
 
 // maxExcludeTxidSuffixes bounds the exclude list a client may send to
 // GetMempoolTx. The list names transactions the caller already has, so it is
 // only ever useful up to the size of the mempool itself; this cap sits well
-// above the number of transactions zcashd's default mempool can hold.
+// above the number of transactions a node's default mempool can hold.
 const maxExcludeTxidSuffixes = 20000
 
 func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp walletrpc.CompactTxStreamer_GetMempoolTxServer) error {
@@ -702,7 +702,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	// allocate, hex-encode and sort all of it -- historically while holding
 	// s.mutex, and even when the mempool was empty and the response would be
 	// empty too (GHSA-4hp3-3494-3f2m). The cap is comfortably larger than the
-	// number of transactions zcashd's default mempool can hold, so an exclude
+	// number of transactions a node's default mempool can hold, so an exclude
 	// list beyond it cannot describe a useful set in any case.
 	if len(exclude.ExcludeTxidSuffixes) > maxExcludeTxidSuffixes {
 		return status.Errorf(codes.InvalidArgument,
@@ -870,7 +870,7 @@ func MempoolFilter(items, exclude []string) []string {
 }
 
 func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
-	// Bound the address count before contacting zcashd: getaddressutxos cannot
+	// Bound the address count before contacting the node: getaddressutxos cannot
 	// push down StartHeight/MaxEntries, so lightwalletd fetches and
 	// materializes the entire backend result before applying those limits.
 	// Capping the input keeps one request from forcing unbounded backend work
@@ -884,7 +884,7 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 			return err
 		}
 	}
-	addrList := &common.ZcashdRpcRequestGetaddressutxos{
+	addrList := &common.RpcRequestGetaddressutxos{
 		Addresses: arg.Addresses,
 	}
 	param, err := json.Marshal(addrList)
@@ -905,7 +905,7 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 		return status.Errorf(code,
 			"getAddressUtxos: getaddressutxos error: %s", rpcErr.Error())
 	}
-	var utxosReply []common.ZcashdRpcReplyGetaddressutxos
+	var utxosReply []common.RpcReplyGetaddressutxos
 	err = json.Unmarshal(result, &utxosReply)
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument,
@@ -1001,7 +1001,7 @@ func (s *lwdStreamer) GetSubtreeRoots(arg *walletrpc.GetSubtreeRootsArg, resp wa
 		return status.Errorf(codes.InvalidArgument,
 			"GetSubtreeRoots: z_getsubtreesbyindex, error: %s", rpcErr.Error())
 	}
-	var reply common.ZcashdRpcReplyGetsubtreebyindex
+	var reply common.RpcReplyGetsubtreebyindex
 	err = json.Unmarshal(result, &reply)
 	if err != nil {
 		return status.Errorf(codes.Unknown,
@@ -1104,7 +1104,7 @@ func (s *DarksideStreamer) Stop(ctx context.Context, _ *walletrpc.Empty) (*walle
 }
 
 // StageBlocksStream accepts a list of blocks from the wallet test code,
-// and makes them available to present from the mock zcashd's GetBlock rpc.
+// and makes them available to present from the mock node's GetBlock rpc.
 func (s *DarksideStreamer) StageBlocksStream(blocks walletrpc.DarksideStreamer_StageBlocksStreamServer) error {
 	for {
 		b, err := blocks.Recv()
@@ -1194,7 +1194,7 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 
 // AddAddressUtxo adds a UTXO which will be returned by GetAddressUtxos() (above)
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
-	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
+	utxosReply := common.RpcReplyGetaddressutxos{
 		Address:     arg.Address,
 		Txid:        hash32.Encode(hash32.Reverse(hash32.FromSlice(arg.Txid))),
 		OutputIndex: int64(arg.Index),

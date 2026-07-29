@@ -4,8 +4,6 @@
 package cmd
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,8 +13,6 @@ import (
 	"strings"
 	"syscall"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -189,7 +185,7 @@ func startServer(opts *common.Options) error {
 		reflection.Register(server)
 	}
 
-	// Initialize Zcash RPC client. Right now (Jan 2018) this is only for
+	// Initialize the Zcash node RPC client. Right now (Jan 2018) this is only for
 	// sending transactions, but in the future it could back a different type
 	// of block streamer.
 
@@ -207,30 +203,30 @@ func startServer(opts *common.Options) error {
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("setting up RPC connection to zebrad or zcashd")
+			}).Fatal("setting up RPC connection to the Zcash node")
 		}
 		_, err = rpcclient.New(connCfg, nil)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("setting up RPC connection to zebrad or zcashd")
+			}).Fatal("setting up RPC connection to the Zcash node")
 		}
 		// Indirect function for test mocking (so unit tests can talk to stub functions).
 		common.RawRequest, err = frontend.NewContextRawRequest(connCfg)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("setting up RPC connection to zebrad or zcashd")
+			}).Fatal("setting up RPC connection to the Zcash node")
 		}
 
-		// Ensure that we can communicate with zcashd
+		// Ensure that we can communicate with the Zcash node
 		common.FirstRPC()
 
 		getLightdInfo, err := common.GetLightdInfo()
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
-			}).Fatal("getting initial information from zebrad or zcashd")
+			}).Fatal("getting initial information from the Zcash node")
 		}
 		common.Log.Info("Got sapling height ", getLightdInfo.SaplingActivationHeight,
 			" block height ", getLightdInfo.BlockHeight,
@@ -249,48 +245,18 @@ func startServer(opts *common.Options) error {
 			backend = "zakura"
 		case strings.Contains(subver, "/Zebra:"):
 			backend = "zebrad"
-		case strings.Contains(subver, "/MagicBean:"):
-			backend = "zcashd"
-		}
-		if backend != "" {
-			common.NodeName = backend
 		}
 
-		// Verify that the backend is one we know how to talk to and, for
-		// zcashd, that the required experimental features are enabled.
-		// --no-backend-check skips all of this, allowing lightwalletd to
+		// Verify that the backend is one we know how to talk to.
+		// --no-backend-check skips this, allowing lightwalletd to
 		// connect to any node that speaks the expected RPCs.
 		if opts.NoBackendCheck {
 			common.Log.Warn("--no-backend-check given; not verifying the backend, subversion ", subver)
+		} else if backend != "" {
+			common.Log.Info("Detected ", backend, " backend")
 		} else {
-			switch backend {
-			case "zebrad", "zakura":
-				common.Log.Info("Detected ", backend, " backend; skipping experimental feature check")
-
-			case "zcashd":
-				result, rpcErr := common.RawRequest(context.Background(), "getexperimentalfeatures", []json.RawMessage{})
-				if rpcErr != nil {
-					common.Log.Fatalf("zcashd backend detected but getexperimentalfeatures RPC failed: %s", rpcErr.Error())
-				}
-
-				var feats []string
-				if err := json.Unmarshal(result, &feats); err != nil {
-					common.Log.Info("failed to decode getexperimentalfeatures reply: %w", err)
-				}
-
-				switch {
-				case slices.Contains(feats, "lightwalletd"):
-				case slices.Contains(feats, "insightexplorer"):
-				default:
-					common.Log.Fatal(
-						"zcashd is running without the required experimental feature enabled; " +
-							"enable 'lightwalletd' or 'insightexplorer'")
-				}
-
-			default:
-				common.Log.Fatalf("unsupported backend subversion %q (expected zebrad, zakura, or the "+
-					"deprecated zcashd); use --no-backend-check to connect anyway", subver)
-			}
+			common.Log.Fatalf("unsupported backend subversion %q (expected zebrad or zakura); "+
+				"use --no-backend-check to connect anyway", subver)
 		}
 	}
 
@@ -417,15 +383,15 @@ func init() {
 	rootCmd.Flags().String("rpcpassword", "", "RPC password")
 	rootCmd.Flags().String("rpchost", "", "RPC host")
 	rootCmd.Flags().String("rpcport", "", "RPC host port")
-	rootCmd.Flags().Bool("no-backend-check", false, "don't verify that the backend node is zebrad, zakura or zcashd; connect to any node")
+	rootCmd.Flags().Bool("no-backend-check", false, "don't verify that the backend node is zebrad or zakura; connect to any node")
 	rootCmd.Flags().Bool("no-tls-very-insecure", false, "run without the required TLS certificate, only for debugging, DO NOT use in production")
 	rootCmd.Flags().Bool("gen-cert-very-insecure", false, "run with self-signed TLS certificate, only for debugging, DO NOT use in production")
-	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from zebrad or zcashd; reinitialize local cache files")
+	rootCmd.Flags().Bool("redownload", false, "re-fetch all blocks from the Zcash node; reinitialize local cache files")
 	rootCmd.Flags().Bool("nocache", false, "don't maintain a compact blocks disk cache (to reduce storage)")
-	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from zebrad or zcashd, starting at this height")
+	rootCmd.Flags().Int("sync-from-height", -1, "re-fetch blocks from the Zcash node, starting at this height")
 	rootCmd.Flags().String("data-dir", "/var/lib/lightwalletd", "data directory (such as db)")
 	rootCmd.Flags().Bool("ping-very-insecure", false, "allow Ping GRPC for testing")
-	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock zebrad for integration testing (shuts down after 30 minutes)")
+	rootCmd.Flags().Bool("darkside-very-insecure", false, "run with GRPC-controllable mock Zcash node for integration testing (shuts down after 30 minutes)")
 	rootCmd.Flags().Int("darkside-timeout", 30, "override 30 minute default darkside timeout")
 	rootCmd.Flags().String("donation-address", "", "Zcash UA address to accept donations for operating this server")
 

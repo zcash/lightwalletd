@@ -28,7 +28,7 @@ type darksideState struct {
 	cache       *BlockCache
 
 	// This is the highest (latest) block height currently being presented
-	// by the mock zcashd.
+	// by the mock Zcash node.
 	latestHeight int
 
 	// Size of the Sapling commitment tree as of `startHeight - 1`.
@@ -38,9 +38,9 @@ type darksideState struct {
 	// Size of the Ironwood commitment tree as of `startHeight - 1`.
 	startIronwoodTreeSize uint32
 
-	// These blocks (up to and including tip) are presented by mock zcashd.
+	// These blocks (up to and including tip) are presented by the mock Zcash node.
 	// activeBlocks[0] is the block at height startHeight.
-	activeBlocks []*activeBlock // full blocks, binary, as from zcashd getblock rpc
+	activeBlocks []*activeBlock // full blocks, binary, as from the getblock rpc
 
 	// Staged blocks are waiting to be applied (by ApplyStaged()) to activeBlocks.
 	// They are in order of arrival (not necessarily sorted by height), and are
@@ -57,7 +57,7 @@ type darksideState struct {
 	stagedTransactions []stagedTx
 
 	// Unordered list of replies
-	getAddressUtxos []ZcashdRpcReplyGetaddressutxos
+	getAddressUtxos []RpcReplyGetaddressutxos
 
 	// List of (address, transaction, height) tuples for getaddresstxids
 	getAddressTransactions []*walletrpc.DarksideAddressTransaction
@@ -530,7 +530,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		block := parser.NewBlock()
 		block.ParseFromSlice(state.activeBlocks[index].bytes)
 		hash := block.GetDisplayHashString()
-		blockchaininfo := &ZcashdRpcReplyGetblockchaininfo{
+		blockchaininfo := &RpcReplyGetblockchaininfo{
 			Chain: state.chainName,
 			Upgrades: map[string]Upgradeinfo{
 				"76b809bb": {ActivationHeight: state.startHeight},
@@ -542,7 +542,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(blockchaininfo)
 
 	case "getinfo":
-		info := &ZcashdRpcReplyGetinfo{
+		info := &RpcReplyGetinfo{
 			Build:      "darksidewallet-build",
 			Subversion: "darksidewallet-subversion",
 		}
@@ -641,7 +641,7 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(block.GetDisplayHashString())
 
 	case "getaddresstxids":
-		var req ZcashdRpcRequestGetaddresstxids
+		var req RpcRequestGetaddresstxids
 		err := json.Unmarshal(params[0], &req)
 		if err != nil {
 			return nil, errors.New("failed to parse getaddresstxids JSON")
@@ -716,12 +716,12 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 		return json.Marshal(reply)
 
 	case "getaddressutxos":
-		var req ZcashdRpcRequestGetaddressutxos
+		var req RpcRequestGetaddressutxos
 		err := json.Unmarshal(params[0], &req)
 		if err != nil {
 			return nil, errors.New("failed to parse getaddressutxos JSON")
 		}
-		utxosReply := make([]ZcashdRpcReplyGetaddressutxos, 0)
+		utxosReply := make([]RpcReplyGetaddressutxos, 0)
 		for _, utxo := range state.getAddressUtxos {
 			if slices.Contains(req.Addresses, utxo.Address) {
 				utxosReply = append(utxosReply, utxo)
@@ -752,22 +752,22 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 					"Stage it using AddTreeState() first"))
 		}
 
-		zcashdTreeState := &ZcashdRpcReplyGettreestate{}
+		treeStateReply := &RpcReplyGettreestate{}
 
-		zcashdTreeState.Hash = treeState.Hash
-		zcashdTreeState.Height = int(treeState.Height)
-		zcashdTreeState.Time = treeState.Time
-		zcashdTreeState.Sapling.Commitments.FinalState = treeState.SaplingTree
+		treeStateReply.Hash = treeState.Hash
+		treeStateReply.Height = int(treeState.Height)
+		treeStateReply.Time = treeState.Time
+		treeStateReply.Sapling.Commitments.FinalState = treeState.SaplingTree
 
 		if treeState.OrchardTree != "" {
-			zcashdTreeState.Orchard.Commitments.FinalState = treeState.OrchardTree
+			treeStateReply.Orchard.Commitments.FinalState = treeState.OrchardTree
 		}
 
 		if treeState.IronwoodTree != "" {
-			zcashdTreeState.Ironwood.Commitments.FinalState = treeState.IronwoodTree
+			treeStateReply.Ironwood.Commitments.FinalState = treeState.IronwoodTree
 		}
 
-		return json.Marshal(zcashdTreeState)
+		return json.Marshal(treeStateReply)
 
 	case "z_getsubtreesbyindex":
 		// This is implemented by DarksideGetSubtreeRoots().
@@ -966,7 +966,7 @@ func DarksideStageTransactionsURL(height int, url string) error {
 	return scan.Err()
 }
 
-func DarksideAddAddressUtxo(arg ZcashdRpcReplyGetaddressutxos) error {
+func DarksideAddAddressUtxo(arg RpcReplyGetaddressutxos) error {
 	mutex.Lock()
 	state.getAddressUtxos = append(state.getAddressUtxos, arg)
 	mutex.Unlock()

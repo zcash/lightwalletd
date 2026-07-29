@@ -2,7 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-// Package parser deserializes blocks from zcashd.
+// Package parser deserializes blocks from the Zcash node.
 package parser
 
 import (

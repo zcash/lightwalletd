@@ -16,7 +16,12 @@ import (
 	ini "gopkg.in/ini.v1"
 )
 
-// ConnConfigFromConf reads the zcashd configuration file.
+// ConnConfigFromConf reads a config file describing how to reach the Zcash
+// node's RPC interface: either TOML (.toml extension) or zcash.conf-style INI.
+// Note that a node's own config file (e.g. zebrad.toml) is generally not
+// suitable here: its RPC listen address is the node's bind address, which is
+// not necessarily an address that lightwalletd can reach. Prefer the
+// --rpchost, --rpcport, --rpcuser, and --rpcpassword options instead.
 func ConnConfigFromConf(confPath string) (*rpcclient.ConnConfig, error) {
 	return connFromConf(confPath)
 }
@@ -27,23 +32,9 @@ func ConnConfigFromFlags(opts *common.Options) *rpcclient.ConnConfig {
 		Host:         net.JoinHostPort(opts.RPCHost, opts.RPCPort),
 		User:         opts.RPCUser,
 		Pass:         opts.RPCPassword,
-		HTTPPostMode: true, // Zcash only supports HTTP POST mode
-		DisableTLS:   true, // Zcash does not provide TLS by default
+		HTTPPostMode: true, // the node RPC only supports HTTP POST mode
+		DisableTLS:   true, // the node RPC does not provide TLS by default
 	}
-}
-
-// NewZRPCFromConf reads the zcashd configuration file.
-func NewZRPCFromConf(confPath string) (*rpcclient.Client, error) {
-	connCfg, err := ConnConfigFromConf(confPath)
-	if err != nil {
-		return nil, err
-	}
-	return rpcclient.New(connCfg, nil)
-}
-
-// NewZRPCFromFlags gets zcashd rpc connection information from provided flags.
-func NewZRPCFromFlags(opts *common.Options) (*rpcclient.Client, error) {
-	return rpcclient.New(ConnConfigFromFlags(opts), nil)
 }
 
 func connFromConf(confPath string) (*rpcclient.ConnConfig, error) {
@@ -54,6 +45,8 @@ func connFromConf(confPath string) (*rpcclient.ConnConfig, error) {
 	}
 }
 
+// Read a zcash.conf-style INI config file to find the RPC address and
+// credentials of the Zcash node.
 func connFromIni(confPath string) (*rpcclient.ConnConfig, error) {
 	cfg, err := ini.Load(confPath)
 	if err != nil {
@@ -77,24 +70,24 @@ func connFromIni(confPath string) (*rpcclient.ConnConfig, error) {
 	password := cfg.Section("").Key("rpcpassword").String()
 
 	if password == "" {
-		return nil, errors.New("rpcpassword not found (or empty), please add rpcpassword= to zcash.conf")
+		return nil, errors.New("rpcpassword not found (or empty), please add rpcpassword= to the config file")
 	}
 
-	// Connect to local Zcash RPC server using HTTP POST mode.
+	// Connect to the node's RPC server using HTTP POST mode.
 	connCfg := &rpcclient.ConnConfig{
 		Host:         net.JoinHostPort(rpcaddr, rpcport),
 		User:         username,
 		Pass:         password,
-		HTTPPostMode: true, // Zcash only supports HTTP POST mode
-		DisableTLS:   true, // Zcash does not provide TLS by default
+		HTTPPostMode: true, // the node RPC only supports HTTP POST mode
+		DisableTLS:   true, // the node RPC does not provide TLS by default
 	}
 	// Notice the notification parameter is nil since notifications are
 	// not supported in HTTP POST mode.
 	return connCfg, nil
 }
 
-// If passed a string, interpret as a path, open and read; if passed
-// a byte slice, interpret as the config file content (used in testing).
+// Read a TOML config file containing an [rpc] table (listen_addr, rpcuser,
+// rpcpassword) to find the RPC address and credentials of the Zcash node.
 func connFromToml(confPath string) (*rpcclient.ConnConfig, error) {
 	var tomlConf struct {
 		Rpc struct {
@@ -111,8 +104,8 @@ func connFromToml(confPath string) (*rpcclient.ConnConfig, error) {
 		Host:         tomlConf.Rpc.Listen_addr,
 		User:         tomlConf.Rpc.RPCUser,
 		Pass:         tomlConf.Rpc.RPCPassword,
-		HTTPPostMode: true, // Zcash only supports HTTP POST mode
-		DisableTLS:   true, // Zcash does not provide TLS by default
+		HTTPPostMode: true, // the node RPC only supports HTTP POST mode
+		DisableTLS:   true, // the node RPC does not provide TLS by default
 	}
 
 	// Notice the notification parameter is nil since notifications are
