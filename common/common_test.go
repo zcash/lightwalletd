@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,10 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ------------------------------------------ Setup
@@ -523,6 +527,197 @@ func TestGetBlockRange(t *testing.T) {
 		t.Fatal("unexpected step:", step)
 	}
 	os.RemoveAll(unitTestPath)
+}
+
+// staleForkCache returns a cache holding a single height-380640 block from a
+// fork that the backend has since reorged away from. Its hash is arbitrary;
+// all that matters is that it differs from the hash of the real height-380640
+// block, which is what the real height-380641 block (blocks[1], served by
+// discontinuityStub below) names as its PrevHash.
+//
+// This is the state described in GHSA-m7j5-wvx3-qj6j: the background ingestor
+// hasn't yet rewound the cache, so a range that spans the cache/backend
+// boundary would mix two forks.
+func staleForkCache(t *testing.T) *BlockCache {
+	os.RemoveAll(unitTestPath)
+	cache := NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
+	err := cache.Add(380640, &walletrpc.CompactBlock{
+		Height:   380640,
+		Hash:     bytes.Repeat([]byte{0xa1}, 32),
+		PrevHash: bytes.Repeat([]byte{0xa0}, 32),
+	})
+	if err != nil {
+		t.Fatal("cache.Add failed:", err)
+	}
+	return cache
+}
+
+// discontinuityStub serves only height 380641; height 380640 is satisfied from
+// the cache, so it's never requested from the backend.
+func discontinuityStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+	if method != "getblock" {
+		testT.Error("unexpected method")
+	}
+	var arg string
+	if err := json.Unmarshal(params[0], &arg); err != nil {
+		testT.Fatal("could not unmarshal height")
+	}
+
+	step++
+	switch step {
+	case 1:
+		if arg != "380641" {
+			testT.Error("unexpected height")
+		}
+		return []byte("{\"Tx\": [\"" + testTxid + "\"], \"Hash\": \"" + testBlockid41 + "\"}"), nil
+	case 2:
+		if arg != testBlockid41 {
+			testT.Error("unexpected hash")
+		}
+		return blocks[1], nil
+	}
+	testT.Error("discontinuityStub called too many times")
+	return nil, nil
+}
+
+// checkDiscontinuity requires that the next thing GetBlockRange produces is the
+// discontinuity error, rather than another block.
+func checkDiscontinuity(t *testing.T, blockChan <-chan *walletrpc.CompactBlock, errChan <-chan error) {
+	t.Helper()
+	select {
+	case err := <-errChan:
+		if status.Code(err) != codes.Aborted {
+			t.Fatal("unexpected error code:", status.Code(err), err)
+		}
+		if !strings.Contains(err.Error(), "chain discontinuity") {
+			t.Fatal("unexpected error:", err)
+		}
+	case cBlock := <-blockChan:
+		t.Fatal("streamed a block that doesn't connect, height:", cBlock.Height)
+	}
+}
+
+// A range that spans a stale cached block and the current backend block must
+// fail rather than stream a chain that can't exist.
+func TestGetBlockRangeDiscontinuity(t *testing.T) {
+	testT = t
+	RawRequest = discontinuityStub
+	defer resetGlobals()
+	testcache = staleForkCache(t)
+	defer os.RemoveAll(unitTestPath)
+
+	blockChan := make(chan *walletrpc.CompactBlock)
+	errChan := make(chan error)
+	blockRange := &walletrpc.BlockRange{
+		Start: &walletrpc.BlockID{Height: 380640},
+		End:   &walletrpc.BlockID{Height: 380641},
+	}
+	go GetBlockRange(context.Background(), testcache, blockChan, errChan, blockRange)
+
+	// The stale 380640 goes out before there's anything to compare it
+	// against; the mismatch can only be detected once 380641 arrives.
+	select {
+	case err := <-errChan:
+		t.Fatal("unexpected error:", err)
+	case cBlock := <-blockChan:
+		if cBlock.Height != 380640 {
+			t.Fatal("unexpected Height:", cBlock.Height)
+		}
+	}
+
+	// blocks[1].PrevHash is the real 380640 hash, not the stale one.
+	checkDiscontinuity(t, blockChan, errChan)
+
+	if step != 2 {
+		t.Fatal("unexpected step:", step)
+	}
+}
+
+// Same as TestGetBlockRangeDiscontinuity, but with start greater than end, so
+// the blocks are compared in the other direction.
+func TestGetBlockRangeDiscontinuityReverse(t *testing.T) {
+	testT = t
+	RawRequest = discontinuityStub
+	defer resetGlobals()
+	testcache = staleForkCache(t)
+	defer os.RemoveAll(unitTestPath)
+
+	blockChan := make(chan *walletrpc.CompactBlock)
+	errChan := make(chan error)
+	blockRange := &walletrpc.BlockRange{
+		Start: &walletrpc.BlockID{Height: 380641},
+		End:   &walletrpc.BlockID{Height: 380640},
+	}
+	go GetBlockRange(context.Background(), testcache, blockChan, errChan, blockRange)
+
+	// read in block 380641 (from the backend, the current fork)
+	select {
+	case err := <-errChan:
+		t.Fatal("unexpected error:", err)
+	case cBlock := <-blockChan:
+		if cBlock.Height != 380641 {
+			t.Fatal("unexpected Height:", cBlock.Height)
+		}
+	}
+
+	// The stale cached 380640 isn't the block that 380641 descends from.
+	checkDiscontinuity(t, blockChan, errChan)
+
+	if step != 2 {
+		t.Fatal("unexpected step:", step)
+	}
+}
+
+// The same cache/backend split, but with a cached block that really is the
+// parent of the backend's block: the range must stream normally. Without this,
+// nothing covers the happy path across the cache/backend boundary, which is
+// every wallet syncing at the cache tip.
+func TestGetBlockRangeContiguousReverse(t *testing.T) {
+	testT = t
+	RawRequest = discontinuityStub
+	defer resetGlobals()
+	os.RemoveAll(unitTestPath)
+	defer os.RemoveAll(unitTestPath)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
+
+	// Cache the real 380640, the block that the backend's 380641 descends from.
+	block := parser.NewBlock()
+	var blockHex string
+	if err := json.Unmarshal(blocks[0], &blockHex); err != nil {
+		t.Fatal("could not unmarshal test block:", err)
+	}
+	blockBytes, err := hex.DecodeString(blockHex)
+	if err != nil {
+		t.Fatal("could not decode test block:", err)
+	}
+	if _, err := block.ParseFromSlice(blockBytes); err != nil {
+		t.Fatal("could not parse test block:", err)
+	}
+	if err := testcache.Add(380640, block.ToCompact()); err != nil {
+		t.Fatal("cache.Add failed:", err)
+	}
+
+	blockChan := make(chan *walletrpc.CompactBlock)
+	errChan := make(chan error)
+	blockRange := &walletrpc.BlockRange{
+		Start: &walletrpc.BlockID{Height: 380641},
+		End:   &walletrpc.BlockID{Height: 380640},
+	}
+	go GetBlockRange(context.Background(), testcache, blockChan, errChan, blockRange)
+
+	for _, height := range []uint64{380641, 380640} {
+		select {
+		case err := <-errChan:
+			t.Fatal("unexpected error:", err)
+		case cBlock := <-blockChan:
+			if cBlock.Height != height {
+				t.Fatal("unexpected Height:", cBlock.Height)
+			}
+		}
+	}
+	if err := <-errChan; err != nil {
+		t.Fatal("unexpected error:", err)
+	}
 }
 
 func TestGetBlockRangeCancelsInFlightRPC(t *testing.T) {
