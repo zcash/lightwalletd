@@ -586,14 +586,23 @@ func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*wa
 		return nil, status.Errorf(codes.ResourceExhausted,
 			"getTaddressBalanceZcashdRpc: too many addresses (limit %d)", maxTaddrsPerRequest)
 	}
+	// Eliminate duplicate addresses; zcashd sums per list entry, so a repeated
+	// address would otherwise inflate the balance it reports.
+	addresses := make([]string, 0)
+	seen := make(map[string]struct{})
 	for _, addr := range addressList {
+		if _, dup := seen[addr]; dup {
+			continue
+		}
 		if err := checkTaddress(addr); err != nil {
 			return nil, err
 		}
+		seen[addr] = struct{}{}
+		addresses = append(addresses, addr)
 	}
 	params := make([]json.RawMessage, 1)
 	addrList := &common.ZcashdRpcRequestGetaddressbalance{
-		Addresses: addressList,
+		Addresses: addresses,
 	}
 	param, err := json.Marshal(addrList)
 	if err != nil {
@@ -890,22 +899,26 @@ func MempoolFilter(items, exclude []string) []string {
 }
 
 func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f func(*walletrpc.GetAddressUtxosReply) error) error {
-	// Bound the address count before contacting zcashd: getaddressutxos cannot
-	// push down StartHeight/MaxEntries, so lightwalletd fetches and
-	// materializes the entire backend result before applying those limits.
-	// Capping the input keeps one request from forcing unbounded backend work
-	// and result materialization (GHSA-x4m7-3gpp-xc36).
+	// GHSA-x4m7-3gpp-xc36
 	if len(arg.Addresses) > maxTaddrsPerRequest {
 		return status.Errorf(codes.ResourceExhausted,
 			"getAddressUtxos: too many addresses (limit %d)", maxTaddrsPerRequest)
 	}
+	// Eliminate duplicate addresses; returned UTXO set doesn't change.
+	addresses := make([]string, 0)
+	seen := make(map[string]struct{})
 	for _, a := range arg.Addresses {
+		if _, dup := seen[a]; dup {
+			continue
+		}
 		if err := checkTaddress(a); err != nil {
 			return err
 		}
+		seen[a] = struct{}{}
+		addresses = append(addresses, a)
 	}
 	addrList := &common.ZcashdRpcRequestGetaddressutxos{
-		Addresses: arg.Addresses,
+		Addresses: addresses,
 	}
 	param, err := json.Marshal(addrList)
 	if err != nil {
