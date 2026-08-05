@@ -72,12 +72,14 @@ jobs:
           DST_PASS: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
         run: |
           TAG="${{ github.event.release.tag_name }}"
-          go install github.com/google/go-containerregistry/cmd/crane@latest
-          crane copy \
+          go install github.com/google/go-containerregistry/cmd/crane@v0.21.8
+          # go install writes to GOPATH/bin, which is not on PATH in this job.
+          CRANE="$(go env GOPATH)/bin/crane"
+          "${CRANE}" copy \
             --src-creds "${SRC_USER}:${SRC_PASS}" \
             --dst-creds "${DST_USER}:${DST_PASS}" \
             electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
-          crane copy \
+          "${CRANE}" copy \
             --src-creds "${SRC_USER}:${SRC_PASS}" \
             --dst-creds "${DST_USER}:${DST_PASS}" \
             electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
