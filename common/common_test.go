@@ -215,6 +215,15 @@ func TestGetLightdInfo(t *testing.T) {
 	if getLightdInfo.DonationAddress != "ua1234test" {
 		t.Error("unexpected DonationAddress", getLightdInfo.DonationAddress)
 	}
+	// Clients are required to check this before requesting non-default
+	// poolTypes, so an empty value tells them transparent data is unavailable
+	// even though this server serves it.
+	if getLightdInfo.LightwalletProtocolVersion != LightwalletProtocolVersion {
+		t.Error("unexpected LightwalletProtocolVersion", getLightdInfo.LightwalletProtocolVersion)
+	}
+	if getLightdInfo.LightwalletProtocolVersion == "" {
+		t.Error("LightwalletProtocolVersion must not be empty")
+	}
 	// If more than one network upgrade is pending, the closest
 	// (next) should be reported.
 	if getLightdInfo.UpgradeName != "b" {

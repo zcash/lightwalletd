@@ -6,6 +6,22 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- Report `lightwalletProtocolVersion` in `GetLightdInfo`. The field was added
+  to `LightdInfo` in lightwallet-protocol v0.4.0, in the same release as
+  `BlockRange.poolTypes`, and is the signal clients are required to check
+  before requesting non-default pool types. lightwalletd never populated it,
+  so it was always the empty string, and a client following that rule could
+  not tell a server that serves transparent and Ironwood data inside compact
+  blocks from one that does not. Correctly-behaving clients therefore had to
+  fall back to shielded-only scanning, or rely on an out-of-band assertion
+  from the operator, against servers that had supported the data since 0.5.0.
+  The value is a constant tracking the vendored `lightwallet-protocol`
+  subtree, currently v0.5.0, and is not overwritten by the build.
+
 ## [0.5.3] - 2026-08-04
 
 ### Fixed

@@ -35,6 +35,19 @@ var (
 	DonationAddress = ""
 )
 
+// LightwalletProtocolVersion is the version of
+// https://github.com/zcash/lightwallet-protocol that this server implements,
+// reported to clients in LightdInfo.
+//
+// It describes the protocol served, not the build, so unlike the variables
+// above it is a constant and is not overwritten by 'make build'. Clients rely
+// on it to decide whether they may request non-default `poolTypes` (that field
+// and this one were added together, in protocol v0.4.0), so it must be updated
+// in lockstep with the lightwallet-protocol subtree under
+// lightwallet-protocol/ - and only once the server actually serves everything
+// the named version specifies.
+const LightwalletProtocolVersion = "v0.5.0"
+
 type Options struct {
 	GRPCBindAddr        string `json:"grpc_bind_address,omitempty"`
 	GRPCLogging         bool   `json:"grpc_logging_insecure,omitempty"`
@@ -326,6 +339,8 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		DonationAddress:         DonationAddress,
 		UpgradeName:             upgrade.Name,
 		UpgradeHeight:           uint64(upgrade.ActivationHeight),
+
+		LightwalletProtocolVersion: LightwalletProtocolVersion,
 	}, nil
 }
 
