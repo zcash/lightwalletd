@@ -385,6 +385,60 @@ func TestGetTaddressBalanceStream(t *testing.T) {
 	}
 }
 
+func TestGetTaddressBalanceTooManyAddresses(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// The unary method takes the whole list in one protobuf message, so its
+	// only bound was gRPC's 4MB MaxRecvMsgSize -- about 113,000 addresses at
+	// 37 wire bytes each, an order of magnitude above the cap the streaming
+	// and utxo methods enforce (GHSA-x4m7-3gpp-xc36).
+	//
+	// Distinct addresses, so that the counts here are unaffected by any later
+	// deduplication of the list.
+	addrs := make([]string, maxTaddrsPerRequest+1)
+	for i := range addrs {
+		addrs[i] = fmt.Sprintf("t1%033d", i)
+	}
+
+	// Exactly at the limit: accepted, and the whole list reaches zcashd.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressbalance" {
+			testT.Fatal("unexpected method", method)
+		}
+		var req common.ZcashdRpcRequestGetaddressbalance
+		if err := json.Unmarshal(params[0], &req); err != nil {
+			testT.Fatal("could not unmarshal getaddressbalance request")
+		}
+		if len(req.Addresses) != maxTaddrsPerRequest {
+			testT.Fatal("expected the whole list to reach zcashd, got:", len(req.Addresses))
+		}
+		return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 1234})
+	}
+	balance, err := lwd.GetTaddressBalance(context.Background(),
+		&walletrpc.AddressList{Addresses: addrs[:maxTaddrsPerRequest]})
+	if err != nil {
+		t.Fatal("GetTaddressBalance failed at exactly the limit:", err)
+	}
+	if balance.ValueZat != 1234 {
+		t.Fatal("unexpected balance:", balance.ValueZat)
+	}
+
+	// One over: rejected before zcashd is contacted.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called when the address list is over the limit")
+		return nil, nil
+	}
+	_, err = lwd.GetTaddressBalance(context.Background(), &walletrpc.AddressList{Addresses: addrs})
+	if err == nil {
+		t.Fatal("GetTaddressBalance should have failed on too many addresses")
+	}
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+	}
+}
+
 func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
 	testT = t
 	defer resetGlobals()

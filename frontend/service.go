@@ -581,6 +581,11 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 }
 
 func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*walletrpc.Balance, error) {
+	// GHSA-x4m7-3gpp-xc36
+	if len(addressList) > maxTaddrsPerRequest {
+		return nil, status.Errorf(codes.ResourceExhausted,
+			"getTaddressBalanceZcashdRpc: too many addresses (limit %d)", maxTaddrsPerRequest)
+	}
 	for _, addr := range addressList {
 		if err := checkTaddress(addr); err != nil {
 			return nil, err
@@ -633,9 +638,8 @@ func (s *lwdStreamer) GetTaddressBalance(ctx context.Context, addresses *walletr
 // memory growth and backend work: GetTaddressBalanceStream accumulates
 // streamed addresses until the process is OOM-killed, and GetAddressUtxos
 // forwards the whole list to zcashd and materializes the full result before
-// applying client-side limits. The unary GetTaddressBalance is already
-// implicitly bounded by gRPC's MaxRecvMsgSize; this gives the other methods an
-// equivalent bound, generous for any legitimate wallet (GHSA-x4m7-3gpp-xc36).
+// applying client-side limits. Generous for any legitimate wallet
+// (GHSA-x4m7-3gpp-xc36).
 const maxTaddrsPerRequest = 10000
 
 // GetTaddressBalanceStream returns the total balance for a list of taddrs
