@@ -10,6 +10,15 @@ The most recent changes are listed first.
 
 ### Fixed
 
+- `GetTaddressBalance` now rejects an address list longer than the same 10,000
+  limit that `GetTaddressBalanceStream`, `GetAddressUtxos` and
+  `GetAddressUtxosStream` already enforce. The unary method takes its whole
+  list in one protobuf message, so its only bound was gRPC's 4MB
+  `MaxRecvMsgSize` — roughly 113,000 addresses at 37 wire bytes each, an order
+  of magnitude above the intended cap. A single request could therefore ask
+  the backend for eleven times more address-index lookups than any other
+  method allows, and return only an 8-byte balance (GHSA-x4m7-3gpp-xc36).
+
 - Report `lightwalletProtocolVersion` in `GetLightdInfo`. The field was added
   to `LightdInfo` in lightwallet-protocol v0.4.0, in the same release as
   `BlockRange.poolTypes`, and is the signal clients are required to check
