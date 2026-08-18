@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -461,6 +462,162 @@ func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
 	}
 	if status.Code(err) != codes.ResourceExhausted {
 		t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+	}
+}
+
+func TestGetTaddressBalanceDeduplicates(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	taddr := func(c string) string { return "t1" + strings.Repeat(c, 33) }
+	addrA, addrB := taddr("a"), taddr("b")
+
+	// zcashd sums getaddressbalance over the list entries, so a repeated
+	// address inflates the balance it reports; zebrad collapses duplicates
+	// before querying. Model zcashd here: 1000 zats per entry received.
+	var forwarded []string
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressbalance" {
+			testT.Fatal("unexpected method", method)
+		}
+		var req common.ZcashdRpcRequestGetaddressbalance
+		if err := json.Unmarshal(params[0], &req); err != nil {
+			testT.Fatal("could not unmarshal getaddressbalance request")
+		}
+		forwarded = req.Addresses
+		return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{
+			Balance: int64(1000 * len(req.Addresses)),
+		})
+	}
+
+	balance, err := lwd.GetTaddressBalance(context.Background(),
+		&walletrpc.AddressList{Addresses: []string{addrA, addrB, addrA, addrA}})
+	if err != nil {
+		t.Fatal("GetTaddressBalance failed:", err)
+	}
+	if !reflect.DeepEqual(forwarded, []string{addrA, addrB}) {
+		t.Fatal("expected the distinct addresses in first-occurrence order, got:", forwarded)
+	}
+	// Two distinct addresses, so two entries' worth -- not four.
+	if balance.ValueZat != 2000 {
+		t.Fatal("expected balance 2000, got:", balance.ValueZat)
+	}
+}
+
+func TestGetTaddressBalanceEmptyList(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// An empty address list is not an error; the balance of nothing is zero.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressbalance" {
+			testT.Fatal("unexpected method", method)
+		}
+		return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 0})
+	}
+
+	balance, err := lwd.GetTaddressBalance(context.Background(), &walletrpc.AddressList{})
+	if err != nil {
+		t.Fatal("GetTaddressBalance failed on an empty address list:", err)
+	}
+	if balance.ValueZat != 0 {
+		t.Fatal("expected balance 0, got:", balance.ValueZat)
+	}
+}
+
+func TestGetAddressUtxosEmptyList(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// An empty address list is not an error; it selects no utxos.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressutxos" {
+			testT.Fatal("unexpected method", method)
+		}
+		return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{})
+	}
+
+	reply, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed on an empty address list:", err)
+	}
+	if len(reply.AddressUtxos) != 0 {
+		t.Fatal("expected no utxos, got:", len(reply.AddressUtxos))
+	}
+}
+
+func TestGetAddressUtxosDeduplicates(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// A distinct valid taddr per letter: "t1" followed by 33 more characters.
+	taddr := func(c string) string { return "t1" + strings.Repeat(c, 33) }
+	addrA, addrB, addrC := taddr("a"), taddr("b"), taddr("c")
+	addrD, addrE, addrF := taddr("d"), taddr("e"), taddr("f")
+
+	// zcashd looks up each entry of the address list independently, so a
+	// repeated address multiplies its backend cost and its UTXOs in the reply.
+	// Repeating an address costs the caller nothing, so lightwalletd must send
+	// each distinct address once, in first-occurrence order. Six addresses so
+	// that an implementation collecting them out of order (from a map, say)
+	// reliably fails this rather than matching by chance.
+	var forwarded []string
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressutxos" {
+			testT.Fatal("unexpected method", method)
+		}
+		var req common.ZcashdRpcRequestGetaddressutxos
+		if err := json.Unmarshal(params[0], &req); err != nil {
+			testT.Fatal("could not unmarshal getaddressutxos request")
+		}
+		forwarded = req.Addresses
+		return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{{
+			Address:     addrA,
+			Txid:        "0788e4dc9973cd9a54e0f4d51ec96f4b8e6a8e0f8a1e1e9e4b2c2a1d0e0f0a0b",
+			OutputIndex: 0,
+			Script:      "76a914000000000000000000000000000000000000000088ac",
+			Satoshis:    1000,
+			Height:      1234,
+		}})
+	}
+
+	// Duplicates interleaved with the distinct addresses, and one address
+	// (addrA) repeated far more often than the rest.
+	reply, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses: []string{
+			addrA, addrB, addrA, addrC, addrB, addrA,
+			addrD, addrA, addrE, addrD, addrF, addrA,
+		},
+	})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed:", err)
+	}
+	want := []string{addrA, addrB, addrC, addrD, addrE, addrF}
+	if !reflect.DeepEqual(forwarded, want) {
+		t.Fatal("expected the distinct addresses in first-occurrence order, got:", forwarded)
+	}
+	if len(reply.AddressUtxos) != 1 {
+		t.Fatal("expected one utxo, got:", len(reply.AddressUtxos))
+	}
+
+	// An invalid address is still rejected, even if a valid one precedes it,
+	// and even though the dedupe check runs first.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an invalid address")
+		return nil, nil
+	}
+	_, err = lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses: []string{addrA, addrA, "not-a-valid-address"},
+	})
+	if err == nil {
+		t.Fatal("GetAddressUtxos should have failed on bad address")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument on bad address, got:", err)
 	}
 }
 

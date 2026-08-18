@@ -31,6 +31,30 @@ The most recent changes are listed first.
   The value is a constant tracking the vendored `lightwallet-protocol`
   subtree, currently v0.5.0, and is not overwritten by the build.
 
+- `GetTaddressBalance` and `GetTaddressBalanceStream` no longer report an
+  inflated balance when the client names the same address more than once.
+  zcashd's `getaddressbalance` sums over the list entries, so a repeated
+  address was counted repeatedly; a doubled address returned exactly twice the
+  correct balance. zebrad collapses duplicates before querying, so the same
+  request returned different numbers depending on which backend lightwalletd
+  was configured with. The address list is now deduplicated before the backend
+  call, so the reported balance is the balance of the distinct addresses named,
+  on any backend.
+
+- `GetAddressUtxos` and `GetAddressUtxosStream` now collapse repeated
+  addresses before calling the backend, so a request naming one address n times
+  no longer asks the backend to look it up n times and return n copies of its
+  UTXOs. Against zcashd that was a real multiplier — repeating an address is
+  free to the caller, since addresses are public and neither a key nor any
+  funds are needed to name one, so a single request could multiply the busiest
+  address on the chain by the 10,000-address limit. zebrad already collapses
+  duplicates before querying its state, so it was never exposed to this;
+  lightwalletd no longer depends on the backend to do it. This narrows the
+  worst case rather than closing it: `StartHeight` and `MaxEntries` remain
+  response filters applied after the whole backend result is materialized, so
+  the UTXO set of even a single named address is still fetched in full
+  (GHSA-x4m7-3gpp-xc36).
+
 ## [0.5.3] - 2026-08-04
 
 ### Fixed
