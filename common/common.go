@@ -172,6 +172,9 @@ type (
 	// zcashd rpc "getaddressutxos"
 	ZcashdRpcRequestGetaddressutxos struct {
 		Addresses []string `json:"addresses"`
+		// Optional; a backend that doesn't implement these ignores them.
+		StartHeight uint64 `json:"startHeight,omitempty"`
+		MaxEntries  uint32 `json:"maxEntries,omitempty"`
 	}
 	ZcashdRpcReplyGetaddressutxos struct {
 		Address     string

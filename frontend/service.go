@@ -918,7 +918,9 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 		addresses = append(addresses, a)
 	}
 	addrList := &common.ZcashdRpcRequestGetaddressutxos{
-		Addresses: addresses,
+		Addresses:   addresses,
+		StartHeight: arg.StartHeight,
+		MaxEntries:  arg.MaxEntries,
 	}
 	param, err := json.Marshal(addrList)
 	if err != nil {
@@ -946,6 +948,7 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 	}
 	n := 0
 	for _, utxo := range utxosReply {
+		// Re-apply the limits; a backend that ignored them sent everything.
 		if uint64(utxo.Height) < arg.StartHeight {
 			continue
 		}
@@ -953,6 +956,7 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 		if arg.MaxEntries > 0 && uint32(n) > arg.MaxEntries {
 			break
 		}
+
 		txidBigEndian, err := hex.DecodeString(utxo.Txid)
 		if err != nil {
 			return status.Errorf(codes.Internal,
