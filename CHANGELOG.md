@@ -8,6 +8,20 @@ The most recent changes are listed first.
 
 ## [Unreleased]
 
+### Changed
+
+- `GetAddressUtxos` and `GetAddressUtxosStream` now pass `startHeight` and
+  `maxEntries` to the backend `getaddressutxos` RPC, instead of only applying
+  them to the reply. No backend implements the arguments yet, and a backend
+  that doesn't implement them ignores the extra JSON keys, so on its own this
+  changes nothing: the client-side filter stays, and correctness never depends
+  on the backend honoring them. It is the lightwalletd half of moving the
+  limits to where the work is done, which is what the unremediated part of
+  GHSA-x4m7-3gpp-xc36 needs -- today a request naming a single address with a
+  large UTXO set makes the node produce that entire set, however narrow a
+  height range or however few entries the client asked for. A request that
+  sets neither argument is serialized exactly as it was before.
+
 ### Fixed
 
 - `GetTaddressBalance` now rejects an address list longer than the same 10,000

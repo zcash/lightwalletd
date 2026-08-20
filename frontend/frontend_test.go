@@ -625,6 +625,73 @@ type testgettx struct {
 	walletrpc.CompactTxStreamer_GetTaddressTransactionsServer
 }
 
+func TestGetAddressUtxosPushesDownLimits(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	taddr := "t1" + strings.Repeat("a", 33)
+	utxo := func(height int) common.ZcashdRpcReplyGetaddressutxos {
+		return common.ZcashdRpcReplyGetaddressutxos{
+			Address:     taddr,
+			Txid:        "0788e4dc9973cd9a54e0f4d51ec96f4b8e6a8e0f8a1e1e9e4b2c2a1d0e0f0a0b",
+			OutputIndex: 0,
+			Script:      "76a914000000000000000000000000000000000000000088ac",
+			Satoshis:    1000,
+			Height:      height,
+		}
+	}
+
+	// Model a backend that doesn't implement the new arguments: it returns
+	// every utxo, in chain order, whatever the request asked for.
+	var sent json.RawMessage
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressutxos" {
+			testT.Fatal("unexpected method", method)
+		}
+		sent = params[0]
+		return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{
+			utxo(100), utxo(200), utxo(300), utxo(400),
+		})
+	}
+
+	reply, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses:   []string{taddr},
+		StartHeight: 200,
+		MaxEntries:  2,
+	})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed:", err)
+	}
+	var req common.ZcashdRpcRequestGetaddressutxos
+	if err := json.Unmarshal(sent, &req); err != nil {
+		t.Fatal("could not unmarshal getaddressutxos request")
+	}
+	if req.StartHeight != 200 || req.MaxEntries != 2 {
+		t.Fatal("expected the limits to reach the backend, got:", string(sent))
+	}
+	// The backend ignored them, so the client-side filter must still hold.
+	heights := make([]uint64, 0)
+	for _, u := range reply.AddressUtxos {
+		heights = append(heights, u.Height)
+	}
+	if !reflect.DeepEqual(heights, []uint64{200, 300}) {
+		t.Fatal("expected utxos at heights 200 and 300, got:", heights)
+	}
+
+	// A request that sets neither limit is byte-for-byte what it was before
+	// the arguments existed, so an unpatched backend sees no change.
+	_, err = lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses: []string{taddr},
+	})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed:", err)
+	}
+	if want := `{"addresses":["` + taddr + `"]}`; string(sent) != want {
+		t.Fatal("expected unset limits to be omitted, got:", string(sent))
+	}
+}
+
 func (tg *testgettx) Context() context.Context {
 	return context.Background()
 }
