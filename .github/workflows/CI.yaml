@@ -62,12 +62,7 @@ jobs:
             electriccoinco/lightwalletd:latest
 
       - name: Push to zodlinc
-        # crane copy with explicit --src-creds and --dst-creds avoids the
-        # docker login session conflict (both registries are docker.io but
-        # different org credentials).
         env:
-          SRC_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-          SRC_PASS: ${{ secrets.DOCKERHUB_PASSWORD }}
           DST_USER: ${{ secrets.ZODLINC_DOCKERHUB_USERNAME }}
           DST_PASS: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
         run: |
@@ -75,11 +70,7 @@ jobs:
           go install github.com/google/go-containerregistry/cmd/crane@v0.21.8
           # go install writes to GOPATH/bin, which is not on PATH in this job.
           CRANE="$(go env GOPATH)/bin/crane"
-          "${CRANE}" copy \
-            --src-creds "${SRC_USER}:${SRC_PASS}" \
-            --dst-creds "${DST_USER}:${DST_PASS}" \
-            electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
-          "${CRANE}" copy \
-            --src-creds "${SRC_USER}:${SRC_PASS}" \
-            --dst-creds "${DST_USER}:${DST_PASS}" \
-            electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
+          # The source repo is public, so only the destination needs credentials.
+          "${CRANE}" auth login index.docker.io -u "${DST_USER}" -p "${DST_PASS}"
+          "${CRANE}" copy electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
+          "${CRANE}" copy electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
