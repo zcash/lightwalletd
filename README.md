@@ -59,6 +59,8 @@ Lightwalletd uses the following node RPCs:
 - `getaddressbalance`
 - `getaddressutxos`
 
+To test against a public Zebra endpoint before your own node is fully synced, see the [Zcash RPC latency benchmark](https://openchainbench.com/benchmarks/zcash-rpc) for a live comparison of available keyless endpoints (Tatum Zebra, Tatum zcashd, Blockchair).
+
 ## Lightwalletd
 
 First, install [Go](https://golang.org/dl/#stable) version 1.17 or later. You can see your current version by running `go version`.
