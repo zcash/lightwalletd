@@ -17,6 +17,14 @@ The most recent changes are listed first.
   open as many streams as it likes. Set it to 0 to restore the old unlimited
   behavior.
 
+### Changed
+
+- Where there is a cgroup memory limit (a container run with `--memory`, or a
+  systemd unit with `MemoryMax`), lightwalletd now sets Go's soft memory limit
+  to 90% of it. The Go runtime does not read cgroup limits by itself, so a
+  burst of allocation could be OOM-killed at a heap size the collector was
+  content to let grow. Setting `GOMEMLIMIT` in the environment overrides this.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
