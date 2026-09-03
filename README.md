@@ -33,23 +33,20 @@ Documentation for lightwalletd clients (the gRPC interface) is in `docs/rtd/inde
 
 # Local/Developer Usage
 
-## Zcashd
+## Zebrad
 
-You must start a local instance of `zcashd`, and its `.zcash/zcash.conf` file must include the following entries
-(set the user and password strings accordingly):
-```
-txindex=1
-lightwalletd=1
-experimentalfeatures=1
-rpcuser=xxxxx
-rpcpassword=xxxxx
+You must run a local instance of [`zebrad`](https://github.com/ZcashFoundation/zebra) with its JSON-RPC server enabled. Its `zebrad.toml` file (create one with `zebrad generate -o zebrad.toml`) must include the following entries:
+```toml
+[rpc]
+listen_addr = "127.0.0.1:8232"
+enable_cookie_auth = false
 ```
 
-The `zcashd` can be configured to run `mainnet` or `testnet` (or `regtest`). If you stop `zcashd` and restart it on a different network (switch from `testnet` to `mainnet`, for example), you must also stop and restart lightwalletd.
+The RPC server is disabled unless `listen_addr` is set; by convention, use port 8232 on mainnet and 18232 on testnet. Cookie authentication must be disabled, because lightwalletd does not read zebrad's cookie file. Do not expose the RPC port beyond localhost.
 
-It's necessary to run `zcashd --reindex` one time for these options to take effect. This typically takes several hours, and requires more space in the `.zcash` data directory.
+`zebrad` can be configured to run `Mainnet` or `Testnet` (the `network` section of `zebrad.toml`). If you stop `zebrad` and restart it on a different network, you must also stop and restart lightwalletd.
 
-Lightwalletd uses the following `zcashd` RPCs:
+Lightwalletd uses the following node RPCs:
 - `getinfo`
 - `getblockchaininfo`
 - `getbestblockhash`
@@ -74,13 +71,27 @@ your `$GOPATH` (`$HOME/go` by default), then build the lightwalletd server binar
 Assuming you used `make` to build the server, here's a typical developer invocation:
 
 ```
-./lightwalletd --no-tls-very-insecure --zcash-conf-path ~/.zcash/zcash.conf --data-dir . --log-file /dev/stdout
+./lightwalletd --no-tls-very-insecure --zcash-conf-path ~/.config/zebrad.toml --data-dir . --log-file /dev/stdout
 ```
 Type `./lightwalletd help` to see the full list of options and arguments.
 
+The `--zcash-conf-path` flag accepts either a zebrad `.toml` file (the RPC address is read from `[rpc] listen_addr`) or a zcashd-style `.conf` file; the file extension selects the format. Alternatively, pass the RPC connection parameters directly with `--rpchost`, `--rpcport`, `--rpcuser`, and `--rpcpassword` (all four are required; zebrad ignores the credentials when cookie authentication is disabled).
+
+## Health check
+
+To verify that the server is up, use [grpcurl](https://github.com/fullstorydev/grpcurl) to call the `GetLightdInfo` RPC:
+
+```
+grpcurl -plaintext 127.0.0.1:9067 cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo
+```
+
+A successful reply reports the chain name, block height, and backend node version. Because the server queries the backend node to answer, a successful reply confirms both the gRPC frontend and the connection to `zebrad`.
+
+Omit `-plaintext` when the server runs with TLS. The server enables gRPC reflection at the default log level (`--log-level` 3 or higher), so no `.proto` files are needed; `grpcurl -plaintext 127.0.0.1:9067 list` enumerates the available services.
+
 # Production Usage
 
-Run a local instance of `zcashd` (see above), except do _not_ specify `--no-tls-very-insecure`.
+Run a local instance of `zebrad` (see above), except do _not_ specify `--no-tls-very-insecure`.
 Ensure [Go](https://golang.org/dl/#stable) version 1.17 or later is installed.
 
 **x509 Certificates**
@@ -112,7 +123,7 @@ certbot certonly --standalone --preferred-challenges http -d some.forward.dns.co
 Example using server binary built from Makefile:
 
 ```
-./lightwalletd --tls-cert cert.pem --tls-key key.pem --zcash-conf-path /home/zcash/.zcash/zcash.conf --log-file /logs/server.log
+./lightwalletd --tls-cert cert.pem --tls-key key.pem --zcash-conf-path /etc/zebrad/zebrad.toml --log-file /logs/server.log
 ```
 
 ## Block cache
@@ -128,8 +139,8 @@ the `--data-dir` command-line option).
 
 lightwalletd checks the consistency of these files at startup and during
 operation as these files may be damaged by, for example, an unclean shutdown.
-If the server detects corruption, it will automatically re-downloading blocks
-from `zcashd` from that height, requiring up to an hour again (no manual
+If the server detects corruption, it will automatically re-download blocks
+from `zebrad` from that height, requiring up to an hour again (no manual
 intervention is required). But this should occur rarely.
 
 If lightwalletd detects corruption in these cache files, it will log

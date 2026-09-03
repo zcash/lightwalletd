@@ -5,6 +5,7 @@
 package common
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -33,6 +34,19 @@ var (
 	NodeName        = "zebrad"
 	DonationAddress = ""
 )
+
+// LightwalletProtocolVersion is the version of
+// https://github.com/zcash/lightwallet-protocol that this server implements,
+// reported to clients in LightdInfo.
+//
+// It describes the protocol served, not the build, so unlike the variables
+// above it is a constant and is not overwritten by 'make build'. Clients rely
+// on it to decide whether they may request non-default `poolTypes` (that field
+// and this one were added together, in protocol v0.4.0), so it must be updated
+// in lockstep with the lightwallet-protocol subtree under
+// lightwallet-protocol/ - and only once the server actually serves everything
+// the named version specifies.
+const LightwalletProtocolVersion = "v0.5.0"
 
 type Options struct {
 	GRPCBindAddr        string `json:"grpc_bind_address,omitempty"`
@@ -158,6 +172,9 @@ type (
 	// zcashd rpc "getaddressutxos"
 	ZcashdRpcRequestGetaddressutxos struct {
 		Addresses []string `json:"addresses"`
+		// Optional; a backend that doesn't implement these ignores them.
+		StartHeight uint64 `json:"startHeight,omitempty"`
+		MaxEntries  uint32 `json:"maxEntries,omitempty"`
 	}
 	ZcashdRpcReplyGetaddressutxos struct {
 		Address     string
@@ -325,6 +342,8 @@ func GetLightdInfo() (*walletrpc.LightdInfo, error) {
 		DonationAddress:         DonationAddress,
 		UpgradeName:             upgrade.Name,
 		UpgradeHeight:           uint64(upgrade.ActivationHeight),
+
+		LightwalletProtocolVersion: LightwalletProtocolVersion,
 	}, nil
 }
 
@@ -607,13 +626,19 @@ func GetBlockRange(ctx context.Context, cache *BlockCache, blockOut chan<- *wall
 	// Go over [start, end] inclusive
 	low := int(span.Start.Height)
 	high := int(span.End.Height)
-	if low > high {
+	backward := low > high
+	if backward {
 		// reverse the order
 		low, high = high, low
 	}
+	// The hash that the next block must match to prove it's adjacent to the one
+	// just sent. Going forward that's the hash of the block just sent, which
+	// the next block must name as its parent; going backward it's that block's
+	// parent, which the next block must be. Nil before the first block is sent.
+	var wantHash []byte
 	for i := low; i <= high; i++ {
 		j := i
-		if span.Start.Height > span.End.Height {
+		if backward {
 			// reverse the order
 			j = high - (i - low)
 		}
@@ -626,6 +651,22 @@ func GetBlockRange(ctx context.Context, cache *BlockCache, blockOut chan<- *wall
 			}
 			return
 		}
+		// The field of this block that has to match wantHash (see above).
+		gotHash := block.PrevHash
+		if backward {
+			gotHash = block.Hash
+		}
+		if wantHash != nil && !bytes.Equal(gotHash, wantHash) {
+			// The cache and the backend disagree about the chain, which is the
+			// state the node is in while the ingestor repairs a reorg. Fail
+			// rather than serve a sequence of blocks that can't exist.
+			select {
+			case errOut <- status.Error(codes.Aborted,
+				"GetBlockRange: chain discontinuity during reorg repair"):
+			case <-ctx.Done():
+			}
+			return
+		}
 		block.Vtx = filterBlockPool(block.Vtx, span.PoolTypes)
 
 		// Note that we do want to return blocks that have had all of its transactions filtered,
@@ -634,6 +675,10 @@ func GetBlockRange(ctx context.Context, cache *BlockCache, blockOut chan<- *wall
 		case blockOut <- block:
 		case <-ctx.Done():
 			return
+		}
+		wantHash = block.Hash
+		if backward {
+			wantHash = block.PrevHash
 		}
 	}
 	select {

@@ -6,7 +6,96 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
-## [Unreleased]
+## [0.5.4] - 2026-08-27
+
+### Changed
+
+- `GetAddressUtxos` and `GetAddressUtxosStream` now pass `startHeight` and
+  `maxEntries` to the backend `getaddressutxos` RPC, instead of only applying
+  them to the reply. No backend implements the arguments yet, and a backend
+  that doesn't implement them ignores the extra JSON keys, so on its own this
+  changes nothing: the client-side filter stays, and correctness never depends
+  on the backend honoring them. It is the lightwalletd half of moving the
+  limits to where the work is done, which is what the unremediated part of
+  GHSA-x4m7-3gpp-xc36 needs -- today a request naming a single address with a
+  large UTXO set makes the node produce that entire set, however narrow a
+  height range or however few entries the client asked for. A request that
+  sets neither argument is serialized exactly as it was before.
+
+### Fixed
+
+- `GetSubtreeRoots` now rejects an unrecognized `ShieldedProtocol` with
+  `InvalidArgument` instead of `Unknown`. It was the one production handler
+  returning a bare Go error, which gRPC surfaces as `codes.Unknown` -- the code
+  a client reads as "the server had a problem" and backs off and retries on,
+  for a request that cannot succeed until the caller changes it. The darkside
+  `Reset` handler's `ChainName` check returned a bare error the same way, four
+  lines below its `BranchID` check, which already used `InvalidArgument`.
+
+- `GetTaddressBalance` now rejects an address list longer than the same 10,000
+  limit that `GetTaddressBalanceStream`, `GetAddressUtxos` and
+  `GetAddressUtxosStream` already enforce. The unary method takes its whole
+  list in one protobuf message, so its only bound was gRPC's 4MB
+  `MaxRecvMsgSize` — roughly 113,000 addresses at 37 wire bytes each, an order
+  of magnitude above the intended cap. A single request could therefore ask
+  the backend for eleven times more address-index lookups than any other
+  method allows, and return only an 8-byte balance (GHSA-x4m7-3gpp-xc36).
+
+- Report `lightwalletProtocolVersion` in `GetLightdInfo`. The field was added
+  to `LightdInfo` in lightwallet-protocol v0.4.0, in the same release as
+  `BlockRange.poolTypes`, and is the signal clients are required to check
+  before requesting non-default pool types. lightwalletd never populated it,
+  so it was always the empty string, and a client following that rule could
+  not tell a server that serves transparent and Ironwood data inside compact
+  blocks from one that does not. Correctly-behaving clients therefore had to
+  fall back to shielded-only scanning, or rely on an out-of-band assertion
+  from the operator, against servers that had supported the data since 0.5.0.
+  The value is a constant tracking the vendored `lightwallet-protocol`
+  subtree, currently v0.5.0, and is not overwritten by the build.
+
+- `GetTaddressBalance` and `GetTaddressBalanceStream` no longer report an
+  inflated balance when the client names the same address more than once.
+  zcashd's `getaddressbalance` sums over the list entries, so a repeated
+  address was counted repeatedly; a doubled address returned exactly twice the
+  correct balance. zebrad collapses duplicates before querying, so the same
+  request returned different numbers depending on which backend lightwalletd
+  was configured with. The address list is now deduplicated before the backend
+  call, so the reported balance is the balance of the distinct addresses named,
+  on any backend.
+
+- `GetAddressUtxos` and `GetAddressUtxosStream` now collapse repeated
+  addresses before calling the backend, so a request naming one address n times
+  no longer asks the backend to look it up n times and return n copies of its
+  UTXOs. Against zcashd that was a real multiplier — repeating an address is
+  free to the caller, since addresses are public and neither a key nor any
+  funds are needed to name one, so a single request could multiply the busiest
+  address on the chain by the 10,000-address limit. zebrad already collapses
+  duplicates before querying its state, so it was never exposed to this;
+  lightwalletd no longer depends on the backend to do it. This narrows the
+  worst case rather than closing it: `StartHeight` and `MaxEntries` remain
+  response filters applied after the whole backend result is materialized, so
+  the UTXO set of even a single named address is still fetched in full
+  (GHSA-x4m7-3gpp-xc36).
+
+## [0.5.3] - 2026-08-04
+
+### Fixed
+
+- `GetBlockRange` and `GetBlockRangeNullifiers` now check that each block they
+  return connects to the one before it, and fail the stream with `Aborted`
+  rather than send a block that doesn't (GHSA-m7j5-wvx3-qj6j). Every height in
+  the range is resolved independently, from the block cache when it's present
+  there and from the backend node otherwise, so while the background ingestor
+  was still repairing a reorg, a single request spanning the cache tip could
+  return a block from the abandoned fork followed by one from the current
+  fork. That pair violates `block[n+1].prevHash == block[n].hash` and
+  describes a chain that cannot exist, which a strict wallet will reject and a
+  lenient one may briefly index against. Note that this makes each response
+  internally consistent; a range served entirely from the not-yet-repaired
+  part of the cache still returns blocks from the abandoned fork, until the
+  ingestor rewinds past them.
+
+## [0.5.2] - 2026-07-30
 
 ### Fixed
 

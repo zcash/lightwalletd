@@ -6,6 +6,6 @@ coverage.out
 test-log
 lwd-api.html
 *.orig
-__debug_bin
+__debug_bin*
 .vscode
 */unittestcache/

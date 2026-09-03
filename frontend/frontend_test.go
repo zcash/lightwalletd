@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -385,6 +386,60 @@ func TestGetTaddressBalanceStream(t *testing.T) {
 	}
 }
 
+func TestGetTaddressBalanceTooManyAddresses(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// The unary method takes the whole list in one protobuf message, so its
+	// only bound was gRPC's 4MB MaxRecvMsgSize -- about 113,000 addresses at
+	// 37 wire bytes each, an order of magnitude above the cap the streaming
+	// and utxo methods enforce (GHSA-x4m7-3gpp-xc36).
+	//
+	// Distinct addresses, so that the counts here are unaffected by any later
+	// deduplication of the list.
+	addrs := make([]string, maxTaddrsPerRequest+1)
+	for i := range addrs {
+		addrs[i] = fmt.Sprintf("t1%033d", i)
+	}
+
+	// Exactly at the limit: accepted, and the whole list reaches zcashd.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressbalance" {
+			testT.Fatal("unexpected method", method)
+		}
+		var req common.ZcashdRpcRequestGetaddressbalance
+		if err := json.Unmarshal(params[0], &req); err != nil {
+			testT.Fatal("could not unmarshal getaddressbalance request")
+		}
+		if len(req.Addresses) != maxTaddrsPerRequest {
+			testT.Fatal("expected the whole list to reach zcashd, got:", len(req.Addresses))
+		}
+		return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 1234})
+	}
+	balance, err := lwd.GetTaddressBalance(context.Background(),
+		&walletrpc.AddressList{Addresses: addrs[:maxTaddrsPerRequest]})
+	if err != nil {
+		t.Fatal("GetTaddressBalance failed at exactly the limit:", err)
+	}
+	if balance.ValueZat != 1234 {
+		t.Fatal("unexpected balance:", balance.ValueZat)
+	}
+
+	// One over: rejected before zcashd is contacted.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called when the address list is over the limit")
+		return nil, nil
+	}
+	_, err = lwd.GetTaddressBalance(context.Background(), &walletrpc.AddressList{Addresses: addrs})
+	if err == nil {
+		t.Fatal("GetTaddressBalance should have failed on too many addresses")
+	}
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatal("expected ResourceExhausted on too many addresses, got:", err)
+	}
+}
+
 func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
 	testT = t
 	defer resetGlobals()
@@ -410,8 +465,231 @@ func TestGetAddressUtxosTooManyAddresses(t *testing.T) {
 	}
 }
 
+func TestGetTaddressBalanceDeduplicates(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	taddr := func(c string) string { return "t1" + strings.Repeat(c, 33) }
+	addrA, addrB := taddr("a"), taddr("b")
+
+	// zcashd sums getaddressbalance over the list entries, so a repeated
+	// address inflates the balance it reports; zebrad collapses duplicates
+	// before querying. Model zcashd here: 1000 zats per entry received.
+	var forwarded []string
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressbalance" {
+			testT.Fatal("unexpected method", method)
+		}
+		var req common.ZcashdRpcRequestGetaddressbalance
+		if err := json.Unmarshal(params[0], &req); err != nil {
+			testT.Fatal("could not unmarshal getaddressbalance request")
+		}
+		forwarded = req.Addresses
+		return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{
+			Balance: int64(1000 * len(req.Addresses)),
+		})
+	}
+
+	balance, err := lwd.GetTaddressBalance(context.Background(),
+		&walletrpc.AddressList{Addresses: []string{addrA, addrB, addrA, addrA}})
+	if err != nil {
+		t.Fatal("GetTaddressBalance failed:", err)
+	}
+	if !reflect.DeepEqual(forwarded, []string{addrA, addrB}) {
+		t.Fatal("expected the distinct addresses in first-occurrence order, got:", forwarded)
+	}
+	// Two distinct addresses, so two entries' worth -- not four.
+	if balance.ValueZat != 2000 {
+		t.Fatal("expected balance 2000, got:", balance.ValueZat)
+	}
+}
+
+func TestGetTaddressBalanceEmptyList(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// An empty address list is not an error; the balance of nothing is zero.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressbalance" {
+			testT.Fatal("unexpected method", method)
+		}
+		return json.Marshal(common.ZcashdRpcReplyGetaddressbalance{Balance: 0})
+	}
+
+	balance, err := lwd.GetTaddressBalance(context.Background(), &walletrpc.AddressList{})
+	if err != nil {
+		t.Fatal("GetTaddressBalance failed on an empty address list:", err)
+	}
+	if balance.ValueZat != 0 {
+		t.Fatal("expected balance 0, got:", balance.ValueZat)
+	}
+}
+
+func TestGetAddressUtxosEmptyList(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// An empty address list is not an error; it selects no utxos.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressutxos" {
+			testT.Fatal("unexpected method", method)
+		}
+		return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{})
+	}
+
+	reply, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed on an empty address list:", err)
+	}
+	if len(reply.AddressUtxos) != 0 {
+		t.Fatal("expected no utxos, got:", len(reply.AddressUtxos))
+	}
+}
+
+func TestGetAddressUtxosDeduplicates(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// A distinct valid taddr per letter: "t1" followed by 33 more characters.
+	taddr := func(c string) string { return "t1" + strings.Repeat(c, 33) }
+	addrA, addrB, addrC := taddr("a"), taddr("b"), taddr("c")
+	addrD, addrE, addrF := taddr("d"), taddr("e"), taddr("f")
+
+	// zcashd looks up each entry of the address list independently, so a
+	// repeated address multiplies its backend cost and its UTXOs in the reply.
+	// Repeating an address costs the caller nothing, so lightwalletd must send
+	// each distinct address once, in first-occurrence order. Six addresses so
+	// that an implementation collecting them out of order (from a map, say)
+	// reliably fails this rather than matching by chance.
+	var forwarded []string
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressutxos" {
+			testT.Fatal("unexpected method", method)
+		}
+		var req common.ZcashdRpcRequestGetaddressutxos
+		if err := json.Unmarshal(params[0], &req); err != nil {
+			testT.Fatal("could not unmarshal getaddressutxos request")
+		}
+		forwarded = req.Addresses
+		return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{{
+			Address:     addrA,
+			Txid:        "0788e4dc9973cd9a54e0f4d51ec96f4b8e6a8e0f8a1e1e9e4b2c2a1d0e0f0a0b",
+			OutputIndex: 0,
+			Script:      "76a914000000000000000000000000000000000000000088ac",
+			Satoshis:    1000,
+			Height:      1234,
+		}})
+	}
+
+	// Duplicates interleaved with the distinct addresses, and one address
+	// (addrA) repeated far more often than the rest.
+	reply, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses: []string{
+			addrA, addrB, addrA, addrC, addrB, addrA,
+			addrD, addrA, addrE, addrD, addrF, addrA,
+		},
+	})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed:", err)
+	}
+	want := []string{addrA, addrB, addrC, addrD, addrE, addrF}
+	if !reflect.DeepEqual(forwarded, want) {
+		t.Fatal("expected the distinct addresses in first-occurrence order, got:", forwarded)
+	}
+	if len(reply.AddressUtxos) != 1 {
+		t.Fatal("expected one utxo, got:", len(reply.AddressUtxos))
+	}
+
+	// An invalid address is still rejected, even if a valid one precedes it,
+	// and even though the dedupe check runs first.
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("zcashd must not be called for an invalid address")
+		return nil, nil
+	}
+	_, err = lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses: []string{addrA, addrA, "not-a-valid-address"},
+	})
+	if err == nil {
+		t.Fatal("GetAddressUtxos should have failed on bad address")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument on bad address, got:", err)
+	}
+}
+
 type testgettx struct {
 	walletrpc.CompactTxStreamer_GetTaddressTransactionsServer
+}
+
+func TestGetAddressUtxosPushesDownLimits(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	taddr := "t1" + strings.Repeat("a", 33)
+	utxo := func(height int) common.ZcashdRpcReplyGetaddressutxos {
+		return common.ZcashdRpcReplyGetaddressutxos{
+			Address:     taddr,
+			Txid:        "0788e4dc9973cd9a54e0f4d51ec96f4b8e6a8e0f8a1e1e9e4b2c2a1d0e0f0a0b",
+			OutputIndex: 0,
+			Script:      "76a914000000000000000000000000000000000000000088ac",
+			Satoshis:    1000,
+			Height:      height,
+		}
+	}
+
+	// Model a backend that doesn't implement the new arguments: it returns
+	// every utxo, in chain order, whatever the request asked for.
+	var sent json.RawMessage
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getaddressutxos" {
+			testT.Fatal("unexpected method", method)
+		}
+		sent = params[0]
+		return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{
+			utxo(100), utxo(200), utxo(300), utxo(400),
+		})
+	}
+
+	reply, err := lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses:   []string{taddr},
+		StartHeight: 200,
+		MaxEntries:  2,
+	})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed:", err)
+	}
+	var req common.ZcashdRpcRequestGetaddressutxos
+	if err := json.Unmarshal(sent, &req); err != nil {
+		t.Fatal("could not unmarshal getaddressutxos request")
+	}
+	if req.StartHeight != 200 || req.MaxEntries != 2 {
+		t.Fatal("expected the limits to reach the backend, got:", string(sent))
+	}
+	// The backend ignored them, so the client-side filter must still hold.
+	heights := make([]uint64, 0)
+	for _, u := range reply.AddressUtxos {
+		heights = append(heights, u.Height)
+	}
+	if !reflect.DeepEqual(heights, []uint64{200, 300}) {
+		t.Fatal("expected utxos at heights 200 and 300, got:", heights)
+	}
+
+	// A request that sets neither limit is byte-for-byte what it was before
+	// the arguments existed, so an unpatched backend sees no change.
+	_, err = lwd.GetAddressUtxos(context.Background(), &walletrpc.GetAddressUtxosArg{
+		Addresses: []string{taddr},
+	})
+	if err != nil {
+		t.Fatal("GetAddressUtxos failed:", err)
+	}
+	if want := `{"addresses":["` + taddr + `"]}`; string(sent) != want {
+		t.Fatal("expected unset limits to be omitted, got:", string(sent))
+	}
 }
 
 func (tg *testgettx) Context() context.Context {
@@ -1157,5 +1435,70 @@ func TestGetMempoolTxAbortsRefreshOnClientCancel(t *testing.T) {
 	// And it must not have published a degraded cache.
 	if mempoolMap != nil && len(*mempoolMap) > 0 {
 		t.Fatalf("a partial cache was published: %d entries", len(*mempoolMap))
+	}
+}
+
+type testgetsubtreeroots struct {
+	walletrpc.CompactTxStreamer_GetSubtreeRootsServer
+}
+
+func (tg *testgetsubtreeroots) Context() context.Context {
+	return context.Background()
+}
+
+func (tg *testgetsubtreeroots) Send(sr *walletrpc.SubtreeRoot) error {
+	return nil
+}
+
+// An unrecognized ShieldedProtocol must arrive as InvalidArgument, not Unknown.
+func TestGetSubtreeRootsUnknownProtocolIsInvalidArgument(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		testT.Fatal("the backend must not be called for an unrecognized shielded protocol")
+		return nil, nil
+	}
+	err := lwd.GetSubtreeRoots(&walletrpc.GetSubtreeRootsArg{
+		ShieldedProtocol: walletrpc.ShieldedProtocol(9999),
+	}, &testgetsubtreeroots{})
+	if err == nil {
+		t.Fatal("GetSubtreeRoots should have failed on an unrecognized shielded protocol")
+	}
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatal("expected InvalidArgument for an unrecognized shielded protocol, got:",
+			status.Code(err), err)
+	}
+
+	// The recognized protocols still reach the backend, named as the RPC expects.
+	for _, protocol := range []walletrpc.ShieldedProtocol{
+		walletrpc.ShieldedProtocol_sapling,
+		walletrpc.ShieldedProtocol_orchard,
+		walletrpc.ShieldedProtocol_ironwood,
+	} {
+		called := false
+		common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+			called = true
+			if method != "z_getsubtreesbyindex" {
+				testT.Fatal("unexpected method", method)
+			}
+			var name string
+			if err := json.Unmarshal(params[0], &name); err != nil {
+				testT.Fatal("could not unmarshal the protocol parameter")
+			}
+			if name != protocol.String() {
+				testT.Fatal("expected protocol", protocol.String(), "got", name)
+			}
+			return json.Marshal(common.ZcashdRpcReplyGetsubtreebyindex{})
+		}
+		if err := lwd.GetSubtreeRoots(&walletrpc.GetSubtreeRootsArg{
+			ShieldedProtocol: protocol,
+		}, &testgetsubtreeroots{}); err != nil {
+			t.Fatal("GetSubtreeRoots failed for", protocol.String(), err)
+		}
+		if !called {
+			t.Fatal("the backend was not called for", protocol.String())
+		}
 	}
 }
