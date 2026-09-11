@@ -6,6 +6,17 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Added
+
+- `--grpc-max-concurrent-streams` bounds how many gRPC streams one client
+  connection may have open at once; the default is 100. There was previously
+  no limit, and gRPC omits `SETTINGS_MAX_CONCURRENT_STREAMS` from the
+  connection preface when none is set, announcing to every client that it may
+  open as many streams as it likes. Set it to 0 to restore the old unlimited
+  behavior.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed

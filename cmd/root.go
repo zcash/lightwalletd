@@ -46,28 +46,29 @@ var rootCmd = &cobra.Command{
          bandwidth-efficient interface to the Zcash blockchain`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := &common.Options{
-			GRPCBindAddr:        viper.GetString("grpc-bind-addr"),
-			GRPCLogging:         viper.GetBool("grpc-logging-insecure"),
-			HTTPBindAddr:        viper.GetString("http-bind-addr"),
-			TLSCertPath:         viper.GetString("tls-cert"),
-			TLSKeyPath:          viper.GetString("tls-key"),
-			LogLevel:            viper.GetUint64("log-level"),
-			LogFile:             viper.GetString("log-file"),
-			ZcashConfPath:       viper.GetString("zcash-conf-path"),
-			RPCUser:             viper.GetString("rpcuser"),
-			RPCPassword:         viper.GetString("rpcpassword"),
-			RPCHost:             viper.GetString("rpchost"),
-			RPCPort:             viper.GetString("rpcport"),
-			NoBackendCheck:      viper.GetBool("no-backend-check"),
-			NoTLSVeryInsecure:   viper.GetBool("no-tls-very-insecure"),
-			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
-			DataDir:             viper.GetString("data-dir"),
-			Redownload:          viper.GetBool("redownload"),
-			NoCache:             viper.GetBool("nocache"),
-			SyncFromHeight:      viper.GetInt("sync-from-height"),
-			PingEnable:          viper.GetBool("ping-very-insecure"),
-			Darkside:            viper.GetBool("darkside-very-insecure"),
-			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
+			GRPCBindAddr:             viper.GetString("grpc-bind-addr"),
+			GRPCLogging:              viper.GetBool("grpc-logging-insecure"),
+			GRPCMaxConcurrentStreams: viper.GetUint64("grpc-max-concurrent-streams"),
+			HTTPBindAddr:             viper.GetString("http-bind-addr"),
+			TLSCertPath:              viper.GetString("tls-cert"),
+			TLSKeyPath:               viper.GetString("tls-key"),
+			LogLevel:                 viper.GetUint64("log-level"),
+			LogFile:                  viper.GetString("log-file"),
+			ZcashConfPath:            viper.GetString("zcash-conf-path"),
+			RPCUser:                  viper.GetString("rpcuser"),
+			RPCPassword:              viper.GetString("rpcpassword"),
+			RPCHost:                  viper.GetString("rpchost"),
+			RPCPort:                  viper.GetString("rpcport"),
+			NoBackendCheck:           viper.GetBool("no-backend-check"),
+			NoTLSVeryInsecure:        viper.GetBool("no-tls-very-insecure"),
+			GenCertVeryInsecure:      viper.GetBool("gen-cert-very-insecure"),
+			DataDir:                  viper.GetString("data-dir"),
+			Redownload:               viper.GetBool("redownload"),
+			NoCache:                  viper.GetBool("nocache"),
+			SyncFromHeight:           viper.GetInt("sync-from-height"),
+			PingEnable:               viper.GetBool("ping-very-insecure"),
+			Darkside:                 viper.GetBool("darkside-very-insecure"),
+			DarksideTimeout:          viper.GetUint64("darkside-timeout"),
 		}
 
 		common.Log.Debugf("Options: %#v\n", opts)
@@ -110,6 +111,29 @@ func fileExists(filename string) bool {
 	return !info.IsDir()
 }
 
+// serverOptions returns the gRPC options common to the TLS and plaintext
+// servers. MaxConcurrentStreams is the important one: unset, gRPC omits
+// SETTINGS_MAX_CONCURRENT_STREAMS from the connection preface, telling every
+// client it may open as many streams as it likes.
+func serverOptions(opts *common.Options) []grpc.ServerOption {
+	serverOpts := []grpc.ServerOption{
+		grpc.StatsHandler(&connStatsHandler{}),
+		grpc.StreamInterceptor(
+			grpc_middleware.ChainStreamServer(
+				grpc_prometheus.StreamServerInterceptor),
+		),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			logging.LogInterceptor,
+			grpc_prometheus.UnaryServerInterceptor),
+		),
+	}
+	if opts.GRPCMaxConcurrentStreams > 0 {
+		serverOpts = append(serverOpts,
+			grpc.MaxConcurrentStreams(uint32(opts.GRPCMaxConcurrentStreams)))
+	}
+	return serverOpts
+}
+
 func startServer(opts *common.Options) error {
 	if opts.LogFile != "" {
 		// instead write parsable logs for logstash/splunk/etc
@@ -135,22 +159,16 @@ func startServer(opts *common.Options) error {
 		"buildUser": common.BuildUser,
 	}).Infof("Starting lightwalletd process version %s", common.Version)
 
+	if limit := common.SetMemoryLimit(); limit > 0 {
+		common.Log.Infof("Set Go soft memory limit to %d bytes from the cgroup limit", limit)
+	}
+
 	// gRPC initialization
-	var server *grpc.Server
+	serverOpts := serverOptions(opts)
 
 	if opts.NoTLSVeryInsecure {
 		common.Log.Warningln("Starting insecure no-TLS (plaintext) server")
 		fmt.Println("Starting insecure server")
-		server = grpc.NewServer(
-			grpc.StatsHandler(&connStatsHandler{}),
-			grpc.StreamInterceptor(
-				grpc_middleware.ChainStreamServer(
-					grpc_prometheus.StreamServerInterceptor),
-			),
-			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-				logging.LogInterceptor,
-				grpc_prometheus.UnaryServerInterceptor),
-			))
 	} else {
 		var transportCreds credentials.TransportCredentials
 		if opts.GenCertVeryInsecure {
@@ -169,17 +187,9 @@ func startServer(opts *common.Options) error {
 				}).Fatal("couldn't load TLS credentials")
 			}
 		}
-		server = grpc.NewServer(
-			grpc.Creds(transportCreds),
-			grpc.StatsHandler(&connStatsHandler{}),
-			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
-				grpc_prometheus.StreamServerInterceptor),
-			),
-			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-				logging.LogInterceptor,
-				grpc_prometheus.UnaryServerInterceptor),
-			))
+		serverOpts = append(serverOpts, grpc.Creds(transportCreds))
 	}
+	server := grpc.NewServer(serverOpts...)
 	grpc_prometheus.EnableHandlingTimeHistogram()
 	grpc_prometheus.Register(server)
 	go startHTTPServer(opts)
@@ -408,6 +418,7 @@ func init() {
 	rootCmd.Flags().String("http-bind-addr", "127.0.0.1:9068", "the address to listen for http on")
 	rootCmd.Flags().String("grpc-bind-addr", "127.0.0.1:9067", "the address to listen for grpc on")
 	rootCmd.Flags().Bool("grpc-logging-insecure", false, "enable grpc logging to stderr")
+	rootCmd.Flags().Int("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -433,6 +444,8 @@ func init() {
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
 	viper.BindPFlag("grpc-logging-insecure", rootCmd.Flags().Lookup("grpc-logging-insecure"))
 	viper.SetDefault("grpc-logging-insecure", false)
+	viper.BindPFlag("grpc-max-concurrent-streams", rootCmd.Flags().Lookup("grpc-max-concurrent-streams"))
+	viper.SetDefault("grpc-max-concurrent-streams", 100)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))
