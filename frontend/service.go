@@ -31,13 +31,49 @@ type lwdStreamer struct {
 	cache      *common.BlockCache
 	chainName  string
 	pingEnable bool
-	mutex      sync.Mutex
+	// permits bounds concurrent block-range work; nil means unlimited.
+	permits chan struct{}
+	mutex   sync.Mutex
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
-// NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}, nil
+// blockRangeWait caps how long a request queues for a permit. A variable so
+// tests need not wait it out.
+var blockRangeWait = 10 * time.Second
+
+// NewLwdStreamer constructs a gRPC context. maxBlockRange bounds how many
+// block-range requests may be served at once; zero means unlimited.
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, maxBlockRange uint64) (walletrpc.CompactTxStreamerServer, error) {
+	s := &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}
+	if maxBlockRange > 0 {
+		s.permits = make(chan struct{}, maxBlockRange)
+	}
+	return s, nil
+}
+
+// acquireBlockRange takes a permit for block-range work, waiting for one if
+// none is free, and returns the function that gives it back.
+func (s *lwdStreamer) acquireBlockRange(ctx context.Context) (func(), error) {
+	if s.permits == nil {
+		return func() {}, nil
+	}
+	// Fires at whichever comes first, our cap or the client's own deadline, so
+	// a client that set one is never held past it.
+	waitCtx, cancel := context.WithTimeout(ctx, blockRangeWait)
+	defer cancel()
+	select {
+	case s.permits <- struct{}{}:
+		return func() { <-s.permits }, nil
+	case <-waitCtx.Done():
+		if ctx.Err() != nil {
+			// The client gave up rather than us running out of patience.
+			return nil, ctx.Err()
+		}
+		// Unavailable, not ResourceExhausted: wallet clients retry the former
+		// with backoff and surface the latter as a hard error.
+		return nil, status.Error(codes.Unavailable,
+			"too many concurrent block-range requests; retry shortly")
+	}
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
@@ -283,6 +319,11 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			"GetBlockRange: must specify start and end heights")
 	}
 	ctx := resp.Context()
+	release, err := s.acquireBlockRange(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go common.GetBlockRange(ctx, s.cache, blockChan, errChan, span)
@@ -323,6 +364,11 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 	}
 	span.PoolTypes = filtered
 	ctx := resp.Context()
+	release, err := s.acquireBlockRange(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go common.GetBlockRange(ctx, s.cache, blockChan, errChan, span)

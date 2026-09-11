@@ -49,6 +49,7 @@ var rootCmd = &cobra.Command{
 			GRPCBindAddr:             viper.GetString("grpc-bind-addr"),
 			GRPCLogging:              viper.GetBool("grpc-logging-insecure"),
 			GRPCMaxConcurrentStreams: viper.GetUint64("grpc-max-concurrent-streams"),
+			MaxConcurrentBlockRange:  viper.GetUint64("max-concurrent-blockrange"),
 			HTTPBindAddr:             viper.GetString("http-bind-addr"),
 			TLSCertPath:              viper.GetString("tls-cert"),
 			TLSKeyPath:               viper.GetString("tls-key"),
@@ -350,7 +351,8 @@ func startServer(opts *common.Options) error {
 
 	// Compact transaction service initialization
 	{
-		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable)
+		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable,
+			opts.MaxConcurrentBlockRange)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -419,6 +421,7 @@ func init() {
 	rootCmd.Flags().String("grpc-bind-addr", "127.0.0.1:9067", "the address to listen for grpc on")
 	rootCmd.Flags().Bool("grpc-logging-insecure", false, "enable grpc logging to stderr")
 	rootCmd.Flags().Int("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
+	rootCmd.Flags().Int("max-concurrent-blockrange", 200, "max block-range requests served at once, server-wide (0 for unlimited)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -446,6 +449,8 @@ func init() {
 	viper.SetDefault("grpc-logging-insecure", false)
 	viper.BindPFlag("grpc-max-concurrent-streams", rootCmd.Flags().Lookup("grpc-max-concurrent-streams"))
 	viper.SetDefault("grpc-max-concurrent-streams", 100)
+	viper.BindPFlag("max-concurrent-blockrange", rootCmd.Flags().Lookup("max-concurrent-blockrange"))
+	viper.SetDefault("max-concurrent-blockrange", 200)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))

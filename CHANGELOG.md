@@ -17,6 +17,13 @@ The most recent changes are listed first.
   open as many streams as it likes. Set it to 0 to restore the old unlimited
   behavior.
 
+- `--max-concurrent-blockrange` bounds how many block-range requests the
+  server will work on at once across every connection, where
+  `--grpc-max-concurrent-streams` bounds only a single one; the default is
+  200. Requests beyond the limit wait for a free slot rather than failing, up
+  to the sooner of their own deadline and ten seconds, and are then refused
+  with `UNAVAILABLE`. Set it to 0 for no limit.
+
 ### Changed
 
 - Where there is a cgroup memory limit (a container run with `--memory`, or a
