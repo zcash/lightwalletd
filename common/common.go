@@ -55,6 +55,7 @@ type Options struct {
 	GRPCLogging              bool   `json:"grpc_logging_insecure,omitempty"`
 	GRPCMaxConcurrentStreams uint64 `json:"grpc_max_concurrent_streams,omitempty"`
 	MaxConcurrentBlockRange  uint64 `json:"max_concurrent_blockrange,omitempty"`
+	ClientStreamIdleTimeout  uint64 `json:"client_stream_idle_timeout,omitempty"`
 	HTTPBindAddr             string `json:"http_bind_address,omitempty"`
 	TLSCertPath              string `json:"tls_cert_path,omitempty"`
 	TLSKeyPath               string `json:"tls_cert_key,omitempty"`
