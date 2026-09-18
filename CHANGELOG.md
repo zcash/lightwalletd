@@ -6,6 +6,25 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Added
+
+- `--grpc-max-concurrent-streams` bounds how many gRPC streams one client
+  connection may have open at once; the default is 100. There was previously
+  no limit, and gRPC omits `SETTINGS_MAX_CONCURRENT_STREAMS` from the
+  connection preface when none is set, announcing to every client that it may
+  open as many streams as it likes. Set it to 0 to restore the old unlimited
+  behavior.
+
+### Changed
+
+- Where there is a cgroup memory limit (a container run with `--memory`, or a
+  systemd unit with `MemoryMax`), lightwalletd now sets Go's soft memory limit
+  to 90% of it. The Go runtime does not read cgroup limits by itself, so a
+  burst of allocation could be OOM-killed at a heap size the collector was
+  content to let grow. Setting `GOMEMLIMIT` in the environment overrides this.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
