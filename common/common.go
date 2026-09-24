@@ -452,11 +452,29 @@ func stopIngestor() {
 	}
 }
 
+// bestBlockHashRetryDelay returns the wait before retrying getbestblockhash
+// after the given number of consecutive failures: 1s, 2s, 4s, ... capped at 30s.
+func bestBlockHashRetryDelay(failures int) time.Duration {
+	const maxDelay = 30 * time.Second
+	if failures < 1 {
+		failures = 1
+	}
+	if failures > 6 {
+		return maxDelay
+	}
+	delay := time.Second << (failures - 1)
+	if delay > maxDelay {
+		return maxDelay
+	}
+	return delay
+}
+
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
 	lastLog := Time.Now()
 	lastHeightLogged := 0
+	bestBlockHashFailures := 0
 
 	// Start listening for new blocks
 	for i := 0; rep == 0 || i < rep; i++ {
@@ -469,9 +487,23 @@ func BlockIngestor(c *BlockCache, rep int) {
 
 		result, err := RawRequest(context.Background(), "getbestblockhash", []json.RawMessage{})
 		if err != nil {
+			// Transient backend errors (e.g. HTTP 429 "Too many connections" when the
+			// node is under load) must not kill lightwalletd: exiting drops every
+			// in-flight client stream and the reconnect storm adds to the overload.
+			// Retry with a capped exponential backoff instead.
+			bestBlockHashFailures++
+			delay := bestBlockHashRetryDelay(bestBlockHashFailures)
 			Log.WithFields(logrus.Fields{
-				"error": err,
-			}).Fatal("error " + NodeName + " getbestblockhash rpc")
+				"error":    err,
+				"failures": bestBlockHashFailures,
+				"retry_in": delay.String(),
+			}).Warn("error " + NodeName + " getbestblockhash rpc, will retry")
+			Time.Sleep(delay)
+			continue
+		}
+		if bestBlockHashFailures > 0 {
+			Log.Info(NodeName+" getbestblockhash rpc recovered after ", bestBlockHashFailures, " failures")
+			bestBlockHashFailures = 0
 		}
 		var hashHex string
 		err = json.Unmarshal(result, &hashHex)
