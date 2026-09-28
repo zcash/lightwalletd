@@ -17,7 +17,9 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
+	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
 	"google.golang.org/grpc/codes"
@@ -425,6 +427,90 @@ func blockIngestorStub(ctx context.Context, method string, params []json.RawMess
 	}
 	testT.Error("blockIngestorStub called too many times")
 	return nil, nil
+}
+
+// blockIngestorRetryStub fails getbestblockhash twice (as a node returning
+// HTTP 429 under load would), then reports the tip lightwalletd already has.
+func blockIngestorRetryStub(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+	step++
+	if method != "getbestblockhash" {
+		testT.Fatal("unexpected method", method)
+	}
+	switch step {
+	case 1:
+		checkSleepMethod(0, 0, "getbestblockhash", method)
+		return nil, errors.New("status code: 429, response: \"Too many connections. Please try again later.\"")
+	case 2:
+		checkSleepMethod(1, 1, "getbestblockhash", method)
+		return nil, errors.New("status code: 429, response: \"Too many connections. Please try again later.\"")
+	case 3:
+		checkSleepMethod(2, 3, "getbestblockhash", method)
+		// Matches the (empty) cache's latest hash, so the ingestor considers itself synced.
+		r, _ := json.Marshal(hash32.Encode(hash32.Reverse(testcache.GetLatestHash())))
+		return r, nil
+	}
+	testT.Error("blockIngestorRetryStub called too many times")
+	return nil, nil
+}
+
+func TestBlockIngestorRetriesGetbestblockhash(t *testing.T) {
+	testT = t
+	RawRequest = blockIngestorRetryStub
+	defer resetGlobals()
+	Time.Sleep = sleepStub
+	Time.Now = nowStub
+	os.RemoveAll(unitTestPath)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, -1)
+	bestBlockHashLastSuccess.Set(0)
+	// Must not exit (Log.Fatal) on the failures; three iterations then return.
+	BlockIngestor(testcache, 3)
+	if step != 3 {
+		t.Error("unexpected final step", step)
+	}
+	// 1s + 2s backoff, then the 2s synced wait.
+	if sleepCount != 3 || sleepDuration != 5*time.Second {
+		t.Error("unexpected sleeps", sleepCount, sleepDuration)
+	}
+	// Set only by the successful call, made after the 1s + 2s backoff.
+	var m dto.Metric
+	if err := bestBlockHashLastSuccess.Write(&m); err != nil {
+		t.Fatal(err)
+	}
+	if got, expected := m.GetGauge().GetValue(), float64(time.Time{}.Add(3*time.Second).Unix()); got != expected {
+		t.Error("unexpected last success timestamp", got, expected)
+	}
+	os.RemoveAll(unitTestPath)
+}
+
+func TestBestBlockHashRetryDelay(t *testing.T) {
+	// These are the expected delays on each retry
+	expectedList := []time.Duration{1, 1, 2, 4, 8, 16, 30, 30}
+	for failures, expected := range expectedList {
+		expected *= time.Second
+		if got := bestBlockHashRetryDelay(failures); got != expected {
+			t.Errorf("bestBlockHashRetryDelay(%d) = %v, expected %v", failures, got, expected)
+		}
+	}
+	// A large failure count must not overflow the shift.
+	if got := bestBlockHashRetryDelay(100); got != 30*time.Second {
+		t.Errorf("bestBlockHashRetryDelay(100) = %v, expected 30s", got)
+	}
+}
+
+func TestBestBlockHashLogLevel(t *testing.T) {
+	for _, tc := range []struct {
+		failingFor time.Duration
+		expected   logrus.Level
+	}{
+		{0, logrus.WarnLevel},
+		{bestBlockHashErrorAfter - time.Second, logrus.WarnLevel},
+		{bestBlockHashErrorAfter, logrus.ErrorLevel},
+		{time.Hour, logrus.ErrorLevel},
+	} {
+		if got := bestBlockHashLogLevel(tc.failingFor); got != tc.expected {
+			t.Errorf("bestBlockHashLogLevel(%v) = %v, expected %v", tc.failingFor, got, tc.expected)
+		}
+	}
 }
 
 func TestBlockIngestor(t *testing.T) {
