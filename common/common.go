@@ -469,12 +469,26 @@ func bestBlockHashRetryDelay(failures int) time.Duration {
 	return delay
 }
 
+// bestBlockHashErrorAfter is how long getbestblockhash can keep failing
+// before the retry log line is raised from Warn to Error.
+const bestBlockHashErrorAfter = 5 * time.Minute
+
+// bestBlockHashLogLevel returns the level for a retry log line, given how
+// long getbestblockhash has been failing.
+func bestBlockHashLogLevel(failingFor time.Duration) logrus.Level {
+	if failingFor >= bestBlockHashErrorAfter {
+		return logrus.ErrorLevel
+	}
+	return logrus.WarnLevel
+}
+
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
 	lastLog := Time.Now()
 	lastHeightLogged := 0
 	bestBlockHashFailures := 0
+	var firstBestBlockHashFailure time.Time
 
 	// Start listening for new blocks
 	for i := 0; rep == 0 || i < rep; i++ {
@@ -488,13 +502,18 @@ func BlockIngestor(c *BlockCache, rep int) {
 		result, err := RawRequest(context.Background(), "getbestblockhash", []json.RawMessage{})
 		if err != nil {
 			// Retry transient backend errors (e.g. HTTP 429 "Too many connections").
+			if bestBlockHashFailures == 0 {
+				firstBestBlockHashFailure = Time.Now()
+			}
 			bestBlockHashFailures++
 			delay := bestBlockHashRetryDelay(bestBlockHashFailures)
+			failingFor := Time.Now().Sub(firstBestBlockHashFailure)
 			Log.WithFields(logrus.Fields{
-				"error":    err,
-				"failures": bestBlockHashFailures,
-				"retry_in": delay.String(),
-			}).Warn("error " + NodeName + " getbestblockhash rpc, will retry")
+				"error":       err,
+				"failures":    bestBlockHashFailures,
+				"failing_for": failingFor.String(),
+				"retry_in":    delay.String(),
+			}).Log(bestBlockHashLogLevel(failingFor), "error "+NodeName+" getbestblockhash rpc, will retry")
 			Time.Sleep(delay)
 			continue
 		}

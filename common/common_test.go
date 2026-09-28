@@ -481,6 +481,26 @@ func TestBestBlockHashRetryDelay(t *testing.T) {
 			t.Errorf("bestBlockHashRetryDelay(%d) = %v, expected %v", failures, got, expected)
 		}
 	}
+	// A large failure count must not overflow the shift.
+	if got := bestBlockHashRetryDelay(100); got != 30*time.Second {
+		t.Errorf("bestBlockHashRetryDelay(100) = %v, expected 30s", got)
+	}
+}
+
+func TestBestBlockHashLogLevel(t *testing.T) {
+	for _, tc := range []struct {
+		failingFor time.Duration
+		expected   logrus.Level
+	}{
+		{0, logrus.WarnLevel},
+		{bestBlockHashErrorAfter - time.Second, logrus.WarnLevel},
+		{bestBlockHashErrorAfter, logrus.ErrorLevel},
+		{time.Hour, logrus.ErrorLevel},
+	} {
+		if got := bestBlockHashLogLevel(tc.failingFor); got != tc.expected {
+			t.Errorf("bestBlockHashLogLevel(%v) = %v, expected %v", tc.failingFor, got, tc.expected)
+		}
+	}
 }
 
 func TestBlockIngestor(t *testing.T) {
