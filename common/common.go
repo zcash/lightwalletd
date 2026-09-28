@@ -487,10 +487,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 
 		result, err := RawRequest(context.Background(), "getbestblockhash", []json.RawMessage{})
 		if err != nil {
-			// Transient backend errors (e.g. HTTP 429 "Too many connections" when the
-			// node is under load) must not kill lightwalletd: exiting drops every
-			// in-flight client stream and the reconnect storm adds to the overload.
-			// Retry with a capped exponential backoff instead.
+			// Retry transient backend errors (e.g. HTTP 429 "Too many connections").
 			bestBlockHashFailures++
 			delay := bestBlockHashRetryDelay(bestBlockHashFailures)
 			Log.WithFields(logrus.Fields{

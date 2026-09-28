@@ -473,12 +473,12 @@ func TestBlockIngestorRetriesGetbestblockhash(t *testing.T) {
 }
 
 func TestBestBlockHashRetryDelay(t *testing.T) {
-	for failures, want := range map[int]time.Duration{
-		0: time.Second, 1: time.Second, 2: 2 * time.Second, 3: 4 * time.Second,
-		5: 16 * time.Second, 6: 30 * time.Second, 100: 30 * time.Second,
-	} {
-		if got := bestBlockHashRetryDelay(failures); got != want {
-			t.Errorf("bestBlockHashRetryDelay(%d) = %v, want %v", failures, got, want)
+	// These are the expected delays on each retry
+	expectedList := []time.Duration{1, 1, 2, 4, 8, 16, 30, 30}
+	for failures, expected := range expectedList {
+		expected *= time.Second
+		if got := bestBlockHashRetryDelay(failures); got != expected {
+			t.Errorf("bestBlockHashRetryDelay(%d) = %v, expected %v", failures, got, expected)
 		}
 	}
 }
