@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
@@ -482,6 +484,11 @@ func bestBlockHashLogLevel(failingFor time.Duration) logrus.Level {
 	return logrus.WarnLevel
 }
 
+var bestBlockHashLastSuccess = promauto.NewGauge(prometheus.GaugeOpts{
+	Name: "lightwalletd_getbestblockhash_last_success_timestamp_seconds",
+	Help: "Unix time of the last successful getbestblockhash call to the backend.",
+})
+
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
@@ -517,6 +524,7 @@ func BlockIngestor(c *BlockCache, rep int) {
 			Time.Sleep(delay)
 			continue
 		}
+		bestBlockHashLastSuccess.Set(float64(Time.Now().Unix()))
 		if bestBlockHashFailures > 0 {
 			Log.Info(NodeName+" getbestblockhash rpc recovered after ", bestBlockHashFailures, " failures")
 			bestBlockHashFailures = 0

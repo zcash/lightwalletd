@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
@@ -460,6 +461,7 @@ func TestBlockIngestorRetriesGetbestblockhash(t *testing.T) {
 	Time.Now = nowStub
 	os.RemoveAll(unitTestPath)
 	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, -1)
+	bestBlockHashLastSuccess.Set(0)
 	// Must not exit (Log.Fatal) on the failures; three iterations then return.
 	BlockIngestor(testcache, 3)
 	if step != 3 {
@@ -468,6 +470,14 @@ func TestBlockIngestorRetriesGetbestblockhash(t *testing.T) {
 	// 1s + 2s backoff, then the 2s synced wait.
 	if sleepCount != 3 || sleepDuration != 5*time.Second {
 		t.Error("unexpected sleeps", sleepCount, sleepDuration)
+	}
+	// Set only by the successful call, made after the 1s + 2s backoff.
+	var m dto.Metric
+	if err := bestBlockHashLastSuccess.Write(&m); err != nil {
+		t.Fatal(err)
+	}
+	if got, expected := m.GetGauge().GetValue(), float64(time.Time{}.Add(3*time.Second).Unix()); got != expected {
+		t.Error("unexpected last success timestamp", got, expected)
 	}
 	os.RemoveAll(unitTestPath)
 }
