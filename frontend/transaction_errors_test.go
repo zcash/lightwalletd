@@ -124,3 +124,25 @@ func TestGetTransactionBackendStatus(t *testing.T) {
 		}
 	})
 }
+
+// Darkside uses the same handler with its own backend implementation. Missing
+// transactions must retain the same status as the production JSON-RPC backend.
+func TestGetTransactionDarksideMissing(t *testing.T) {
+	defer resetGlobals()
+	wasDarkside := common.DarksideEnabled
+	defer func() { common.DarksideEnabled = wasDarkside }()
+	cache := common.NewBlockCache(t.TempDir(), "unittestnet", 0, -1)
+	defer cache.Close()
+	common.DarksideInit(cache, 3600)
+	if err := common.DarksideReset(0, "test", "regtest", 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	service, err := NewLwdStreamer(cache, "regtest", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.GetTransaction(context.Background(), &walletrpc.TxFilter{Hash: make([]byte, 32)})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("missing darkside transaction: code=%v err=%v, want NotFound", status.Code(err), err)
+	}
+}
