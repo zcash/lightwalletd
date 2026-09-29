@@ -700,6 +700,9 @@ var mempoolList []string
 // Last time we pulled a copy of the mempool from zcashd.
 var lastMempool time.Time
 
+// Start time of the latest successfully published refresh, guarded by s.mutex.
+var lastMempoolSnapshot time.Time
+
 // maxExcludeTxidSuffixes bounds the exclude list a client may send to
 // GetMempoolTx. The list names transactions the caller already has, so it is
 // only ever useful up to the size of the mempool itself; this cap sits well
@@ -836,7 +839,8 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		}
 		s.mutex.Lock()
 		// Never let a slower, older refresh overwrite a newer snapshot.
-		if lastMempool.Equal(refreshStarted) {
+		if !refreshStarted.Before(lastMempoolSnapshot) {
+			lastMempoolSnapshot = refreshStarted
 			mempoolList = newmempoolList
 			mempoolMap = &newmempoolMap
 		}

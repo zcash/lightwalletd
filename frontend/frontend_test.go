@@ -68,6 +68,7 @@ func resetGlobals() {
 	mempoolMap = nil
 	mempoolList = nil
 	lastMempool = time.Time{}
+	lastMempoolSnapshot = time.Time{}
 }
 
 func TestMain(m *testing.M) {
