@@ -859,8 +859,11 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 
 // Return the subset of items that aren't excluded, but
 // if more than one item matches an exclude entry, return
-// all those items.
+// all those items. The arguments are not modified: GetMempoolTx passes the
+// shared mempoolList, which it reads without holding s.mutex.
 func MempoolFilter(items, exclude []string) []string {
+	items = slices.Clone(items)
+	exclude = slices.Clone(exclude)
 	slices.Sort(items)
 	slices.Sort(exclude)
 	// Determine how many items match each exclude item.
