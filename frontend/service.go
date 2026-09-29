@@ -610,7 +610,7 @@ func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*wa
 
 	result, rpcErr := common.RawRequest(ctx, "getaddressbalance", params)
 	if rpcErr != nil {
-		var code codes.Code
+		code := codes.Unknown
 		switch {
 		case strings.Contains(rpcErr.Error(), "Invalid address"):
 			code = codes.InvalidArgument
@@ -928,7 +928,7 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 	params := []json.RawMessage{param}
 	result, rpcErr := common.RawRequest(ctx, "getaddressutxos", params)
 	if rpcErr != nil {
-		var code codes.Code
+		code := codes.Unknown
 		switch {
 		case strings.Contains(rpcErr.Error(), "Invalid address"):
 			code = codes.InvalidArgument

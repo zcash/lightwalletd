@@ -6,6 +6,15 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- Transparent balance and UTXO RPCs now report unclassified backend failures
+  as `Unknown` instead of returning a successful zero balance or empty UTXO
+  result. This applies to unary and streaming variants; the existing
+  `InvalidArgument` and `NotFound` mappings are unchanged.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
