@@ -749,14 +749,15 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	}
 
 	// Hold the mutex only long enough to decide whether this call refreshes
-	// the cache, and to snapshot it and update lastMempool to prevent another
-	// thread from refreshing while our thread is doing that.
+	// the cache, snapshot it, and record when this refresh starts. A backend
+	// call can exceed the refresh interval, allowing a newer refresh to start.
 	streamCtx := resp.Context()
 	s.mutex.Lock()
 	refresh := time.Since(lastMempool).Seconds() >= 2
 	if refresh {
 		lastMempool = time.Now()
 	}
+	refreshStarted := lastMempool
 	cachedList := mempoolList
 	var cachedMap map[string]*walletrpc.CompactTx
 	if mempoolMap != nil {
@@ -834,8 +835,11 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
 		s.mutex.Lock()
-		mempoolList = newmempoolList
-		mempoolMap = &newmempoolMap
+		// Never let a slower, older refresh overwrite a newer snapshot.
+		if lastMempool.Equal(refreshStarted) {
+			mempoolList = newmempoolList
+			mempoolMap = &newmempoolMap
+		}
 		s.mutex.Unlock()
 		cachedList, cachedMap = newmempoolList, newmempoolMap
 	}
