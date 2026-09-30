@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"math"
 	"os"
 	"regexp"
 	"slices"
@@ -184,6 +185,14 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 		tx, err := s.GetTransaction(timeout, &walletrpc.TxFilter{Hash: txHash})
 		if err != nil {
 			return err
+		}
+		// Chain state can change between the address-index query and this
+		// lookup. Only emit transactions still mined in the requested range;
+		// zero and MaxUint64 are the mempool and side-chain sentinels.
+		if tx.Height == 0 || tx.Height == math.MaxUint64 || tx.Height < start || tx.Height > end {
+			return status.Errorf(codes.Aborted,
+				"GetTaddressTransactions: transaction %s has height %d inconsistent with mined range [%d, %d]; retry request",
+				txidstr, tx.Height, start, end)
 		}
 		if err = resp.Send(tx); err != nil {
 			return err
