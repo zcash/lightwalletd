@@ -341,8 +341,13 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 		go func() {
 			// We hold only the read lock, need the exclusive lock.
 			c.mutex.Lock()
-			c.recoverFromCorruption()
-			c.mutex.Unlock()
+			defer c.mutex.Unlock()
+			// A reorg or another recovery may have removed or replaced the
+			// damaged block while this goroutine waited for the write lock.
+			// Recheck before discarding a cache that has already been repaired.
+			if height >= c.firstBlock && height < c.nextBlock && c.readBlock(height) == nil {
+				c.recoverFromCorruption()
+			}
 		}()
 		return nil
 	}
