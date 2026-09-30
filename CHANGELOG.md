@@ -6,6 +6,15 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- Abort transparent transaction-range streams before sending a transaction
+  that is no longer mined in the requested range. Per-transaction lookups can
+  observe changed chain metadata after the address-index query; mempool,
+  side-chain, and out-of-range results now require restarting the request.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
