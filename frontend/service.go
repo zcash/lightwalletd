@@ -811,6 +811,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
 		}
 	}
+	exclude.PoolTypes = common.CanonicalPoolTypes(exclude.PoolTypes)
 	if slices.Contains(exclude.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
 		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
 	}

@@ -1637,3 +1637,23 @@ func TestGetStandardFee(t *testing.T) {
 		}
 	})
 }
+
+func TestGetMempoolTxCanonicalizesPoolTypes(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		return []byte("[]"), nil
+	}
+	poolTypes := make([]walletrpc.PoolType, 100_000)
+	for i := range poolTypes {
+		poolTypes[i] = walletrpc.PoolType_ORCHARD
+	}
+	req := &walletrpc.GetMempoolTxRequest{PoolTypes: poolTypes}
+	if err := lwd.GetMempoolTx(req, &testmempooltx{}); err != nil {
+		t.Fatal(err)
+	}
+	if len(req.PoolTypes) != 1 {
+		t.Fatalf("GetMempoolTx filtered against %d pool types, expected 1", len(req.PoolTypes))
+	}
+}

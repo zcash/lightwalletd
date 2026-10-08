@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1250,5 +1251,93 @@ func TestFilterTxPoolIronwood(t *testing.T) {
 	defaultFiltered := filterBlockPool([]*walletrpc.CompactTx{tx}, nil)
 	if len(defaultFiltered) != 1 || len(defaultFiltered[0].IronwoodActions) != 1 {
 		t.Fatal("default shielded filter should keep ironwood actions")
+	}
+}
+
+func TestCanonicalPoolTypes(t *testing.T) {
+	S, O := walletrpc.PoolType_SAPLING, walletrpc.PoolType_ORCHARD
+	invalid := walletrpc.PoolType_POOL_TYPE_INVALID
+	many := make([]walletrpc.PoolType, 1_000_000)
+	for i := range many {
+		many[i] = S
+	}
+	manyUnknown := make([]walletrpc.PoolType, 1_000_000)
+	for i := range manyUnknown {
+		manyUnknown[i] = walletrpc.PoolType(100 + i)
+	}
+	for _, tc := range []struct {
+		name     string
+		in       []walletrpc.PoolType
+		expected []walletrpc.PoolType
+	}{
+		{"empty stays empty", nil, []walletrpc.PoolType{}},
+		{"repeats removed", []walletrpc.PoolType{S, S, O, S}, []walletrpc.PoolType{S, O}},
+		{"invalid kept", []walletrpc.PoolType{invalid, S, invalid}, []walletrpc.PoolType{invalid, S}},
+		{"unknown kept", []walletrpc.PoolType{99}, []walletrpc.PoolType{99}},
+		{"unknowns collapse", []walletrpc.PoolType{99, 100, S, 101}, []walletrpc.PoolType{99, S}},
+		{"a million repeats", many, []walletrpc.PoolType{S}},
+		{"a million distinct unknowns", manyUnknown, []walletrpc.PoolType{100}},
+	} {
+		if got := CanonicalPoolTypes(tc.in); !slices.Equal(got, tc.expected) {
+			t.Errorf("%s: got %v, expected %v", tc.name, got, tc.expected)
+		}
+	}
+}
+
+// Canonicalizing must not change which parts of a transaction are returned.
+func TestCanonicalPoolTypesKeepsFiltering(t *testing.T) {
+	tx := &walletrpc.CompactTx{
+		Vout:            []*walletrpc.TxOut{{Value: 1}},
+		Outputs:         []*walletrpc.CompactSaplingOutput{{}},
+		Actions:         []*walletrpc.CompactOrchardAction{{}},
+		IronwoodActions: []*walletrpc.CompactOrchardAction{{}},
+	}
+	shape := func(vtx []*walletrpc.CompactTx) string {
+		if len(vtx) == 0 {
+			return "none"
+		}
+		x := vtx[0]
+		return fmt.Sprint(len(x.Vout), len(x.Outputs), len(x.Actions), len(x.IronwoodActions))
+	}
+	for _, in := range [][]walletrpc.PoolType{
+		nil,
+		{walletrpc.PoolType_SAPLING, walletrpc.PoolType_SAPLING},
+		{walletrpc.PoolType_TRANSPARENT, walletrpc.PoolType_IRONWOOD, walletrpc.PoolType_TRANSPARENT},
+		{99},
+		{99, walletrpc.PoolType_ORCHARD, 100},
+	} {
+		before := shape(filterBlockPool([]*walletrpc.CompactTx{tx}, in))
+		after := shape(filterBlockPool([]*walletrpc.CompactTx{tx}, CanonicalPoolTypes(in)))
+		if before != after {
+			t.Errorf("pool types %v: filtering changed from %s to %s", in, before, after)
+		}
+	}
+}
+
+func TestGetBlockRangeCanonicalizesPoolTypes(t *testing.T) {
+	testT = t
+	RawRequest = getblockStub
+	defer resetGlobals()
+	os.RemoveAll(unitTestPath)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, 0)
+	defer os.RemoveAll(unitTestPath)
+	poolTypes := make([]walletrpc.PoolType, 100_000)
+	for i := range poolTypes {
+		poolTypes[i] = walletrpc.PoolType_SAPLING
+	}
+	span := &walletrpc.BlockRange{
+		Start:     &walletrpc.BlockID{Height: 380640},
+		End:       &walletrpc.BlockID{Height: 380640},
+		PoolTypes: poolTypes,
+	}
+	blockChan := make(chan *walletrpc.CompactBlock)
+	errChan := make(chan error)
+	go GetBlockRange(context.Background(), testcache, blockChan, errChan, span)
+	<-blockChan
+	if err := <-errChan; err != nil {
+		t.Fatal(err)
+	}
+	if len(span.PoolTypes) != 1 {
+		t.Fatalf("GetBlockRange filtered against %d pool types, expected 1", len(span.PoolTypes))
 	}
 }
