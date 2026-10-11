@@ -8,6 +8,11 @@ on:
     types: [published]
   pull_request:
   workflow_dispatch:
+    inputs:
+      mirror_tag:
+        description: "Copy this electriccoinco/lightwalletd tag to zodlinc (vX.Y.Z); empty = no mirror"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -61,16 +66,40 @@ jobs:
             electriccoinco/lightwalletd:${{ github.event.release.tag_name }}
             electriccoinco/lightwalletd:latest
 
-      - name: Push to zodlinc
+  # Separate from docker_push: the electriccoinco login there and a zodlinc login are both for
+  # docker.io, so one tool cannot hold both, and reading the public source with the zodlinc org
+  # token fails ("access token has insufficient scopes", v0.5.4 and v0.5.5). skopeo reads the
+  # source anonymously, writes with the zodlinc credentials, and copies the multi-arch index as
+  # is, so zodlinc gets the same digest. Also runnable by hand: workflow_dispatch with mirror_tag.
+  zodlinc_mirror:
+    needs: [docker_push]
+    if: >-
+      always() &&
+      ((github.event_name == 'release' && needs.docker_push.result == 'success') ||
+       (github.event_name == 'workflow_dispatch' && inputs.mirror_tag != ''))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Copy electriccoinco/lightwalletd to zodlinc
         env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ inputs.mirror_tag }}
+          EVENT: ${{ github.event_name }}
           DST_USER: ${{ secrets.ZODLINC_DOCKERHUB_USERNAME }}
           DST_PASS: ${{ secrets.ZODLINC_DOCKERHUB_PASSWORD }}
         run: |
-          TAG="${{ github.event.release.tag_name }}"
-          go install github.com/google/go-containerregistry/cmd/crane@v0.21.8
-          # go install writes to GOPATH/bin, which is not on PATH in this job.
-          CRANE="$(go env GOPATH)/bin/crane"
-          # The source repo is public, so only the destination needs credentials.
-          "${CRANE}" auth login index.docker.io -u "${DST_USER}" -p "${DST_PASS}"
-          "${CRANE}" copy electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
-          "${CRANE}" copy electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-$DISPATCH_TAG}"
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::bad tag '$TAG'"; exit 1; }
+          TAGS="$TAG"
+          # A release also moves latest; a manual run copies only the tag it names.
+          [ "$EVENT" = release ] && TAGS="$TAG latest"
+          for t in $TAGS; do
+            skopeo copy --all --preserve-digests --retry-times 3 \
+              --src-no-creds --dest-creds "${DST_USER}:${DST_PASS}" \
+              "docker://docker.io/electriccoinco/lightwalletd:$t" \
+              "docker://docker.io/zodlinc/lightwalletd:$t"
+            src=$(skopeo inspect --raw --no-creds "docker://docker.io/electriccoinco/lightwalletd:$t" | sha256sum | cut -d' ' -f1)
+            dst=$(skopeo inspect --raw --no-creds "docker://docker.io/zodlinc/lightwalletd:$t" | sha256sum | cut -d' ' -f1)
+            echo "$t: electriccoinco sha256:$src zodlinc sha256:$dst"
+            [ "$src" = "$dst" ] || { echo "::error::digest mismatch for $t"; exit 1; }
+          done
