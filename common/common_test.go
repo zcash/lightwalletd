@@ -126,6 +126,7 @@ func resetGlobals() {
 	g_lastTime = time.Time{}
 	g_txidSeen = map[txid]struct{}{}
 	g_txList = nil
+	g_refreshing = false
 }
 
 // ------------------------------------------ GetLightdInfo()
