@@ -6,6 +6,17 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## Unreleased
+
+### Added
+
+- New `GetStandardFee` gRPC exposing the backend's `getstandardfee` JSON-RPC
+  method (zebrad, zakura). Returns the ZIP 317 marginal fee in zatoshis per
+  logical action and the backend fee-estimator version (0 is the static ZIP
+  317 fee, lowered to 1000 zatoshis by ZIP 2009). Backends without the
+  method return `Unimplemented`, other backend failures `Unavailable`. Part
+  of `lightwallet-protocol` v0.6.0.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
