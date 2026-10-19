@@ -871,9 +871,7 @@ func (x *PingResponse) GetExit() int64 {
 // StandardFee is the reply to the GetStandardFee rpc: the ZIP 317
 // marginal fee, in zatoshis per logical action, that wallets should
 // pay for a transaction to be mined in the next block, as reported by
-// the backend's `getstandardfee` RPC (ZIP 2009 lowers it to 1000
-// zatoshis). The conventional transaction fee is this value times the
-// transaction's number of logical actions, minimum 2 (ZIP 317).
+// the backend's `getstandardfee` RPC.
 type StandardFee struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	FeeZat           uint64                 `protobuf:"varint,1,opt,name=feeZat,proto3" json:"feeZat,omitempty"`                     // standard fee in zatoshis per logical action
