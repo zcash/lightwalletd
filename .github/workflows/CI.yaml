@@ -72,7 +72,11 @@ jobs:
           go install github.com/google/go-containerregistry/cmd/crane@v0.21.8
           # go install writes to GOPATH/bin, which is not on PATH in this job.
           CRANE="$(go env GOPATH)/bin/crane"
-          # The source repo is public, so only the destination needs credentials.
+          # Both repos are on index.docker.io, so crane keeps one credential for
+          # both. The zodlinc token cannot read electriccoinco, so pull the image
+          # before logging in as zodlinc, then push it.
+          OCI="$(mktemp -d)/image"
+          "${CRANE}" pull --format=oci electriccoinco/lightwalletd:${TAG} "${OCI}"
           "${CRANE}" auth login index.docker.io -u "${DST_USER}" -p "${DST_PASS}"
-          "${CRANE}" copy electriccoinco/lightwalletd:${TAG} zodlinc/lightwalletd:${TAG}
-          "${CRANE}" copy electriccoinco/lightwalletd:latest zodlinc/lightwalletd:latest
+          "${CRANE}" push "${OCI}" zodlinc/lightwalletd:${TAG}
+          "${CRANE}" tag zodlinc/lightwalletd:${TAG} latest
