@@ -22,7 +22,9 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '>=1.25.0'
+          # Go 1.27.3 blocks the compromised eMudhra intermediate CA keys
+          # (CVE-2026-111943). Do not relax this to an older toolchain.
+          go-version: '1.27.3'
 
       - name: Build and test
         run: |
