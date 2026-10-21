@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
@@ -895,7 +896,7 @@ func darksideGetRawTransaction(params []json.RawMessage) (json.RawMessage, error
 			return marshalReply(tx, int(entry.Height)), nil
 		}
 	}
-	return nil, errors.New("-5: No information available about transaction")
+	return nil, btcjson.NewRPCError(btcjson.ErrRPCNoTxInfo, "No information available about transaction")
 }
 
 // DarksideStageTransaction adds the given transaction to the staging area.
