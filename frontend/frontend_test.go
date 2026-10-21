@@ -266,10 +266,10 @@ func zcashdrpcStub(ctx context.Context, method string, params []json.RawMessage)
 		if filter.Addresses[0] != "t1234567890123456789012345678901234" {
 			testT.Fatal("wrong address")
 		}
-		if filter.Start != 20 {
+		if filter.Start != 1234560 {
 			testT.Fatal("wrong start")
 		}
-		if filter.End != 30 {
+		if filter.End != 1234570 {
 			testT.Fatal("wrong end")
 		}
 		return []byte("[\"6732cf8d67aac5b82a2a0f0217a7d4aa245b2adb0b97fd2d923dfc674415e221\"]"), nil
@@ -714,8 +714,8 @@ func TestGetTaddressTransactions(t *testing.T) {
 
 	addressBlockFilter := &walletrpc.TransparentAddressBlockFilter{
 		Range: &walletrpc.BlockRange{
-			Start: &walletrpc.BlockID{Height: 20},
-			End:   &walletrpc.BlockID{Height: 30},
+			Start: &walletrpc.BlockID{Height: 1234560},
+			End:   &walletrpc.BlockID{Height: 1234570},
 		},
 	}
 
