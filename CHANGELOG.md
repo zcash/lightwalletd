@@ -6,6 +6,15 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- Revalidate a failed compact-block cache read before deferred corruption
+  recovery. A concurrent reorg can remove or replace the damaged block while
+  recovery waits for the write lock; that stale recovery now preserves the
+  repaired cache instead of clearing its valid blocks from disk.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
