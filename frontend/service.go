@@ -700,6 +700,9 @@ var mempoolList []string
 // Last time we pulled a copy of the mempool from zcashd.
 var lastMempool time.Time
 
+// Start time of the latest successfully published refresh, guarded by s.mutex.
+var lastMempoolSnapshot time.Time
+
 // maxExcludeTxidSuffixes bounds the exclude list a client may send to
 // GetMempoolTx. The list names transactions the caller already has, so it is
 // only ever useful up to the size of the mempool itself; this cap sits well
@@ -749,14 +752,15 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	}
 
 	// Hold the mutex only long enough to decide whether this call refreshes
-	// the cache, and to snapshot it and update lastMempool to prevent another
-	// thread from refreshing while our thread is doing that.
+	// the cache, snapshot it, and record when this refresh starts. A backend
+	// call can exceed the refresh interval, allowing a newer refresh to start.
 	streamCtx := resp.Context()
 	s.mutex.Lock()
 	refresh := time.Since(lastMempool).Seconds() >= 2
 	if refresh {
 		lastMempool = time.Now()
 	}
+	refreshStarted := lastMempool
 	cachedList := mempoolList
 	var cachedMap map[string]*walletrpc.CompactTx
 	if mempoolMap != nil {
@@ -834,8 +838,12 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
 		}
 		s.mutex.Lock()
-		mempoolList = newmempoolList
-		mempoolMap = &newmempoolMap
+		// Never let a slower, older refresh overwrite a newer snapshot.
+		if !refreshStarted.Before(lastMempoolSnapshot) {
+			lastMempoolSnapshot = refreshStarted
+			mempoolList = newmempoolList
+			mempoolMap = &newmempoolMap
+		}
 		s.mutex.Unlock()
 		cachedList, cachedMap = newmempoolList, newmempoolMap
 	}

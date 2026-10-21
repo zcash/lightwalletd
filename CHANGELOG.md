@@ -6,6 +6,13 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- Prevent an older, slower `GetMempoolTx` refresh from overwriting a newer
+  cached snapshot and restoring removed transactions or hiding new ones.
+
 ## [0.5.4] - 2026-08-27
 
 ### Changed
