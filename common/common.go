@@ -48,7 +48,7 @@ var (
 // in lockstep with the lightwallet-protocol subtree under
 // lightwallet-protocol/ - and only once the server actually serves everything
 // the named version specifies.
-const LightwalletProtocolVersion = "v0.5.0"
+const LightwalletProtocolVersion = "v0.6.0"
 
 type Options struct {
 	GRPCBindAddr        string `json:"grpc_bind_address,omitempty"`

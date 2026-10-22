@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/sirupsen/logrus"
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/walletrpc"
@@ -1501,4 +1502,138 @@ func TestGetSubtreeRootsUnknownProtocolIsInvalidArgument(t *testing.T) {
 			t.Fatal("the backend was not called for", protocol.String())
 		}
 	}
+}
+
+// stubBackend installs common.RawRequest replies and errors for the
+// getstandardfee method. The stub fails the test for any other method.
+func stubBackend(t *testing.T, reply json.RawMessage, err error) {
+	t.Helper()
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getstandardfee" {
+			t.Fatal("unexpected backend method:", method)
+		}
+		if len(params) != 0 {
+			t.Fatal("getstandardfee should take no parameters, got:", params)
+		}
+		return reply, err
+	}
+}
+
+func TestGetStandardFee(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	// The happy path.
+	for _, test := range []struct {
+		name           string
+		reply          string
+		wantFeeZat     uint64
+		wantEstVersion uint32
+	}{
+		{"zip2009 marginal fee", `{"standard_fee":1000,"version":0}`, 1000, 0},
+		{"future estimator", `{"standard_fee":1734,"version":2}`, 1734, 2},
+		{"missing version defaults to zero", `{"standard_fee":5000}`, 5000, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			stubBackend(t, json.RawMessage(test.reply), nil)
+			fee, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+			if err != nil {
+				t.Fatal("GetStandardFee failed:", err)
+			}
+			if fee.FeeZat != test.wantFeeZat || fee.EstimatorVersion != test.wantEstVersion {
+				t.Fatal("got (", fee.FeeZat, ",", fee.EstimatorVersion,
+					") want (", test.wantFeeZat, ",", test.wantEstVersion, ")")
+			}
+		})
+	}
+
+	// A backend without the RPC fails with method-not-found. The client
+	// must see Unimplemented, not Unavailable.
+	t.Run("method not found is Unimplemented", func(t *testing.T) {
+		stubBackend(t, nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCMethodNotFound.Code,
+			Message: "method not found",
+		})
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if err == nil {
+			t.Fatal("GetStandardFee should have failed")
+		}
+		if status.Code(err) != codes.Unimplemented {
+			t.Fatal("expected Unimplemented for a backend without getstandardfee, got:",
+				status.Code(err), err)
+		}
+	})
+
+	// Other backend failures are retryable: Unavailable.
+	t.Run("other rpc error is Unavailable", func(t *testing.T) {
+		stubBackend(t, nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCMisc,
+			Message: "internal error",
+		})
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Unavailable {
+			t.Fatal("expected Unavailable for a backend rpc error, got:", status.Code(err), err)
+		}
+	})
+	t.Run("transport error is Unavailable", func(t *testing.T) {
+		stubBackend(t, nil, errors.New("connection refused"))
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Unavailable {
+			t.Fatal("expected Unavailable for a transport error, got:", status.Code(err), err)
+		}
+	})
+
+	// Unparseable replies are a server bug, not retryable: Internal.
+	t.Run("unparseable reply is Internal", func(t *testing.T) {
+		stubBackend(t, json.RawMessage(`not json`), nil)
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for an unparseable reply, got:", status.Code(err), err)
+		}
+	})
+	t.Run("null reply is Internal", func(t *testing.T) {
+		stubBackend(t, nil, nil)
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for a null reply, got:", status.Code(err), err)
+		}
+	})
+	t.Run("wrong-type field is Internal", func(t *testing.T) {
+		stubBackend(t, json.RawMessage(`{"standard_fee":"1000","version":0}`), nil)
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for a string fee field, got:", status.Code(err), err)
+		}
+	})
+	t.Run("fractional fee is Internal", func(t *testing.T) {
+		stubBackend(t, json.RawMessage(`{"standard_fee":1000.5,"version":0}`), nil)
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for a fractional fee, got:", status.Code(err), err)
+		}
+	})
+
+	// Never pass through a zero fee.
+	t.Run("zero fee is Internal", func(t *testing.T) {
+		stubBackend(t, json.RawMessage(`{"standard_fee":0,"version":0}`), nil)
+		_, err := lwd.GetStandardFee(context.Background(), &walletrpc.Empty{})
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for a zero fee, got:", status.Code(err), err)
+		}
+	})
+
+	// Client cancellation is reported as Canceled.
+	t.Run("cancelled context", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		stubBackendCtx := func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+			return nil, ctx.Err()
+		}
+		common.RawRequest = stubBackendCtx
+		cancel()
+		_, err := lwd.GetStandardFee(ctx, &walletrpc.Empty{})
+		if status.Code(err) != codes.Canceled {
+			t.Fatal("expected Canceled, got:", status.Code(err), err)
+		}
+	})
 }

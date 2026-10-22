@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
@@ -503,6 +505,44 @@ func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 		return nil, status.Errorf(codes.Internal, "GetLightdInfo failed: %s", err.Error())
 	}
 	return lightdinfo, err
+}
+
+// GetStandardFee returns the ZIP 317 marginal fee, in zatoshis per
+// logical action, via the backend's `getstandardfee` JSON-RPC method.
+func (s *lwdStreamer) GetStandardFee(ctx context.Context, in *walletrpc.Empty) (*walletrpc.StandardFee, error) {
+	common.Log.Debugf("gRPC GetStandardFee(%+v)\n", in)
+	result, err := common.RawRequest(ctx, "getstandardfee", []json.RawMessage{})
+	if err != nil {
+		// A backend without this RPC fails with JSON-RPC method-not-found.
+		// Return Unimplemented (non-retryable), not Unavailable.
+		var rpcErr *btcjson.RPCError
+		if errors.As(err, &rpcErr) && rpcErr.Code == btcjson.ErrRPCMethodNotFound.Code {
+			return nil, status.Errorf(codes.Unimplemented,
+				"GetStandardFee: the backend does not support the getstandardfee RPC: %s", err.Error())
+		}
+		if ctx.Err() != nil {
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
+		return nil, status.Errorf(codes.Unavailable,
+			"GetStandardFee: getstandardfee failed: %s", err.Error())
+	}
+	var reply struct {
+		StandardFee uint64 `json:"standard_fee"`
+		Version     uint32 `json:"version"`
+	}
+	if err := json.Unmarshal(result, &reply); err != nil {
+		return nil, status.Errorf(codes.Internal,
+			"GetStandardFee: failed to parse getstandardfee reply: %s", err.Error())
+	}
+	if reply.StandardFee == 0 {
+		// A sane backend never reports a zero fee.
+		return nil, status.Error(codes.Internal,
+			"GetStandardFee: the backend reported a zero standard fee")
+	}
+	return &walletrpc.StandardFee{
+		FeeZat:           reply.StandardFee,
+		EstimatorVersion: reply.Version,
+	}, nil
 }
 
 // maxRawTxSize bounds the raw transaction bytes lightwalletd will forward to
