@@ -24,6 +24,13 @@ The most recent changes are listed first.
   to the sooner of their own deadline and ten seconds, and are then refused
   with `UNAVAILABLE`. Set it to 0 for no limit.
 
+- New `GetStandardFee` gRPC exposing the backend's `getstandardfee` JSON-RPC
+  method (zebrad, zakura). Returns the ZIP 317 marginal fee in zatoshis per
+  logical action and the backend fee-estimator version (0 is the static ZIP
+  317 fee, lowered to 1000 zatoshis by ZIP 2009). Backends without the
+  method return `Unimplemented`, other backend failures `Unavailable`. Part
+  of `lightwallet-protocol` v0.6.0.
+
 ### Changed
 
 - Where there is a cgroup memory limit (a container run with `--memory`, or a

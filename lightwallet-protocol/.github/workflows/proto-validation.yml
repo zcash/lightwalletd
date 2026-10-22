@@ -1,0 +1,246 @@
+name: Proto validation
+
+on:
+  pull_request:
+    paths:
+      - 'walletrpc/**'
+      - 'buf.yaml'
+      - 'buf.lock'
+      - '.github/workflows/proto-validation.yml'
+  push:
+    branches: [main]
+    tags: ['v*']
+
+concurrency:
+  group: proto-validation-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# All toolchain versions are pinned. Bump them here when updating.
+env:
+  BUF_VERSION: 1.47.2
+  PROTOC_VERSION: '28.3'
+  GO_VERSION: '1.23.4'
+  PROTOC_GEN_GO_VERSION: v1.36.4
+  PROTOC_GEN_GO_GRPC_VERSION: v1.5.1
+  RUST_TOOLCHAIN: '1.85.0'
+  TONIC_BUILD_VERSION: '0.12.3'
+  PYTHON_VERSION: '3.12'
+  GRPCIO_TOOLS_VERSION: '1.68.1'
+  JAVA_VERSION: '21'
+  PROTOC_GEN_GRPC_KOTLIN_VERSION: '1.4.3'
+  SWIFT_PROTOBUF_VERSION: '1.28.2'
+  GRPC_SWIFT_VERSION: '1.24.1'
+
+jobs:
+  buf:
+    name: buf lint + breaking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history + tags to compare against the latest release tag.
+          fetch-depth: 0
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: ${{ env.BUF_VERSION }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Lint
+        run: buf lint
+      - name: Discover latest release tag
+        id: baseline
+        run: |
+          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | grep -v -- '-rc' | head -n1 || true)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No release tag found; skipping breaking-change check."
+          else
+            echo "Baseline tag: $LATEST_TAG"
+          fi
+          echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+      - name: Breaking-change check vs latest release tag
+        if: steps.baseline.outputs.tag != ''
+        # subdir=walletrpc treats walletrpc/ as the module root in the baseline,
+        # which is necessary for tags older than the introduction of buf.yaml
+        # (it lets buf resolve `import "compact_formats.proto"` correctly).
+        run: buf breaking --against ".git#tag=${{ steps.baseline.outputs.tag }},subdir=walletrpc"
+
+  codegen-go:
+    name: codegen (Go)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@${{ env.PROTOC_GEN_GO_VERSION }}
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@${{ env.PROTOC_GEN_GO_GRPC_VERSION }}
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Generate
+        run: |
+          mkdir -p out
+          protoc -I walletrpc \
+            --go_out=out --go_opt=paths=source_relative \
+            --go-grpc_out=out --go-grpc_opt=paths=source_relative \
+            walletrpc/service.proto walletrpc/compact_formats.proto
+      - name: Verify output
+        run: |
+          test -s out/service.pb.go
+          test -s out/service_grpc.pb.go
+          test -s out/compact_formats.pb.go
+
+  codegen-rust:
+    name: codegen (Rust / tonic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust-check
+      - name: Scaffold tonic-build harness
+        run: |
+          mkdir -p rust-check
+          cat > rust-check/Cargo.toml <<EOF
+          [package]
+          name = "proto-check"
+          version = "0.0.0"
+          edition = "2021"
+          publish = false
+
+          [lib]
+          path = "lib.rs"
+
+          [build-dependencies]
+          tonic-build = "=${{ env.TONIC_BUILD_VERSION }}"
+          EOF
+          : > rust-check/lib.rs
+          cat > rust-check/build.rs <<'EOF'
+          fn main() {
+              tonic_build::configure()
+                  .build_server(true)
+                  .build_client(true)
+                  .compile_protos(
+                      &["../walletrpc/service.proto", "../walletrpc/compact_formats.proto"],
+                      &["../walletrpc"],
+                  )
+                  .expect("tonic-build failed");
+          }
+          EOF
+      - name: Generate
+        working-directory: rust-check
+        # `cargo build` runs build.rs, which invokes tonic-build (codegen).
+        # lib.rs is empty, so this is a codegen-only check.
+        run: cargo build
+
+  codegen-python:
+    name: codegen (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install grpcio-tools
+        run: pip install "grpcio-tools==${{ env.GRPCIO_TOOLS_VERSION }}"
+      - name: Generate
+        run: |
+          mkdir -p out
+          python -m grpc_tools.protoc \
+            -I walletrpc \
+            --python_out=out \
+            --pyi_out=out \
+            --grpc_python_out=out \
+            walletrpc/service.proto walletrpc/compact_formats.proto
+      - name: Verify output imports
+        run: |
+          test -s out/service_pb2.py
+          test -s out/service_pb2_grpc.py
+          test -s out/compact_formats_pb2.py
+          PYTHONPATH=out python -c "import service_pb2, service_pb2_grpc, compact_formats_pb2"
+
+  codegen-kotlin:
+    name: codegen (Kotlin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download protoc-gen-grpc-kotlin
+        run: |
+          V="${{ env.PROTOC_GEN_GRPC_KOTLIN_VERSION }}"
+          URL="https://repo1.maven.org/maven2/io/grpc/protoc-gen-grpc-kotlin/${V}/protoc-gen-grpc-kotlin-${V}-jdk8.jar"
+          curl -fsSL "$URL" -o /tmp/protoc-gen-grpc-kotlin.jar
+          # Maven only ships the JAR; protoc needs an executable, so wrap it.
+          cat > /tmp/protoc-gen-grpc-kotlin <<'EOF'
+          #!/usr/bin/env bash
+          exec java -jar /tmp/protoc-gen-grpc-kotlin.jar "$@"
+          EOF
+          chmod +x /tmp/protoc-gen-grpc-kotlin
+      - name: Generate
+        run: |
+          mkdir -p out-kotlin
+          protoc -I walletrpc \
+            --kotlin_out=out-kotlin \
+            --grpc-kotlin_out=out-kotlin \
+            --plugin=protoc-gen-grpc-kotlin=/tmp/protoc-gen-grpc-kotlin \
+            walletrpc/service.proto walletrpc/compact_formats.proto
+      - name: Verify output
+        run: |
+          KT_COUNT=$(find out-kotlin -name '*.kt' | wc -l | tr -d ' ')
+          if [ "$KT_COUNT" -eq 0 ]; then
+            echo "No Kotlin files generated"
+            ls -R out-kotlin || true
+            exit 1
+          fi
+          echo "Generated $KT_COUNT Kotlin file(s)."
+
+  codegen-swift:
+    name: codegen (Swift)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-protoc@v3
+        with:
+          version: ${{ env.PROTOC_VERSION }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Mint
+        run: brew install mint
+      - name: Cache Mint packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.mint
+          key: mint-${{ runner.os }}-swift-protobuf-${{ env.SWIFT_PROTOBUF_VERSION }}-grpc-swift-${{ env.GRPC_SWIFT_VERSION }}
+      - name: Install Swift protoc plugins
+        run: |
+          mint install apple/swift-protobuf@${{ env.SWIFT_PROTOBUF_VERSION }} protoc-gen-swift
+          mint install grpc/grpc-swift@${{ env.GRPC_SWIFT_VERSION }} protoc-gen-grpc-swift
+          echo "$HOME/.mint/bin" >> "$GITHUB_PATH"
+      - name: Generate
+        run: |
+          mkdir -p out-swift
+          protoc -I walletrpc \
+            --swift_out=out-swift \
+            --grpc-swift_out=Client=true,Server=true:out-swift \
+            walletrpc/service.proto walletrpc/compact_formats.proto
+      - name: Verify output
+        run: |
+          test -s out-swift/service.pb.swift
+          test -s out-swift/service.grpc.swift
+          test -s out-swift/compact_formats.pb.swift

@@ -769,6 +769,14 @@ func darksideRawRequest(method string, params []json.RawMessage) (json.RawMessag
 
 		return json.Marshal(zcashdTreeState)
 
+	case "getstandardfee":
+		// Nothing to stage. Return the post-ZIP-2009 marginal fee,
+		// estimator version 0 (static).
+		return json.Marshal(struct {
+			StandardFee uint64 `json:"standard_fee"`
+			Version     uint32 `json:"version"`
+		}{1000, 0})
+
 	case "z_getsubtreesbyindex":
 		// This is implemented by DarksideGetSubtreeRoots().
 		return nil, errors.New("z_getsubtreesbyindex should never be called")
