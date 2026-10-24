@@ -61,7 +61,7 @@ Lightwalletd uses the following node RPCs:
 
 ## Lightwalletd
 
-First, install [Go](https://golang.org/dl/#stable) version 1.17 or later. You can see your current version by running `go version`.
+First, install [Go](https://golang.org/dl/#stable) version 1.26.10 or later, as required by [`go.mod`](go.mod). The module's `toolchain` directive selects Go 1.27.3 by default; allow automatic toolchain downloads or install that toolchain before building. You can see your current version by running `go version`.
 
 Clone the [current repository](https://github.com/zcash/lightwalletd) into a local directory that is _not_ within any component of
 your `$GOPATH` (`$HOME/go` by default), then build the lightwalletd server binary by running `make`.
