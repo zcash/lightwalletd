@@ -6,7 +6,7 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
-## [0.6.1] - 2026-10-23
+## [0.6.1] - 2026-10-27
 
 ### Added
 
