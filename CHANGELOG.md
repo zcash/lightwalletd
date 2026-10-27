@@ -6,9 +6,23 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
-## [Unreleased]
+## [0.6.1] - 2026-10-27
 
 ### Added
+
+- `--grpc-max-concurrent-streams` bounds how many gRPC streams one client
+  connection may have open at once; the default is 100. There was previously
+  no limit, and gRPC omits `SETTINGS_MAX_CONCURRENT_STREAMS` from the
+  connection preface when none is set, announcing to every client that it may
+  open as many streams as it likes. Set it to 0 to restore the old unlimited
+  behavior (GHSA-xq7v-jj38-pcwr).
+
+- `--max-concurrent-blockrange` bounds how many block-range requests the
+  server will work on at once across every connection, where
+  `--grpc-max-concurrent-streams` bounds only a single one; the default is
+  200. Requests beyond the limit wait for a free slot rather than failing, up
+  to the sooner of their own deadline and ten seconds, and are then refused
+  with `UNAVAILABLE`. Set it to 0 for no limit (GHSA-xq7v-jj38-pcwr).
 
 - New `GetStandardFee` gRPC exposing the backend's `getstandardfee` JSON-RPC
   method (zebrad, zakura). Returns the ZIP 317 marginal fee in zatoshis per
@@ -16,6 +30,82 @@ The most recent changes are listed first.
   317 fee, lowered to 1000 zatoshis by ZIP 2009). Backends without the
   method return `Unimplemented`, other backend failures `Unavailable`. Part
   of `lightwallet-protocol` v0.6.0.
+
+- A streaming RPC whose client stops reading for 60 seconds now ends with
+  `DEADLINE_EXCEEDED`. Before, a client that opened streams and never read
+  them held their resources, including the block-range slots above, for as
+  long as it kept the connection open. A wallet that stalls that long
+  reconnects and resumes from where it left off.
+
+### Changed
+
+- Where there is a cgroup memory limit (a container run with `--memory`, or a
+  systemd unit with `MemoryMax`), lightwalletd now sets Go's soft memory limit
+  to 90% of it. The Go runtime does not read cgroup limits by itself, so a
+  burst of allocation could be OOM-killed at a heap size the collector was
+  content to let grow. Setting `GOMEMLIMIT` in the environment overrides this.
+
+### Fixed
+
+- CI: the release step that mirrors the image to `zodlinc/lightwalletd`
+  failed on v0.6.0 with a 401, because the zodlinc token can't read
+  `electriccoinco`. It now pulls the image before logging in as zodlinc.
+  (#625)
+
+## [0.6.0] - 2026-10-20
+
+### Security
+
+- Built with Go 1.27.3 (module toolchain; Go 1.26.10 or newer required). These Go releases
+  distrust the compromised eMudhra intermediate CA keys in `crypto/x509` (CVE-2026-111943,
+  https://go.dev/issue/82345). Older lightwalletd binaries accept TLS chains through those
+  intermediates and should be replaced with this release. CI and the Docker release build are
+  pinned to Go 1.27.3. (#624)
+
+No functional changes since v0.5.5.
+
+## [0.5.5] - 2026-10-10
+
+### Changed
+
+- The block ingestor no longer exits when `getbestblockhash` fails. A single
+  failed call (for example HTTP 429 "Too many connections" from a loaded
+  zebrad or zakura backend) used to call `Log.Fatal`, dropping every
+  in-flight client stream; replicas sharing one backend then exited and
+  reconnected together, adding to the overload. It now logs a warning and
+  retries with a capped exponential backoff (1s to 30s), raises the log to
+  Error after 5 minutes of continuous failures, and logs once when the RPC
+  recovers. Malformed replies stay fatal. (#604)
+- The Docker image is built in a separate stage and ships only the static
+  binary on `debian:13-slim` (plus `ca-certificates`), instead of the full
+  `golang:1.25` build image. The image drops from 1.9 GB to 193 MB and from
+  1890 to 135 scanner findings. The uid 2002 `lightwalletd` user, data
+  directory ownership, `/bin/bash` and entrypoint are unchanged. The runtime
+  image no longer contains `curl`, `git`, `perl` or the Go toolchain.
+
+### Added
+
+- Gauge `lightwalletd_getbestblockhash_last_success_timestamp_seconds`, the
+  time of the last successful `getbestblockhash`. Since failures are now
+  retried instead of exiting, a lightwalletd whose backend keeps failing
+  serves a stale tip; this lets operators alert on it. (#605)
+
+### Security
+
+- `golang.org/x/text` to v0.41.0 (CVE-2026-56852, denial of service via
+  invalid UTF-8).
+- `golang.org/x/net` to v0.57.0 (CVE-2026-46600, denial of service in
+  `dns/dnsmessage`).
+- `golang.org/x/crypto` to v0.55.0 (CVE-2026-56854). GO-2026-5932
+  (`x/crypto/openpgp` unmaintained) remains; it has no fixed version and
+  lightwalletd does not import the package directly.
+- `google.golang.org/grpc` to v1.83.2.
+
+### Fixed
+
+- CI: the release step that mirrors the image to `zodlinc/lightwalletd`
+  had never completed; it now authenticates to the destination only and
+  uses `crane copy` correctly.
 
 ## [0.5.4] - 2026-08-27
 
