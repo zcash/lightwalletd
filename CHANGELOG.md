@@ -6,6 +6,13 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- The startup debug log line that prints the parsed options no longer
+  includes the backend RPC password (CodeQL alert #4).
+
 ## [0.6.1] - 2026-10-27
 
 ### Added
