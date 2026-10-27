@@ -6,6 +6,13 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [Unreleased]
+
+### Fixed
+
+- The startup debug log line that prints the parsed options no longer
+  includes the backend RPC password (CodeQL alert #4).
+
 ## [0.6.1] - 2026-10-27
 
 ### Added
@@ -30,6 +37,12 @@ The most recent changes are listed first.
   317 fee, lowered to 1000 zatoshis by ZIP 2009). Backends without the
   method return `Unimplemented`, other backend failures `Unavailable`. Part
   of `lightwallet-protocol` v0.6.0.
+
+- A streaming RPC whose client stops reading for 60 seconds now ends with
+  `DEADLINE_EXCEEDED`. Before, a client that opened streams and never read
+  them held their resources, including the block-range slots above, for as
+  long as it kept the connection open. A wallet that stalls that long
+  reconnects and resumes from where it left off.
 
 ### Changed
 

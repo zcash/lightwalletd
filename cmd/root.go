@@ -72,7 +72,10 @@ var rootCmd = &cobra.Command{
 			DarksideTimeout:          viper.GetUint64("darkside-timeout"),
 		}
 
-		common.Log.Debugf("Options: %#v\n", opts)
+		// Log viper's view rather than opts, which holds the RPC password.
+		settings := viper.AllSettings()
+		delete(settings, "rpcpassword")
+		common.Log.Debugf("Options: %v\n", settings)
 
 		filesThatShouldExist := []string{
 			opts.LogFile,
@@ -121,7 +124,8 @@ func serverOptions(opts *common.Options) []grpc.ServerOption {
 		grpc.StatsHandler(&connStatsHandler{}),
 		grpc.StreamInterceptor(
 			grpc_middleware.ChainStreamServer(
-				grpc_prometheus.StreamServerInterceptor),
+				grpc_prometheus.StreamServerInterceptor,
+				sendTimeoutInterceptor(streamSendTimeout)),
 		),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			logging.LogInterceptor,
@@ -420,8 +424,8 @@ func init() {
 	rootCmd.Flags().String("http-bind-addr", "127.0.0.1:9068", "the address to listen for http on")
 	rootCmd.Flags().String("grpc-bind-addr", "127.0.0.1:9067", "the address to listen for grpc on")
 	rootCmd.Flags().Bool("grpc-logging-insecure", false, "enable grpc logging to stderr")
-	rootCmd.Flags().Int("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
-	rootCmd.Flags().Int("max-concurrent-blockrange", 200, "max block-range requests served at once, server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-blockrange", 200, "max block-range requests served at once, server-wide (0 for unlimited)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
