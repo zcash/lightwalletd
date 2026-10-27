@@ -121,7 +121,8 @@ func serverOptions(opts *common.Options) []grpc.ServerOption {
 		grpc.StatsHandler(&connStatsHandler{}),
 		grpc.StreamInterceptor(
 			grpc_middleware.ChainStreamServer(
-				grpc_prometheus.StreamServerInterceptor),
+				grpc_prometheus.StreamServerInterceptor,
+				sendTimeoutInterceptor(streamSendTimeout)),
 		),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
 			logging.LogInterceptor,

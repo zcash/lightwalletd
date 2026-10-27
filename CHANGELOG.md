@@ -31,6 +31,12 @@ The most recent changes are listed first.
   method return `Unimplemented`, other backend failures `Unavailable`. Part
   of `lightwallet-protocol` v0.6.0.
 
+- A streaming RPC whose client stops reading for 60 seconds now ends with
+  `DEADLINE_EXCEEDED`. Before, a client that opened streams and never read
+  them held their resources, including the block-range slots above, for as
+  long as it kept the connection open. A wallet that stalls that long
+  reconnects and resumes from where it left off.
+
 ### Changed
 
 - Where there is a cgroup memory limit (a container run with `--memory`, or a
