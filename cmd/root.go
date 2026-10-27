@@ -72,7 +72,10 @@ var rootCmd = &cobra.Command{
 			DarksideTimeout:          viper.GetUint64("darkside-timeout"),
 		}
 
-		common.Log.Debugf("Options: %#v\n", opts)
+		// Keep the backend RPC password out of the log.
+		logOpts := *opts
+		logOpts.RPCPassword = "<redacted>"
+		common.Log.Debugf("Options: %#v\n", logOpts)
 
 		filesThatShouldExist := []string{
 			opts.LogFile,
