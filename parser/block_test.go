@@ -93,3 +93,29 @@ func TestParseBlockRejectsTransactionCountThatCannotFit(t *testing.T) {
 		t.Fatalf("error mismatch:\nhave: %v\nwant substring: %s", err, wantErr)
 	}
 }
+
+// minimalBlockHeader is a 141-byte version-4 header with zero-valued fields
+// and an empty Equihash solution.
+func minimalBlockHeader() []byte {
+	hdr := make([]byte, 141)
+	hdr[0] = 0x04
+	return hdr
+}
+
+func TestParseBlockRejectsNoTransactions(t *testing.T) {
+	blockData := append(minimalBlockHeader(), 0x00)
+	_, err := NewBlock().ParseFromSlice(blockData)
+	if err == nil || !strings.Contains(err.Error(), "no transactions") {
+		t.Fatalf("got %v, want a no-transactions error", err)
+	}
+}
+
+func TestParseBlockRejectsInputlessCoinbase(t *testing.T) {
+	// A version-1 transaction with no inputs, no outputs and lock time 0.
+	coinbase := []byte{0x01, 0, 0, 0, 0x00, 0x00, 0, 0, 0, 0}
+	blockData := append(append(minimalBlockHeader(), 0x01), coinbase...)
+	_, err := NewBlock().ParseFromSlice(blockData)
+	if err == nil || !strings.Contains(err.Error(), "no transparent input") {
+		t.Fatalf("got %v, want a no-transparent-input error", err)
+	}
+}
