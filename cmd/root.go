@@ -551,7 +551,28 @@ func initConfig() {
 	}
 }
 
+// metricsReadHeaderTimeout bounds how long a metrics request's headers may
+// take to arrive. A variable so tests can shorten it.
+var metricsReadHeaderTimeout = 10 * time.Second
+
+// newMetricsServer returns the Prometheus HTTP server with timeouts, so a
+// peer that sends a partial request can't hold a connection open forever.
+func newMetricsServer(addr string) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	return &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: metricsReadHeaderTimeout,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 16,
+	}
+}
+
 func startHTTPServer(opts *common.Options) {
-	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(opts.HTTPBindAddr, nil)
+	if err := newMetricsServer(opts.HTTPBindAddr).ListenAndServe(); err != nil {
+		common.Log.Error("metrics HTTP server: ", err)
+	}
 }
