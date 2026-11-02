@@ -37,6 +37,23 @@ jobs:
       - name: Test Docker build
         run: docker build .
 
+  changelog:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check changelog fragment convention
+        env:
+          ALLOW_CHANGELOG_EDIT: ${{ contains(github.event.pull_request.labels.*.name, 'skip-changelog-check') }}
+        run: |
+          python3 scripts/check-changelog.py \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}"
+
   docker_push:
     needs: [build]
     if: github.event_name == 'release'
