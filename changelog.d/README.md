@@ -19,10 +19,18 @@ Create one file per entry, named `<slug>.<category>.md`:
   `security`.
 
 The file holds the entry as plain text, with no leading `- ` and no indent.
-The release script makes it a list item, adding the `- ` and indenting the
-lines after the first, and keeps your line breaks. Wrap lines at 78 columns,
-so they fit within 80 once indented. A blank line starts a second paragraph
-of the same entry. For a security fix, reference the advisory or fixing PR.
+The release script turns it into a list item by adding the `- ` and indenting
+every later line by two spaces. Otherwise the text is used as written:
+
+- Your line breaks are kept. Wrap at 78 columns so lines fit within 80 once
+  indented.
+- A blank line starts a second paragraph of the same entry.
+- After the opening text, the entry can contain a list, nested or not. Write
+  it at the left margin like any Markdown list, and it ends up nested under
+  the entry. The entry can't begin with a list, since a fragment that starts
+  with `- ` is taken to be a finished bullet and used unchanged.
+
+For a security fix, reference the advisory or fixing PR.
 
 A PR can add more than one fragment, including several in the same category.
 Give each its own slug, e.g. `sendtx-budget.security.md` and

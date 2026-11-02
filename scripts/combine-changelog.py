@@ -92,7 +92,7 @@ def as_bullet(text):
         elif not out:
             out.append("- " + ln.lstrip())
         else:
-            out.append("  " + ln.lstrip())
+            out.append("  " + ln)
     return "\n".join(out)
 
 
