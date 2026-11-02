@@ -11,8 +11,9 @@ notes fragments.
 
 Create one file per entry, named `<slug>.<category>.md`:
 
-- `<slug>` is anything short and unique, usually the branch topic, e.g.
-  `metrics-http-timeouts`. The PR number works too once you have one.
+- `<slug>` is short and unique, made of lowercase letters, digits and
+  hyphens. Usually it's the branch topic, e.g. `metrics-http-timeouts`. The PR
+  number works too once you have one.
 - `<category>` is one of the [Keep a Changelog](https://keepachangelog.com/)
   sections, lowercased: `added`, `changed`, `deprecated`, `removed`, `fixed`,
   `security`.

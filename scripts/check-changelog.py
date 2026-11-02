@@ -27,7 +27,7 @@ import sys
 CATEGORIES = ("added", "changed", "deprecated", "removed", "fixed", "security")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRAGMENT_DIR = os.path.join(ROOT, "changelog.d")
-FRAGMENT_RE = re.compile(r"^.+\.(%s)\.md$" % "|".join(CATEGORIES))
+FRAGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.(%s)\.md$" % "|".join(CATEGORIES))
 SKIP_LABEL = "skip-changelog-check"
 
 
@@ -47,7 +47,8 @@ def check_format():
             bad.append(name)
     if bad:
         fail("fragment(s) misnamed: %s\n"
-             "  expected <slug>.<category>.md, category one of: %s"
+             "  expected <slug>.<category>.md, slug of lowercase letters, digits and\n"
+             "  hyphens, category one of: %s"
              % (", ".join(bad), ", ".join(CATEGORIES)))
 
 

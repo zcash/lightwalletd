@@ -22,6 +22,7 @@ import sys
 # Keep a Changelog's category order.
 CATEGORIES = ["Added", "Changed", "Deprecated", "Removed", "Fixed", "Security"]
 CATEGORY_BY_KEY = {c.lower(): c for c in CATEGORIES}
+FRAGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.(%s)\.md$" % "|".join(CATEGORY_BY_KEY))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHANGELOG = os.path.join(ROOT, "CHANGELOG.md")
@@ -57,11 +58,12 @@ def collect_fragments():
     for name in sorted(os.listdir(FRAGMENT_DIR)):
         if not name.endswith(".md") or name == "README.md":
             continue
-        parts = name[: -len(".md")].split(".")
-        if len(parts) < 2 or parts[-1].lower() not in CATEGORY_BY_KEY:
-            die("fragment %r must be named <slug>.<category>.md, where category "
-                "is one of: %s" % (name, ", ".join(c.lower() for c in CATEGORIES)))
-        category = CATEGORY_BY_KEY[parts[-1].lower()]
+        m = FRAGMENT_RE.match(name)
+        if not m:
+            die("fragment %r must be named <slug>.<category>.md, where slug is "
+                "lowercase letters, digits and hyphens, and category is one of: "
+                "%s" % (name, ", ".join(c.lower() for c in CATEGORIES)))
+        category = CATEGORY_BY_KEY[m.group(1)]
         path = os.path.join(FRAGMENT_DIR, name)
         with open(path, encoding="utf-8") as f:
             text = f.read().strip("\n")
