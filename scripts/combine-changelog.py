@@ -56,7 +56,7 @@ def collect_fragments():
     groups = {}
     paths = []
     for name in sorted(os.listdir(FRAGMENT_DIR)):
-        if not name.endswith(".md") or name == "README.md":
+        if name == "README.md":
             continue
         m = FRAGMENT_RE.match(name)
         if not m:
@@ -124,9 +124,26 @@ def insertion_point(lines):
     return first
 
 
+def git(*args):
+    return subprocess.run(["git"] + list(args), cwd=ROOT, capture_output=True,
+                          text=True)
+
+
+def require_committed(paths):
+    """Die unless every fragment is committed, so git rm can't lose one."""
+    rel = [os.path.relpath(p, ROOT) for p in paths]
+    untracked = [r for r in rel if git("ls-files", "--error-unmatch", r).returncode]
+    if untracked:
+        die("fragment(s) not committed: %s\n  commit them first, then rerun"
+            % ", ".join(untracked))
+    if git("diff", "--quiet", "HEAD", "--", *rel).returncode:
+        die("fragment(s) have uncommitted changes\n  commit them first, then rerun")
+
+
 def main():
     version, date = parse_args(sys.argv)
     groups, paths = collect_fragments()
+    require_committed(paths)
     section = build_section(version, date, groups)
 
     with open(CHANGELOG, encoding="utf-8") as f:
@@ -138,12 +155,11 @@ def main():
     with open(CHANGELOG, "w", encoding="utf-8") as f:
         f.write("".join(lines))
 
-    try:
-        subprocess.run(["git", "rm", "-q"] + paths, cwd=ROOT, check=True)
-        subprocess.run(["git", "add", CHANGELOG], cwd=ROOT, check=True)
-    except (OSError, subprocess.CalledProcessError):
-        for path in paths:
-            os.remove(path)
+    for args in (["rm", "-q"] + paths, ["add", CHANGELOG]):
+        r = git(*args)
+        if r.returncode:
+            die("CHANGELOG.md was updated, but 'git %s' failed:\n%s"
+                % (args[0], r.stderr.rstrip()))
 
     count = sum(len(v) for v in groups.values())
     print("Added [%s] - %s from %d fragment(s) across %d categor(y/ies)."

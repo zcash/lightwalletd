@@ -62,4 +62,5 @@ CI runs `scripts/check-changelog.py` on every PR. It rejects a misnamed
 fragment, and it rejects a PR that edits `CHANGELOG.md` directly, since entries
 belong in fragments. A release PR passes because `combine-changelog.py` deletes
 the fragments it folds in. For the rare hand edit, such as fixing a typo in an
-already-released entry, add the `skip-changelog-check` label.
+already-released entry, add the `skip-changelog-check` label. Adding or
+removing the label reruns the check.

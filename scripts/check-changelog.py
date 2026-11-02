@@ -41,7 +41,7 @@ def check_format():
         return
     bad = []
     for name in sorted(os.listdir(FRAGMENT_DIR)):
-        if not name.endswith(".md") or name == "README.md":
+        if name == "README.md":
             continue
         if not FRAGMENT_RE.match(name):
             bad.append(name)
