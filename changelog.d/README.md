@@ -18,9 +18,11 @@ Create one file per entry, named `<slug>.<category>.md`:
   sections, lowercased: `added`, `changed`, `deprecated`, `removed`, `fixed`,
   `security`.
 
-The file holds the finished entry as it should read in the changelog: a
-Markdown bullet starting with `- `, hard-wrapped the same as the rest of
-`CHANGELOG.md`. For a security fix, reference the advisory or fixing PR.
+The file holds the entry as plain text, with no leading `- ` and no indent.
+The release script makes it a list item, adding the `- ` and indenting the
+lines after the first, and keeps your line breaks. Wrap lines at 78 columns,
+so they fit within 80 once indented. A blank line starts a second paragraph
+of the same entry. For a security fix, reference the advisory or fixing PR.
 
 A PR can add more than one fragment, including several in the same category.
 Give each its own slug, e.g. `sendtx-budget.security.md` and
@@ -33,10 +35,10 @@ them in a different order, prefix the slugs with numbers, e.g.
 
 Example, `changelog.d/metrics-http-timeouts.security.md`:
 
-```markdown
-- The Prometheus metrics HTTP server now sets read, write and idle timeouts, so
-  a client that opens a connection and sends a partial request can no longer
-  pin it open indefinitely (GHSA-w24w-x7vw-f2w8).
+```
+The Prometheus metrics HTTP server now sets read, write and idle timeouts, so
+a client that opens a connection and sends a partial request can no longer pin
+it open indefinitely (GHSA-w24w-x7vw-f2w8).
 ```
 
 ## Cutting a release

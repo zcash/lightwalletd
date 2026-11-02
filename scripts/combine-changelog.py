@@ -76,6 +76,26 @@ def collect_fragments():
     return groups, paths
 
 
+def as_bullet(text):
+    """Turn a plain-text fragment into a list item, keeping its line breaks.
+
+    A fragment that already starts with "- " is used as written.
+    """
+    lines = [ln.rstrip() for ln in text.strip().splitlines()]
+    if lines[0].startswith("- "):
+        return "\n".join(lines)
+    out = []
+    for ln in lines:
+        if not ln:
+            if out and out[-1]:
+                out.append("")
+        elif not out:
+            out.append("- " + ln.lstrip())
+        else:
+            out.append("  " + ln.lstrip())
+    return "\n".join(out)
+
+
 def build_section(version, date, groups):
     lines = ["## [%s] - %s" % (version, date), ""]
     for category in CATEGORIES:
@@ -84,7 +104,7 @@ def build_section(version, date, groups):
         lines.append("### " + category)
         lines.append("")
         for _, text in groups[category]:
-            lines.append(text)
+            lines.append(as_bullet(text))
             lines.append("")
     return "\n".join(lines).rstrip("\n") + "\n"
 
