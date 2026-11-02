@@ -22,6 +22,15 @@ The file holds the finished entry as it should read in the changelog: a
 Markdown bullet starting with `- `, hard-wrapped the same as the rest of
 `CHANGELOG.md`. For a security fix, reference the advisory or fixing PR.
 
+A PR can add more than one fragment, including several in the same category.
+Give each its own slug, e.g. `sendtx-budget.security.md` and
+`sendtx-flag.added.md`, or `sendtx-budget.security.md` and
+`sendtx-copies.security.md`.
+
+Within a category, entries appear in alphabetical order of filename. To put
+them in a different order, prefix the slugs with numbers, e.g.
+`01-sendtx-budget.security.md` and `02-sendtx-copies.security.md`.
+
 Example, `changelog.d/metrics-http-timeouts.security.md`:
 
 ```markdown
