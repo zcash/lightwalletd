@@ -3,6 +3,10 @@
 Checklist for cutting a release. The steps that are easy to forget are called
 out as **Gotcha**.
 
+Day to day, a PR that needs a changelog entry adds a fragment under
+`changelog.d/` rather than editing `CHANGELOG.md` directly (see
+`changelog.d/README.md`). This checklist folds those fragments into a release.
+
 ## 1. Choose the version
 
 The CHANGELOG follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
@@ -33,18 +37,24 @@ So **the tag is the version** — no source file changes for a release, and a
 build from an untagged tree reports whatever `git describe` produces (which is
 why an untagged clone can report a misleading version).
 
-## 2. Update the CHANGELOG (in the release PR)
+## 2. Fold the changelog fragments (in the release PR)
 
-Rename the `## [Unreleased]` heading to `## [X.Y.Z] - YYYY-MM-DD`, and add a
-fresh `## [Unreleased]` above it only if there is already unreleased work to
-put there.
+Combine the pending `changelog.d/` fragments into a dated section:
 
-**Gotcha:** this is the step most often missed, and missing it compounds
-silently. The heading was never renamed for v0.4.18, v0.4.19 or v0.5.0, so by
-the time v0.5.0 shipped, `[Unreleased]` held three releases' worth of entries.
-Untangling it meant splitting them across `[0.5.0]`, `[0.4.19]` and `[0.4.18]`
-by checking which entries were present in the CHANGELOG at each release tag.
-Naming the section while cutting the release is what prevents that.
+```sh
+scripts/combine-changelog.py X.Y.Z
+```
+
+This writes a `## [X.Y.Z] - YYYY-MM-DD` section at the top of the version
+history, grouped by category, and stages the removal of the fragments. Review
+`git diff --cached CHANGELOG.md changelog.d`, then commit both the CHANGELOG
+change and the removals in the release PR. Pass an explicit date as a second
+argument to override today's.
+
+Before fragments, this step renamed a single `## [Unreleased]` heading by hand,
+and it was the step most often missed. It was skipped for v0.4.18, v0.4.19 and
+v0.5.0, so by v0.5.0 that heading held three releases' worth of entries, which
+had to be untangled by tag. One fragment per PR makes that pile-up impossible.
 
 The CHANGELOG is the **only** in-repo release artifact. Everything below
 happens after the merge.
@@ -115,7 +125,7 @@ publicly. Cite the fixing PR instead.
 ## Quick checklist
 
 - [ ] Version chosen (minor bump if anything is breaking)
-- [ ] CHANGELOG `[Unreleased]` renamed to `[X.Y.Z] - YYYY-MM-DD`
+- [ ] `changelog.d/` fragments folded into `[X.Y.Z] - YYYY-MM-DD` via `scripts/combine-changelog.py`
 - [ ] Release PR merged
 - [ ] Tag `vX.Y.Z` pushed
 - [ ] GitHub release created (this pushes Docker images and moves `:latest`)
