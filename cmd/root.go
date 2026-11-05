@@ -122,6 +122,7 @@ func fileExists(filename string) bool {
 // client it may open as many streams as it likes.
 func serverOptions(opts *common.Options) []grpc.ServerOption {
 	serverOpts := []grpc.ServerOption{
+		grpc.ForceServerCodecV2(frontend.NewBoundedCodec()),
 		grpc.StatsHandler(&connStatsHandler{}),
 		grpc.StreamInterceptor(
 			grpc_middleware.ChainStreamServer(
