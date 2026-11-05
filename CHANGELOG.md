@@ -6,30 +6,6 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
-## [Unreleased]
-
-### Added
-
-- `--client-stream-idle-timeout` (seconds, default 30) cancels a
-  client-streaming RPC whose client has sent nothing for that long, whether
-  before the first message or between messages. Without it, a client that
-  opens `GetTaddressBalanceStream` and sends no address parks a handler
-  goroutine indefinitely, so enough open streams exhaust memory. Set it to 0
-  to disable.
-
-### Fixed
-
-- The Prometheus metrics HTTP listener (`--http-bind-addr`) now has request
-  timeouts: 10 seconds for a request's headers to arrive, 30 seconds for the
-  whole request and for the response, and 60 seconds idle. Before, a peer
-  that sent a partial request held its connection, and a file descriptor,
-  for as long as it liked, and enough of them starved the gRPC listener in
-  the same process (GHSA-w24w-x7vw-f2w8). A failure to start the listener is
-  now logged instead of ignored.
-
-- The startup debug log line that prints the parsed options no longer
-  includes the backend RPC password (CodeQL alert #4).
-
 ## [0.6.1] - 2026-10-27
 
 ### Added
