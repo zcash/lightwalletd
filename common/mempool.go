@@ -11,6 +11,9 @@ import (
 
 type txid string
 
+// mempoolRefreshTimeout bounds a refresh, which no client can cancel.
+var mempoolRefreshTimeout = 30 * time.Second
+
 var (
 	// Set of mempool txids that have been seen during the current block interval.
 	// The zcashd RPC `getrawmempool` returns the entire mempool each time, so
@@ -63,8 +66,16 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 		}
 		g_lock.Unlock()
 		if refresh {
-			if err := refreshMempool(ctx); err != nil {
-				return err
+			// The refresh is shared, so a caller's cancel mustn't discard it.
+			done := make(chan error, 1)
+			go func() { done <- refreshMempool(context.WithoutCancel(ctx)) }()
+			select {
+			case err := <-done:
+				if err != nil {
+					return err
+				}
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 		}
 		g_lock.Lock()
@@ -96,6 +107,8 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 // refreshMempool brings the shared state up to date without holding g_lock
 // across backend calls. The caller must have set g_refreshing.
 func refreshMempool(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, mempoolRefreshTimeout)
+	defer cancel()
 	defer func() {
 		g_lock.Lock()
 		g_refreshing = false
@@ -161,14 +174,16 @@ func refreshMempoolTxns(ctx context.Context) error {
 		}
 
 		rawtx, err := ParseRawTransaction(result)
-		if err != nil {
-			return err
-		}
 
-		// Marked seen only once fetched, so a cancelled refresh can't hide
+		// Marked seen only once fetched, so an aborted refresh can't hide
 		// it (GHSA-pj5c-jx29-gmxr).
 		g_lock.Lock()
 		g_txidSeen[txid(txidstr)] = struct{}{}
+		if err != nil {
+			g_lock.Unlock()
+			Log.WithField("txid", txidstr).Warn("skipping unparseable mempool transaction: ", err)
+			continue
+		}
 		// Skip any transaction that has been mined since the list of txids
 		// was retrieved.
 		if rawtx.Height == 0 {
