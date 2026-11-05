@@ -239,3 +239,37 @@ func TestMempoolSlowRefreshDoesNotBlockCancel(t *testing.T) {
 	}
 	waitRefreshIdle(t)
 }
+
+// A stream on an old tip returns once another stream has seen the new block,
+// without starting a refresh of its own.
+func TestMempoolStaleStreamDoesNotRefresh(t *testing.T) {
+	defer resetGlobals()
+	stableMempoolGlobals()
+	g_lastTime = time.Now()
+	var calls atomic.Int32
+	RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		calls.Add(1)
+		return nil, errors.New("unexpected RPC: " + method)
+	}
+	done := make(chan error, 1)
+	go func() { done <- GetMempool(context.Background(), func(*walletrpc.RawTransaction) error { return nil }) }()
+	time.Sleep(50 * time.Millisecond)
+
+	// What another stream's refresh does on seeing a new block.
+	g_lock.Lock()
+	g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{BestBlockHash: "new-hash"}
+	g_lastTime = time.Time{}
+	g_lock.Unlock()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("stale stream returned %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("stale stream did not return")
+	}
+	if n := calls.Load(); n != 0 {
+		t.Fatalf("stale stream made %d backend calls, want 0", n)
+	}
+}

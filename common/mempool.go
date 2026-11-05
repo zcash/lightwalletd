@@ -60,6 +60,11 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 		// Don't fetch the mempool more often than every 2 seconds, and let
 		// only one caller at a time do it (GHSA-hp3q-vfr4-v8m6).
 		g_lock.Lock()
+		if g_lastBlockChainInfo.BestBlockHash != stayHash {
+			// Another stream saw a new block; don't refresh for the old one.
+			g_lock.Unlock()
+			return nil
+		}
 		refresh := !g_refreshing && Time.Now().After(g_lastTime.Add(2*time.Second))
 		if refresh {
 			g_refreshing = true
