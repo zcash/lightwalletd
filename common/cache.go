@@ -69,7 +69,7 @@ func (c *BlockCache) clearDbFiles() {
 	}
 	c.Sync()
 	c.starts = c.starts[:1]
-	c.nextBlock = 0
+	c.nextBlock = c.firstBlock
 	c.latestHash = hash32.Nil
 }
 
@@ -222,6 +222,23 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 		c.nextBlock++
 	}
 	Log.Info("Done reading ", c.nextBlock-c.firstBlock, " blocks from disk cache")
+
+	// Make the files hold exactly the blocks just read. Both are opened with
+	// O_APPEND, so the next Add() writes at the physical end of each file,
+	// while starts[] says the next block begins right after the last one
+	// kept above. Anything beyond that point -- blocks dropped by
+	// --sync-from-height or --redownload, a partial lengths entry, or a
+	// block whose length was never written because the process stopped
+	// between the two writes in Add() -- would otherwise put every later
+	// block at the wrong offset. The first read of one would then fail its
+	// checksum and discard the entire cache.
+	nKept := c.nextBlock - c.firstBlock
+	if err := c.lengthsFile.Truncate(int64(4 * nKept)); err != nil {
+		Log.Fatal("truncate lengths file failed: ", err)
+	}
+	if err := c.blocksFile.Truncate(c.starts[nKept]); err != nil {
+		Log.Fatal("truncate blocks file failed: ", err)
+	}
 
 	// Initialize latestHash from the last block on disk so that the first
 	// block ingested after a restart is checked against the cache tip.
