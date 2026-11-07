@@ -183,6 +183,10 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 			lengths = lengths[:(syncFromHeight-startHeight)*4]
 		}
 	}
+	if remainder := len(lengths) % 4; remainder != 0 {
+		Log.Warning("lengths file has a partial entry (", remainder, " trailing bytes)")
+		lengths = lengths[:len(lengths)-remainder]
+	}
 
 	// The last entry in starts[] is where to write the next block.
 	var offset int64
@@ -191,11 +195,6 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 	nBlocks := len(lengths) / 4
 	Log.Info("Reading ", nBlocks, " blocks from the cache ...")
 	for i := 0; i < nBlocks; i++ {
-		if len(lengths[:4]) < 4 {
-			Log.Warning("lengths file has a partial entry")
-			c.recoverFromCorruption()
-			break
-		}
 		length := binary.LittleEndian.Uint32(lengths[i*4 : (i+1)*4])
 		if length < 74 || length > 4*1000*1000 {
 			Log.Warning("lengths file has impossible value ", length)
@@ -221,6 +220,36 @@ func NewBlockCache(dbPath string, chainName string, startHeight int, syncFromHei
 		}
 		c.nextBlock++
 	}
+
+	// Add writes a block before writing its length. An unclean shutdown can
+	// therefore leave bytes in blocks without a matching lengths entry. Also,
+	// syncFromHeight can intentionally load only a prefix of both files. Keep
+	// the files aligned with the entries that were successfully loaded so the
+	// next append starts at the offset recorded in starts[].
+	expectedBlocksSize := c.starts[len(c.starts)-1]
+	expectedLengthsSize := int64(len(c.starts)-1) * 4
+	blocksInfo, err := c.blocksFile.Stat()
+	if err != nil {
+		Log.Fatal("stat ", c.blocksName, " failed: ", err)
+	}
+	if blocksInfo.Size() < expectedBlocksSize {
+		Log.Warning("blocks file is shorter than lengths file: expected ", expectedBlocksSize,
+			" bytes, found ", blocksInfo.Size())
+		c.recoverFromCorruption()
+		expectedBlocksSize = 0
+		expectedLengthsSize = 0
+	} else if blocksInfo.Size() > expectedBlocksSize {
+		Log.Warning("blocks file has an unindexed tail: truncating from ", blocksInfo.Size(),
+			" to ", expectedBlocksSize, " bytes")
+	}
+	if err := c.blocksFile.Truncate(expectedBlocksSize); err != nil {
+		Log.Fatal("truncate blocks file failed: ", err)
+	}
+	if err := c.lengthsFile.Truncate(expectedLengthsSize); err != nil {
+		Log.Fatal("truncate lengths file failed: ", err)
+	}
+	c.Sync()
+
 	Log.Info("Done reading ", c.nextBlock-c.firstBlock, " blocks from disk cache")
 
 	// Initialize latestHash from the last block on disk so that the first
