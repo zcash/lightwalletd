@@ -50,6 +50,8 @@ var rootCmd = &cobra.Command{
 			GRPCLogging:              viper.GetBool("grpc-logging-insecure"),
 			GRPCMaxConcurrentStreams: viper.GetUint64("grpc-max-concurrent-streams"),
 			MaxConcurrentBlockRange:  viper.GetUint64("max-concurrent-blockrange"),
+			MaxStreamRPCs:            viper.GetUint64("max-concurrent-stream-rpcs"),
+			MaxStreamRPCsPerIP:       viper.GetUint64("max-concurrent-stream-rpcs-per-ip"),
 			HTTPBindAddr:             viper.GetString("http-bind-addr"),
 			TLSCertPath:              viper.GetString("tls-cert"),
 			TLSKeyPath:               viper.GetString("tls-key"),
@@ -125,6 +127,7 @@ func serverOptions(opts *common.Options) []grpc.ServerOption {
 		grpc.StreamInterceptor(
 			grpc_middleware.ChainStreamServer(
 				grpc_prometheus.StreamServerInterceptor,
+				streamLimitInterceptor(opts.MaxStreamRPCs, opts.MaxStreamRPCsPerIP),
 				sendTimeoutInterceptor(streamSendTimeout)),
 		),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
@@ -426,6 +429,8 @@ func init() {
 	rootCmd.Flags().Bool("grpc-logging-insecure", false, "enable grpc logging to stderr")
 	rootCmd.Flags().Uint("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
 	rootCmd.Flags().Uint("max-concurrent-blockrange", 200, "max block-range requests served at once, server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-stream-rpcs", 400, "max active streaming RPCs server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-stream-rpcs-per-ip", 100, "max active streaming RPCs per TCP peer IP (0 for unlimited)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -455,6 +460,10 @@ func init() {
 	viper.SetDefault("grpc-max-concurrent-streams", 100)
 	viper.BindPFlag("max-concurrent-blockrange", rootCmd.Flags().Lookup("max-concurrent-blockrange"))
 	viper.SetDefault("max-concurrent-blockrange", 200)
+	viper.BindPFlag("max-concurrent-stream-rpcs", rootCmd.Flags().Lookup("max-concurrent-stream-rpcs"))
+	viper.SetDefault("max-concurrent-stream-rpcs", 400)
+	viper.BindPFlag("max-concurrent-stream-rpcs-per-ip", rootCmd.Flags().Lookup("max-concurrent-stream-rpcs-per-ip"))
+	viper.SetDefault("max-concurrent-stream-rpcs-per-ip", 100)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))
