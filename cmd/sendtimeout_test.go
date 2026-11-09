@@ -84,7 +84,8 @@ func TestServerOptionsEndStreamWhenClientStopsReading(t *testing.T) {
 
 func TestConcurrencyFlagsRejectNegative(t *testing.T) {
 	for _, name := range []string{"grpc-max-concurrent-streams", "max-concurrent-blockrange",
-		"client-stream-idle-timeout", "max-concurrent-recv", "max-concurrent-sendtx-mib"} {
+		"client-stream-idle-timeout", "max-concurrent-recv", "max-concurrent-sendtx-mib",
+		"max-concurrent-stream-rpcs", "max-concurrent-stream-rpcs-per-ip"} {
 		if err := rootCmd.Flags().Set(name, "-1"); err == nil {
 			t.Errorf("--%s=-1 was accepted", name)
 		}
