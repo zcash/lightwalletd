@@ -278,7 +278,11 @@ func FirstRPC() {
 }
 
 func GetBlockChainInfo() (*ZcashdRpcReplyGetblockchaininfo, error) {
-	result, rpcErr := RawRequest(context.Background(), "getblockchaininfo", []json.RawMessage{})
+	return getBlockChainInfo(context.Background())
+}
+
+func getBlockChainInfo(ctx context.Context) (*ZcashdRpcReplyGetblockchaininfo, error) {
+	result, rpcErr := RawRequest(ctx, "getblockchaininfo", []json.RawMessage{})
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
