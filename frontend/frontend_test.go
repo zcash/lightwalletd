@@ -15,6 +15,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -69,6 +70,8 @@ func resetGlobals() {
 	mempoolMap = nil
 	mempoolList = nil
 	lastMempool = time.Time{}
+	mempoolRefreshing = false
+	mempoolPartial = nil
 }
 
 func TestMain(m *testing.M) {
@@ -1389,53 +1392,190 @@ type testmempoolcancel struct {
 func (t *testmempoolcancel) Context() context.Context        { return t.ctx }
 func (t *testmempoolcancel) Send(*walletrpc.CompactTx) error { return nil }
 
-// If the client that triggered a refresh disconnects, the refresh must abort
-// rather than run to completion. RawRequest observes the context, so every
-// remaining per-txid fetch would fail and be swallowed by the "mempool
-// transactions can disappear" path, publishing a cache missing nearly every
-// transaction and degrading it for other callers (GHSA-f9pw-q493-7qvh).
-func TestGetMempoolTxAbortsRefreshOnClientCancel(t *testing.T) {
+// waitMempoolIdle waits for a detached refresh to finish.
+func waitMempoolIdle(t *testing.T, lwd walletrpc.CompactTxStreamerServer) {
+	t.Helper()
+	s := lwd.(*lwdStreamer)
+	for range 250 {
+		s.mutex.Lock()
+		busy := mempoolRefreshing
+		s.mutex.Unlock()
+		if !busy {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("mempool refresh still running")
+}
+
+// A client that cancels during its refresh returns at once, but the refresh
+// runs on and is published, so cancelling can't keep the mempool view stale
+// (GHSA-w64p-hjp5-3mj7).
+func TestGetMempoolTxCancelDoesNotAbortRefresh(t *testing.T) {
 	testT = t
 	defer resetGlobals()
 	lwd, _ := testsetup()
 
-	// A mempool of 50 txids, none of them already cached, so the refresh has
-	// plenty of per-txid fetches left to do after the cancel.
+	ctx, cancel := context.WithCancel(context.Background())
+	release := make(chan struct{})
+	var mu sync.Mutex
+	refreshes := 0
+	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getrawmempool" {
+			testT.Fatal("unexpected method", method)
+		}
+		mu.Lock()
+		refreshes++
+		mu.Unlock()
+		cancel()
+		<-release
+		return []byte("[]"), nil
+	}
+	err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempoolcancel{ctx: ctx})
+	if status.Code(err) != codes.Canceled {
+		t.Fatal("expected Canceled, got:", err)
+	}
+	close(release)
+	waitMempoolIdle(t, lwd)
+	if lastMempool.IsZero() {
+		t.Fatal("the refresh was not published")
+	}
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err != nil {
+		t.Fatal(err)
+	}
+	if refreshes != 1 {
+		t.Fatalf("expected the published refresh to hold off others, got %d refreshes", refreshes)
+	}
+}
+
+// A refresh that times out must abort rather than publish a copy missing
+// every transaction it hadn't fetched yet (GHSA-f9pw-q493-7qvh).
+func TestGetMempoolTxTimedOutRefreshIsNotPublished(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	defer func(d time.Duration) { mempoolRefreshTimeout = d }(mempoolRefreshTimeout)
+	mempoolRefreshTimeout = 100 * time.Millisecond
+	lwd, _ := testsetup()
+
 	var txids []string
 	for i := 0; i < 50; i++ {
 		txids = append(txids, fmt.Sprintf("%064x", i))
 	}
 	listJSON, _ := json.Marshal(txids)
-
-	ctx, cancel := context.WithCancel(context.Background())
 	fetches := 0
-	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
 		switch method {
 		case "getrawmempool":
 			return listJSON, nil
 		case "getrawtransaction":
 			fetches++
-			cancel() // the client hangs up after the first fetch
-			return nil, errors.New("context canceled")
+			<-ctx.Done()
+			return nil, ctx.Err()
 		}
 		testT.Fatal("unexpected method", method)
 		return nil, nil
 	}
+	err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{})
+	if status.Code(err) != codes.DeadlineExceeded {
+		t.Fatal("expected DeadlineExceeded, got:", err)
+	}
+	if fetches > 1 {
+		t.Fatalf("refresh kept fetching after its timeout: %d fetches for 50 txids", fetches)
+	}
+	if mempoolMap != nil || !lastMempool.IsZero() {
+		t.Fatal("a partial cache was published")
+	}
+}
 
-	err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempoolcancel{ctx: ctx})
-	if err == nil {
-		t.Fatal("expected a context error once the client cancelled")
+// Refreshes that keep timing out still make progress, since each one carries
+// on from what the last one fetched.
+func TestGetMempoolTxTimedOutRefreshKeepsProgress(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	defer func(d time.Duration) { mempoolRefreshTimeout = d }(mempoolRefreshTimeout)
+	mempoolRefreshTimeout = 100 * time.Millisecond
+	lwd, _ := testsetup()
+
+	var txids []string
+	for i := 0; i < 30; i++ {
+		txids = append(txids, fmt.Sprintf("%064x", i))
 	}
-	if status.Code(err) != codes.Canceled {
-		t.Fatal("expected Canceled, got:", status.Code(err), err)
+	listJSON, _ := json.Marshal(txids)
+	var mu sync.Mutex
+	fetches := map[string]int{}
+	common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getrawmempool":
+			return listJSON, nil
+		case "getrawtransaction":
+			mu.Lock()
+			fetches[string(params[0])]++
+			mu.Unlock()
+			select {
+			case <-time.After(20 * time.Millisecond):
+				return json.Marshal(hex.EncodeToString(rawTxData[0]))
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		testT.Fatal("unexpected method", method)
+		return nil, nil
 	}
-	// The refresh must have stopped early rather than grinding through all 50.
-	if fetches > 2 {
-		t.Fatalf("refresh kept fetching after cancel: %d fetches for 50 txids", fetches)
+	// Each attempt fetches about five of the 30 before timing out.
+	var err error
+	for range 20 {
+		if err = lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err == nil {
+			break
+		}
 	}
-	// And it must not have published a degraded cache.
-	if mempoolMap != nil && len(*mempoolMap) > 0 {
-		t.Fatalf("a partial cache was published: %d entries", len(*mempoolMap))
+	if err != nil {
+		t.Fatal("refresh never completed:", err)
+	}
+	if len(*mempoolMap) != len(txids) {
+		t.Fatalf("published %d transactions, want %d", len(*mempoolMap), len(txids))
+	}
+	for txid, n := range fetches {
+		// The fetch in flight at a timeout is lost and done again.
+		if n > 2 {
+			t.Fatalf("%s fetched %d times", txid, n)
+		}
+	}
+}
+
+// A client that stops reading must not keep others from refreshing.
+func TestGetMempoolTxSlowReaderDoesNotBlockRefresh(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+	txid := "6732cf8d67aac5b82a2a0f0217a7d4aa245b2adb0b97fd2d923dfc674415e221"
+	var mu sync.Mutex
+	refreshes := 0
+	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getrawmempool":
+			mu.Lock()
+			refreshes++
+			mu.Unlock()
+			return json.Marshal([]string{txid})
+		case "getrawtransaction":
+			return json.Marshal(hex.EncodeToString(rawTxData[0]))
+		}
+		return nil, nil
+	}
+	slow := &testmempoolslow{sending: make(chan struct{}), release: make(chan struct{})}
+	slowDone := make(chan error, 1)
+	go func() { slowDone <- lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, slow) }()
+	<-slow.sending
+	lastMempool = lastMempool.Add(-3 * time.Second)
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err != nil {
+		t.Fatal(err)
+	}
+	close(slow.release)
+	if err := <-slowDone; err != nil {
+		t.Fatal(err)
+	}
+	if refreshes != 2 {
+		t.Fatalf("second caller after the interval did not refresh: %d refreshes", refreshes)
 	}
 }
 
@@ -1636,6 +1776,110 @@ func TestGetStandardFee(t *testing.T) {
 			t.Fatal("expected Canceled, got:", status.Code(err), err)
 		}
 	})
+}
+
+// A transaction whose reply fails to parse is skipped, rather than failing
+// every refresh until it leaves the mempool.
+func TestGetMempoolTxSkipsUnparseableTx(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+	bad := strings.Repeat("00", 32)
+	good := "6732cf8d67aac5b82a2a0f0217a7d4aa245b2adb0b97fd2d923dfc674415e221"
+	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		switch method {
+		case "getrawmempool":
+			return json.Marshal([]string{bad, good})
+		case "getrawtransaction":
+			if string(params[0]) == `"`+bad+`"` {
+				return json.Marshal("zz")
+			}
+			return json.Marshal(hex.EncodeToString(rawTxData[0]))
+		}
+		testT.Fatal("unexpected method", method)
+		return nil, nil
+	}
+	resp := &testmempooltx{}
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.sent != 1 {
+		t.Fatalf("expected the parseable transaction to be sent, got %d", resp.sent)
+	}
+}
+
+// A failed refresh must not leave other callers on the old copy until the
+// next interval (GHSA-w64p-hjp5-3mj7).
+func TestGetMempoolTxFailedRefreshDoesNotStall(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	refreshes := 0
+	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		if method != "getrawmempool" {
+			testT.Fatal("unexpected method", method)
+		}
+		refreshes++
+		if refreshes == 1 {
+			return nil, errors.New("backend unavailable")
+		}
+		return []byte("[]"), nil
+	}
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err == nil {
+		t.Fatal("expected the failed refresh to return an error")
+	}
+	// The very next caller refreshes rather than waiting out the interval.
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err != nil {
+		t.Fatal(err)
+	}
+	if refreshes != 2 {
+		t.Fatalf("expected the next caller to refresh, got %d refreshes", refreshes)
+	}
+	// A published refresh still holds off others for the interval.
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err != nil {
+		t.Fatal(err)
+	}
+	if refreshes != 2 {
+		t.Fatalf("expected no refresh within the interval, got %d refreshes", refreshes)
+	}
+}
+
+// While one refresh is running, other callers serve the cached copy rather
+// than starting refreshes of their own.
+func TestGetMempoolTxOneRefreshAtATime(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var mu sync.Mutex
+	refreshes := 0
+	common.RawRequest = func(_ context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		mu.Lock()
+		refreshes++
+		first := refreshes == 1
+		mu.Unlock()
+		if first {
+			close(entered)
+			<-release
+		}
+		return []byte("[]"), nil
+	}
+	done := make(chan error)
+	go func() { done <- lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}) }()
+	<-entered
+	if err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{}); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if refreshes != 1 {
+		t.Fatalf("expected one refresh while another was running, got %d", refreshes)
+	}
 }
 
 func TestGetMempoolTxCanonicalizesPoolTypes(t *testing.T) {

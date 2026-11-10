@@ -10,7 +10,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"maps"
 	"os"
 	"regexp"
 	"slices"
@@ -793,8 +795,19 @@ var mempoolMap *map[string]*walletrpc.CompactTx
 // Txids in big-endian hex (from the backend)
 var mempoolList []string
 
-// Last time we pulled a copy of the mempool from zcashd.
+// Time of the last refresh that published a new copy of the mempool.
 var lastMempool time.Time
+
+// mempoolRefreshing is set while one call refreshes the mempool, so others
+// serve the cached copy rather than refreshing too.
+var mempoolRefreshing bool
+
+// mempoolRefreshTimeout bounds a refresh, which no client can cancel.
+var mempoolRefreshTimeout = 30 * time.Second
+
+// mempoolPartial holds what a timed-out refresh fetched, unpublished, so the
+// next refresh can carry on from there. Only the refresher uses it.
+var mempoolPartial map[string]*walletrpc.CompactTx
 
 // maxExcludeTxidSuffixes bounds the exclude list a client may send to
 // GetMempoolTx. The list names transactions the caller already has, so it is
@@ -846,13 +859,12 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	}
 
 	// Hold the mutex only long enough to decide whether this call refreshes
-	// the cache, and to snapshot it and update lastMempool to prevent another
-	// thread from refreshing while our thread is doing that.
+	// the cache, and to snapshot it.
 	streamCtx := resp.Context()
 	s.mutex.Lock()
-	refresh := time.Since(lastMempool).Seconds() >= 2
+	refresh := !mempoolRefreshing && time.Since(lastMempool).Seconds() >= 2
 	if refresh {
-		lastMempool = time.Now()
+		mempoolRefreshing = true
 	}
 	cachedList := mempoolList
 	var cachedMap map[string]*walletrpc.CompactTx
@@ -862,79 +874,26 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	s.mutex.Unlock()
 
 	if refresh {
-		// Refresh our copy of the mempool.
-		params := make([]json.RawMessage, 0)
-		result, rpcErr := common.RawRequest(streamCtx, "getrawmempool", params)
-		if rpcErr != nil {
-			return status.Errorf(codes.Internal, "GetMempoolTx: getrawmempool error: %s", rpcErr.Error())
+		// The refresh is shared, so a caller's cancel mustn't discard it.
+		type result struct {
+			list []string
+			m    map[string]*walletrpc.CompactTx
+			err  error
 		}
-		var newmempoolList []string
-		err := json.Unmarshal(result, &newmempoolList)
-		if err != nil {
-			return status.Errorf(codes.Unknown,
-				"GetMempoolTx: failed to unmarshal getrawmempool reply, error: %s", err.Error())
+		done := make(chan result, 1)
+		go func() {
+			list, m, err := s.refreshMempoolTx(context.WithoutCancel(streamCtx), cachedMap)
+			done <- result{list, m, err}
+		}()
+		select {
+		case r := <-done:
+			if r.err != nil {
+				return r.err
+			}
+			cachedList, cachedMap = r.list, r.m
+		case <-streamCtx.Done():
+			return status.FromContextError(streamCtx.Err()).Err()
 		}
-		newmempoolMap := make(map[string]*walletrpc.CompactTx)
-		for _, txidstr := range newmempoolList {
-			if err := streamCtx.Err(); err != nil {
-				return status.FromContextError(err).Err()
-			}
-			if ctx, ok := cachedMap[txidstr]; ok {
-				// This ctx has already been fetched, copy pointer to it.
-				newmempoolMap[txidstr] = ctx
-				continue
-			}
-			txidJSON, err := json.Marshal(txidstr)
-			if err != nil {
-				return status.Errorf(codes.Unknown,
-					"GetMempoolTx: failed to marshal txid, error: %s", err.Error())
-			}
-			// The "0" is because we only need the raw hex, which is returned as
-			// just a hex string, and not even a json string (with quotes).
-			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
-			result, rpcErr := common.RawRequest(streamCtx, "getrawtransaction", params)
-			if rpcErr != nil {
-				// Not an error; mempool transactions can disappear
-				continue
-			}
-			// strip the quotes
-			var txStr string
-			err = json.Unmarshal(result, &txStr)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed to unmarshal getrawtransaction reply, error: %s", err.Error())
-			}
-
-			// convert to binary
-			txBytes, err := hex.DecodeString(txStr)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed decode getrawtransaction reply, error: %s", err.Error())
-			}
-			tx := parser.NewTransaction()
-			txdata, err := tx.ParseFromSlice(txBytes)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed to parse getrawtransaction reply, error: %s", err.Error())
-			}
-			if len(txdata) > 0 {
-				return status.Error(codes.Internal,
-					"GetMempoolTx: extra data deserializing transaction")
-			}
-			txidBigEndian, err := hex.DecodeString(txidstr)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed decode txid, error: %s", err.Error())
-			}
-			// convert from big endian bytes to little endian and set as the txid
-			tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
-			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
-		}
-		s.mutex.Lock()
-		mempoolList = newmempoolList
-		mempoolMap = &newmempoolMap
-		s.mutex.Unlock()
-		cachedList, cachedMap = newmempoolList, newmempoolMap
 	}
 	for _, txid := range MempoolFilter(cachedList, excludeHex) {
 		ctx, ok := cachedMap[txid]
@@ -952,6 +911,111 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 		}
 	}
 	return nil
+}
+
+// refreshMempoolTx fetches and publishes a new copy of the mempool. The
+// caller must have set mempoolRefreshing.
+func (s *lwdStreamer) refreshMempoolTx(ctx context.Context, cachedMap map[string]*walletrpc.CompactTx) ([]string, map[string]*walletrpc.CompactTx, error) {
+	ctx, cancel := context.WithTimeout(ctx, mempoolRefreshTimeout)
+	defer cancel()
+	// Only a published refresh moves lastMempool (GHSA-w64p-hjp5-3mj7).
+	refreshStart := time.Now()
+	known := make(map[string]*walletrpc.CompactTx, len(cachedMap)+len(mempoolPartial))
+	maps.Copy(known, cachedMap)
+	maps.Copy(known, mempoolPartial)
+	list, m, err := fetchMempoolTx(ctx, known)
+	mempoolPartial = nil
+	if err != nil {
+		mempoolPartial = m
+	}
+	s.mutex.Lock()
+	if err == nil {
+		mempoolList = list
+		mempoolMap = &m
+		lastMempool = refreshStart
+	}
+	mempoolRefreshing = false
+	s.mutex.Unlock()
+	return list, m, err
+}
+
+func fetchMempoolTx(ctx context.Context, cachedMap map[string]*walletrpc.CompactTx) ([]string, map[string]*walletrpc.CompactTx, error) {
+	// Refresh our copy of the mempool.
+	params := make([]json.RawMessage, 0)
+	result, rpcErr := common.RawRequest(ctx, "getrawmempool", params)
+	if rpcErr != nil {
+		return nil, nil, status.Errorf(codes.Internal, "GetMempoolTx: getrawmempool error: %s", rpcErr.Error())
+	}
+	var newmempoolList []string
+	err := json.Unmarshal(result, &newmempoolList)
+	if err != nil {
+		return nil, nil, status.Errorf(codes.Unknown,
+			"GetMempoolTx: failed to unmarshal getrawmempool reply, error: %s", err.Error())
+	}
+	newmempoolMap := make(map[string]*walletrpc.CompactTx)
+	for _, txidstr := range newmempoolList {
+		if err := ctx.Err(); err != nil {
+			return nil, newmempoolMap, status.FromContextError(err).Err()
+		}
+		if ctx, ok := cachedMap[txidstr]; ok {
+			// This ctx has already been fetched, copy pointer to it.
+			newmempoolMap[txidstr] = ctx
+			continue
+		}
+		txidJSON, err := json.Marshal(txidstr)
+		if err != nil {
+			return nil, nil, status.Errorf(codes.Unknown,
+				"GetMempoolTx: failed to marshal txid, error: %s", err.Error())
+		}
+		// The "0" is because we only need the raw hex, which is returned as
+		// just a hex string, and not even a json string (with quotes).
+		params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+		result, rpcErr := common.RawRequest(ctx, "getrawtransaction", params)
+		if rpcErr != nil {
+			// An aborted refresh must not publish a copy missing the rest.
+			if err := ctx.Err(); err != nil {
+				return nil, newmempoolMap, status.FromContextError(err).Err()
+			}
+			// Not an error; mempool transactions can disappear
+			continue
+		}
+		tx, err := parseMempoolTx(txidstr, result)
+		if err != nil {
+			// One bad reply mustn't fail every refresh; it's retried next time.
+			common.Log.WithField("txid", txidstr).Warn("GetMempoolTx: skipping transaction: ", err)
+			continue
+		}
+		newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+	}
+	return newmempoolList, newmempoolMap, nil
+}
+
+// parseMempoolTx decodes a getrawtransaction reply for txidstr.
+func parseMempoolTx(txidstr string, result json.RawMessage) (*parser.Transaction, error) {
+	// strip the quotes
+	var txStr string
+	if err := json.Unmarshal(result, &txStr); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal getrawtransaction reply: %w", err)
+	}
+	txBytes, err := hex.DecodeString(txStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode getrawtransaction reply: %w", err)
+	}
+	tx := parser.NewTransaction()
+	txdata, err := tx.ParseFromSlice(txBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse getrawtransaction reply: %w", err)
+	}
+	if len(txdata) > 0 {
+		return nil, errors.New("extra data deserializing transaction")
+	}
+	txidBigEndian, err := hex.DecodeString(txidstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode txid: %w", err)
+	}
+	// convert from big endian bytes to little endian and set as the txid
+	tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
+	return tx, nil
 }
 
 // Return the subset of items that aren't excluded, but
