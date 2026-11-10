@@ -47,10 +47,9 @@ func TestServerRefusesHugeRepeatedFieldsBeforeDecoding(t *testing.T) {
 	defer conn.Close()
 	client := walletrpc.NewCompactTxStreamerClient(conn)
 
-	// The report's request: a 4 MiB list of empty addresses. Refused before the
-	// handler runs.
+	// Many empty addresses, over the codec's bound but under maxRecvMsgSize.
 	_, err = client.GetTaddressBalance(context.Background(),
-		&walletrpc.AddressList{Addresses: make([]string, (4<<20)/2-16)})
+		&walletrpc.AddressList{Addresses: make([]string, 100000)})
 	if status.Code(err) != codes.Internal {
 		t.Fatalf("got %v, expected the codec to refuse it", err)
 	}

@@ -35,7 +35,9 @@ type lwdStreamer struct {
 	pingEnable bool
 	// permits bounds concurrent block-range work; nil means unlimited.
 	permits chan struct{}
-	mutex   sync.Mutex
+	// sendTxBudget bounds the transaction bytes in flight; nil means unlimited.
+	sendTxBudget *byteBudget
+	mutex        sync.Mutex
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
@@ -44,9 +46,11 @@ type lwdStreamer struct {
 var blockRangeWait = 10 * time.Second
 
 // NewLwdStreamer constructs a gRPC context. maxBlockRange bounds how many
-// block-range requests may be served at once; zero means unlimited.
-func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, maxBlockRange uint64) (walletrpc.CompactTxStreamerServer, error) {
-	s := &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}
+// block-range requests may be served at once, and maxSendTxBytes how many
+// transaction bytes SendTransaction handles at once; zero means unlimited.
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, maxBlockRange, maxSendTxBytes uint64) (walletrpc.CompactTxStreamerServer, error) {
+	s := &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing,
+		sendTxBudget: newByteBudget(maxSendTxBytes)}
 	if maxBlockRange > 0 {
 		s.permits = make(chan struct{}, maxBlockRange)
 	}
@@ -599,7 +603,7 @@ const maxRawTxSize = 2000000
 
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
 func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
-	common.Log.Debugf("gRPC SendTransaction(%+v)\n", rawtx)
+	common.Log.Debugf("gRPC SendTransaction(%d bytes)\n", len(rawtx.GetData()))
 	// sendrawtransaction "hexstring" ( allowhighfees )
 	//
 	// Submits raw transaction (binary) to local node and network.
@@ -621,6 +625,12 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 			"SendTransaction: transaction is too large: %d bytes (limit %d)",
 			len(rawtx.Data), maxRawTxSize)
 	}
+	// Taken before the bytes are expanded (GHSA-xrx5-jc6q-9h8r).
+	release, err := s.sendTxBudget.reserve(len(rawtx.Data))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)

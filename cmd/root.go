@@ -51,6 +51,8 @@ var rootCmd = &cobra.Command{
 			GRPCMaxConcurrentStreams: viper.GetUint64("grpc-max-concurrent-streams"),
 			MaxConcurrentBlockRange:  viper.GetUint64("max-concurrent-blockrange"),
 			ClientStreamIdleTimeout:  viper.GetUint64("client-stream-idle-timeout"),
+			MaxConcurrentSendTxMiB:   viper.GetUint64("max-concurrent-sendtx-mib"),
+			MaxConcurrentRecv:        viper.GetUint64("max-concurrent-recv"),
 			HTTPBindAddr:             viper.GetString("http-bind-addr"),
 			TLSCertPath:              viper.GetString("tls-cert"),
 			TLSKeyPath:               viper.GetString("tls-key"),
@@ -138,6 +140,14 @@ func serverOptions(opts *common.Options) []grpc.ServerOption {
 	if opts.GRPCMaxConcurrentStreams > 0 {
 		serverOpts = append(serverOpts,
 			grpc.MaxConcurrentStreams(uint32(opts.GRPCMaxConcurrentStreams)))
+	}
+	// Darkside stages hex-encoded blocks, which can exceed maxRecvMsgSize.
+	if !opts.Darkside {
+		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(maxRecvMsgSize))
+		if opts.MaxConcurrentRecv > 0 {
+			serverOpts = append(serverOpts,
+				newRecvLimiter(opts.MaxConcurrentRecv).serverOptions()...)
+		}
 	}
 	return serverOpts
 }
@@ -359,7 +369,7 @@ func startServer(opts *common.Options) error {
 	// Compact transaction service initialization
 	{
 		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable,
-			opts.MaxConcurrentBlockRange)
+			opts.MaxConcurrentBlockRange, opts.MaxConcurrentSendTxMiB<<20)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -430,6 +440,8 @@ func init() {
 	rootCmd.Flags().Uint("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
 	rootCmd.Flags().Uint("max-concurrent-blockrange", 200, "max block-range requests served at once, server-wide (0 for unlimited)")
 	rootCmd.Flags().Uint("client-stream-idle-timeout", 30, "seconds a client-streaming RPC may stall before it is cancelled (0 to disable)")
+	rootCmd.Flags().Uint("max-concurrent-recv", 32, "max requests being received at once, server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-sendtx-mib", 16, "max transaction data, in MiB, that SendTransaction handles at once, server-wide (0 for unlimited)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -461,6 +473,10 @@ func init() {
 	viper.SetDefault("max-concurrent-blockrange", 200)
 	viper.BindPFlag("client-stream-idle-timeout", rootCmd.Flags().Lookup("client-stream-idle-timeout"))
 	viper.SetDefault("client-stream-idle-timeout", 30)
+	viper.BindPFlag("max-concurrent-sendtx-mib", rootCmd.Flags().Lookup("max-concurrent-sendtx-mib"))
+	viper.SetDefault("max-concurrent-sendtx-mib", 16)
+	viper.BindPFlag("max-concurrent-recv", rootCmd.Flags().Lookup("max-concurrent-recv"))
+	viper.SetDefault("max-concurrent-recv", 32)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))
