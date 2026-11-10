@@ -79,6 +79,9 @@ func (b *Block) GetHeight() int {
 	if b.height != -1 {
 		return b.height
 	}
+	if len(b.vtx) == 0 || len(b.vtx[0].transparentInputs) == 0 {
+		return -1
+	}
 	coinbaseScript := bytestring.String(b.vtx[0].transparentInputs[0].ScriptSig)
 	var heightNum int64
 	if !coinbaseScript.ReadScriptInt64(&heightNum) {

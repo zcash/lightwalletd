@@ -119,3 +119,14 @@ func TestParseBlockRejectsInputlessCoinbase(t *testing.T) {
 		t.Fatalf("got %v, want a no-transparent-input error", err)
 	}
 }
+
+func TestGetHeightWithoutCoinbaseInput(t *testing.T) {
+	if h := NewBlock().GetHeight(); h != -1 {
+		t.Fatalf("block with no transactions: height %d, want -1", h)
+	}
+	b := NewBlock()
+	b.vtx = []*Transaction{NewTransaction()}
+	if h := b.GetHeight(); h != -1 {
+		t.Fatalf("coinbase with no inputs: height %d, want -1", h)
+	}
+}
