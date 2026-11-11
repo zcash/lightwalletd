@@ -215,7 +215,13 @@ func (s *lwdStreamer) GetTaddressTransactions(addressBlockFilter *walletrpc.Tran
 	}
 
 	for _, txidstr := range txids {
-		txidBigEndian, _ := hex.DecodeString(txidstr)
+		txidBigEndian, err := hex.DecodeString(txidstr)
+		if err != nil || len(txidBigEndian) != 32 {
+			// hash32.ReverseSlice below panics if the bytes are shorter than
+			// 32; the backend's reply is data, not something to crash on.
+			return status.Errorf(codes.Internal,
+				"GetTaddressTransactions: getaddresstxids returned an invalid txid %q", txidstr)
+		}
 		// Txid is read as a string, which is in big-endian order. But when converting
 		// to bytes, it should be little-endian
 		txHash := hash32.ReverseSlice(txidBigEndian)
@@ -915,6 +921,12 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 				return status.Errorf(codes.Internal,
 					"GetMempoolTx: failed decode txid, error: %s", err.Error())
 			}
+			if len(txidBigEndian) != 32 {
+				// hash32.FromSlice below panics if the bytes are shorter than
+				// 32; the backend's reply is data, not something to crash on.
+				return status.Errorf(codes.Internal,
+					"GetMempoolTx: getrawmempool returned an invalid txid %q", txidstr)
+			}
 			// convert from big endian bytes to little endian and set as the txid
 			tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
 			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
@@ -1045,6 +1057,12 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 		if err != nil {
 			return status.Errorf(codes.Internal,
 				"getAddressUtxos: failed decode txid, error: %s", err.Error())
+		}
+		if len(txidBigEndian) != 32 {
+			// hash32.ReverseSlice below panics if the bytes are shorter than
+			// 32; the backend's reply is data, not something to crash on.
+			return status.Errorf(codes.Internal,
+				"getAddressUtxos: getaddressutxos returned an invalid txid %q", utxo.Txid)
 		}
 		scriptBytes, err := hex.DecodeString(utxo.Script)
 		if err != nil {
