@@ -29,6 +29,7 @@ func seedMempool(n int) []string {
 	for i := range list {
 		list[i] = fmt.Sprintf("%064x", (n-i)*7919%1009) // unsorted, distinct
 		m[list[i]] = &walletrpc.CompactTx{
+			Txid:    []byte(list[i]),
 			Actions: []*walletrpc.CompactOrchardAction{{Nullifier: make([]byte, 32)}},
 		}
 	}
@@ -36,6 +37,19 @@ func seedMempool(n int) []string {
 	mempoolMap = &m
 	lastMempool = time.Now()
 	return slices.Clone(list)
+}
+
+// txidStream records the Txid of every transaction GetMempoolTx sends it.
+type txidStream struct {
+	walletrpc.CompactTxStreamer_GetMempoolTxServer
+	txids []string
+}
+
+func (s *txidStream) Context() context.Context { return context.Background() }
+
+func (s *txidStream) Send(tx *walletrpc.CompactTx) error {
+	s.txids = append(s.txids, string(tx.Txid))
+	return nil
 }
 
 func noRefreshExpected(context.Context, string, []json.RawMessage) (json.RawMessage, error) {
@@ -80,14 +94,14 @@ func TestGetMempoolTxConcurrentCallers(t *testing.T) {
 	defer resetGlobals()
 	lwd, _ := testsetup()
 	const n = 200
-	seedMempool(n)
+	want := seedMempool(n)
 	common.RawRequest = noRefreshExpected
 
 	var wg sync.WaitGroup
-	streams := make([]*testmempooltx, 8)
+	streams := make([]*txidStream, 8)
 	errs := make([]error, len(streams))
 	for i := range streams {
-		streams[i] = &testmempooltx{}
+		streams[i] = &txidStream{}
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -99,8 +113,22 @@ func TestGetMempoolTxConcurrentCallers(t *testing.T) {
 		if errs[i] != nil {
 			t.Fatal(errs[i])
 		}
-		if s.sent != n {
-			t.Fatalf("caller %d received %d transactions, want %d", i, s.sent, n)
+		// A corrupted list keeps its length (one txid twice, another dropped),
+		// so compare the set received, not just the count.
+		seen := make(map[string]bool, n)
+		for _, txid := range s.txids {
+			if seen[txid] {
+				t.Fatalf("caller %d received txid %s twice", i, txid)
+			}
+			seen[txid] = true
+		}
+		for _, txid := range want {
+			if !seen[txid] {
+				t.Fatalf("caller %d never received txid %s", i, txid)
+			}
+		}
+		if len(s.txids) != n {
+			t.Fatalf("caller %d received %d transactions, want %d", i, len(s.txids), n)
 		}
 	}
 }
