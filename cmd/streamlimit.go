@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/zcash/lightwalletd/walletrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
@@ -14,16 +15,23 @@ import (
 )
 
 // streamLimitInterceptor bounds active streaming handlers across connections.
+// Block-range handlers share a separate limit in the service.
 // A zero limit disables that particular cap.
 func streamLimitInterceptor(max, maxPerIP uint64) grpc.StreamServerInterceptor {
 	var mu sync.Mutex
 	var active uint64
 	activeByIP := make(map[string]uint64)
 
-	return func(srv any, stream grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		if max == 0 && maxPerIP == 0 {
 			return handler(srv, stream)
 		}
+		switch info.FullMethod {
+		case walletrpc.CompactTxStreamer_GetBlockRange_FullMethodName,
+			walletrpc.CompactTxStreamer_GetBlockRangeNullifiers_FullMethodName:
+			return handler(srv, stream)
+		}
+
 		ctx := stream.Context()
 		if err := ctx.Err(); err != nil {
 			return err
