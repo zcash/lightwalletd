@@ -1637,3 +1637,65 @@ func TestGetStandardFee(t *testing.T) {
 		}
 	})
 }
+
+// TestBackendRpcFailureCode guards against a regression of the zero-valued
+// codes.Code in the getaddressbalance and getaddressutxos error paths
+// (introduced with the "return correct gRPC error codes" commit): when the
+// backend error matched neither of the two mapped strings, the switch fell
+// through with code == codes.OK, and status.Errorf(codes.OK, ...) returns a
+// nil error, so the RPC reported success -- a zero balance and an empty
+// UTXO list, respectively -- instead of the backend failure.
+func TestBackendRpcFailureCode(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	validAddr := "t1234567890123456789012345678901234"
+
+	// Simulate the backend failing with an error that matches neither
+	// "Invalid address" nor "No information available" (for example,
+	// zcashd restarting, or addressindex not enabled).
+	backendDown := func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		return nil, errors.New("-1: connection refused")
+	}
+
+	t.Run("GetTaddressBalance", func(t *testing.T) {
+		common.RawRequest = backendDown
+		reply, err := lwd.GetTaddressBalance(context.Background(),
+			&walletrpc.AddressList{Addresses: []string{validAddr}})
+		if err == nil {
+			t.Fatal("backend failure must not be reported as success (would be a zero balance); reply:", reply)
+		}
+		if reply != nil {
+			t.Fatal("expected nil reply alongside the error, got:", reply)
+		}
+		if status.Code(err) != codes.Unavailable {
+			t.Fatal("expected Unavailable for a backend failure, got:", status.Code(err), err)
+		}
+	})
+
+	t.Run("GetAddressUtxos", func(t *testing.T) {
+		common.RawRequest = backendDown
+		reply, err := lwd.GetAddressUtxos(context.Background(),
+			&walletrpc.GetAddressUtxosArg{Addresses: []string{validAddr}})
+		if err == nil {
+			t.Fatal("backend failure must not be reported as success (would be an empty UTXO list); reply:", reply)
+		}
+		if status.Code(err) != codes.Unavailable {
+			t.Fatal("expected Unavailable for a backend failure, got:", status.Code(err), err)
+		}
+	})
+
+	// The two mapped error strings must still take precedence, including
+	// via the client-streaming balance RPC.
+	t.Run("GetTaddressBalanceStream", func(t *testing.T) {
+		common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+			return nil, errors.New("-5: Invalid address")
+		}
+		mock := &testtaddrbalance{addrs: []string{validAddr}}
+		err := lwd.GetTaddressBalanceStream(mock)
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatal("expected InvalidArgument for an invalid address, got:", status.Code(err), err)
+		}
+	})
+}
