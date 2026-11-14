@@ -12,6 +12,7 @@ import (
 	"github.com/zcash/lightwalletd/hash32"
 	"github.com/zcash/lightwalletd/parser"
 	"github.com/zcash/lightwalletd/walletrpc"
+	"google.golang.org/protobuf/proto"
 )
 
 var compacts []*walletrpc.CompactBlock
@@ -195,5 +196,142 @@ func fillCache(t *testing.T) {
 		if int(b.Height) != 289460+i {
 			t.Fatal("unexpected block contents")
 		}
+	}
+}
+
+func TestCacheRecoversFromPartialLengthsTail(t *testing.T) {
+	for partialBytes := 1; partialBytes <= 3; partialBytes++ {
+		t.Run(string(rune('0'+partialBytes))+"_bytes", func(t *testing.T) {
+			dir := t.TempDir()
+			c := NewBlockCache(dir, unitTestChain, 0, -1)
+			for height := 0; height < 2; height++ {
+				if err := c.Add(height, cacheTestBlock(height)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			lengthsName, blocksName := DbFileNames(dir, unitTestChain)
+			c.Close()
+
+			// Simulate a torn length write after a complete block write.
+			appendFile(t, lengthsName, make([]byte, partialBytes))
+			appendFile(t, blocksName, serializedCacheTestBlock(t, 2))
+
+			c = NewBlockCache(dir, unitTestChain, 0, -1)
+			defer c.Close()
+			if c.GetLatestHeight() != 1 || c.Get(1) == nil {
+				t.Fatal("valid blocks were not preserved after trimming the partial tail")
+			}
+			if err := c.Add(2, cacheTestBlock(2)); err != nil {
+				t.Fatal(err)
+			}
+			if block := c.Get(2); block == nil || block.Height != 2 {
+				t.Fatal("block appended after recovery could not be read")
+			}
+		})
+	}
+}
+
+func TestCacheRecoversFromUnindexedBlockTail(t *testing.T) {
+	dir := t.TempDir()
+	c := NewBlockCache(dir, unitTestChain, 0, -1)
+	for height := 0; height < 2; height++ {
+		if err := c.Add(height, cacheTestBlock(height)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lengthsName, blocksName := DbFileNames(dir, unitTestChain)
+	c.Close()
+
+	// Simulate a crash after the block reached disk but before its length did.
+	appendFile(t, blocksName, serializedCacheTestBlock(t, 2))
+
+	c = NewBlockCache(dir, unitTestChain, 0, -1)
+	defer c.Close()
+	if c.GetLatestHeight() != 1 || c.Get(1) == nil {
+		t.Fatal("valid blocks were not preserved after trimming the unindexed block")
+	}
+	if err := c.Add(2, cacheTestBlock(2)); err != nil {
+		t.Fatal(err)
+	}
+	if block := c.Get(2); block == nil || block.Height != 2 {
+		t.Fatal("block appended after recovery could not be read")
+	}
+	lengthsInfo, err := os.Stat(lengthsName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lengthsInfo.Size() != int64(len(c.starts)-1)*4 {
+		t.Fatal("lengths file is not aligned with recovered cache")
+	}
+}
+
+func TestCacheRecoversWhenBlocksFileIsShort(t *testing.T) {
+	dir := t.TempDir()
+	c := NewBlockCache(dir, unitTestChain, 0, -1)
+	for height := 0; height < 2; height++ {
+		if err := c.Add(height, cacheTestBlock(height)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, blocksName := DbFileNames(dir, unitTestChain)
+	c.Close()
+	info, err := os.Stat(blocksName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Truncate(blocksName, info.Size()-1); err != nil {
+		t.Fatal(err)
+	}
+
+	c = NewBlockCache(dir, unitTestChain, 0, -1)
+	defer c.Close()
+	if c.GetLatestHeight() != -1 || c.GetNextHeight() != 0 {
+		t.Fatal("short blocks file should reset the cache")
+	}
+	lengthsInfo, err := c.lengthsFile.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	blocksInfo, err := c.blocksFile.Stat()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lengthsInfo.Size() != 0 || blocksInfo.Size() != 0 {
+		t.Fatal("corrupt cache files were not cleared")
+	}
+}
+
+func cacheTestBlock(height int) *walletrpc.CompactBlock {
+	block := &walletrpc.CompactBlock{
+		Height:   uint64(height),
+		Hash:     make([]byte, 32),
+		PrevHash: make([]byte, 32),
+		Header:   make([]byte, 80),
+	}
+	block.Hash[0] = byte(height)
+	return block
+}
+
+func serializedCacheTestBlock(t *testing.T, height int) []byte {
+	t.Helper()
+	data, err := proto.Marshal(cacheTestBlock(height))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append(checksum(height, data), data...)
+}
+
+func appendFile(t *testing.T, path string, data []byte) {
+	t.Helper()
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
