@@ -1637,3 +1637,103 @@ func TestGetStandardFee(t *testing.T) {
 		}
 	})
 }
+
+// TestBackendTxidLength guards against a server crash (Go slice-to-array
+// conversion panic inside hash32.FromSlice / hash32.ReverseSlice) when the
+// backend returns a txid that is not valid hex, or valid hex of some length
+// other than 32 bytes. The three call sites previously converted backend
+// txids without validating them (GetTaddressTransactions even discarded the
+// hex.DecodeString error), so one malformed reply field would take down every
+// wallet connected to the server.
+func TestBackendTxidLength(t *testing.T) {
+	testT = t
+	defer resetGlobals()
+	lwd, _ := testsetup()
+
+	validAddr := "t1234567890123456789012345678901234"
+	filter := &walletrpc.TransparentAddressBlockFilter{
+		Address: validAddr,
+		Range: &walletrpc.BlockRange{
+			Start: &walletrpc.BlockID{Height: 20},
+			End:   &walletrpc.BlockID{Height: 30},
+		},
+	}
+
+	for _, txid := range []string{"not-hex", "abcd", testTxid} {
+		t.Run("GetTaddressTransactions txid "+txid, func(t *testing.T) {
+			common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+				switch method {
+				case "getaddresstxids":
+					return json.Marshal([]string{txid})
+				case "getrawtransaction":
+					// Reached only for a well-formed txid; any error stops the
+					// fan-out, which this test is not about.
+					return nil, errors.New("-5: no such tx")
+				default:
+					testT.Fatal("unexpected method", method)
+					return nil, nil
+				}
+			}
+			// A panic (not an error return) fails the test with the panic
+			// itself; that is the regression this guards against.
+			err := lwd.GetTaddressTransactions(filter, &testgettx{})
+			if len(txid) != 64 {
+				if err == nil {
+					t.Fatal("a malformed txid must be rejected, not ignored")
+				}
+				if status.Code(err) != codes.Internal {
+					t.Fatal("expected Internal for a malformed txid, got:", status.Code(err), err)
+				}
+			} else if err == nil {
+				t.Fatal("expected the getrawtransaction stub error for a well-formed txid")
+			}
+		})
+	}
+
+	t.Run("GetMempoolTx txid", func(t *testing.T) {
+		common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+			switch method {
+			case "getrawmempool":
+				return json.Marshal([]string{"abcd"})
+			case "getrawtransaction":
+				// The raw tx is fetched (and must parse) before the txid
+				// itself is converted.
+				return json.Marshal(hex.EncodeToString(rawTxData[0]))
+			default:
+				testT.Fatal("unexpected method", method)
+				return nil, nil
+			}
+		}
+		err := lwd.GetMempoolTx(&walletrpc.GetMempoolTxRequest{}, &testmempooltx{})
+		if err == nil {
+			t.Fatal("a malformed txid must be rejected")
+		}
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for a malformed txid, got:", status.Code(err), err)
+		}
+	})
+
+	t.Run("GetAddressUtxos txid", func(t *testing.T) {
+		common.RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+			if method != "getaddressutxos" {
+				testT.Fatal("unexpected method", method)
+			}
+			return json.Marshal([]common.ZcashdRpcReplyGetaddressutxos{{
+				Address:     validAddr,
+				Txid:        "abcd",
+				OutputIndex: 0,
+				Script:      "00",
+				Satoshis:    1000,
+				Height:      20,
+			}})
+		}
+		_, err := lwd.GetAddressUtxos(context.Background(),
+			&walletrpc.GetAddressUtxosArg{Addresses: []string{validAddr}})
+		if err == nil {
+			t.Fatal("a malformed txid must be rejected")
+		}
+		if status.Code(err) != codes.Internal {
+			t.Fatal("expected Internal for a malformed txid, got:", status.Code(err), err)
+		}
+	})
+}
