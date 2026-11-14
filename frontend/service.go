@@ -1393,6 +1393,10 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 
 // AddAddressUtxo adds a UTXO which will be returned by GetAddressUtxos() (above)
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
+	if len(arg.Txid) != 32 {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"AddAddressUtxo: transaction ID has invalid length: %d", len(arg.Txid))
+	}
 	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
 		Address:     arg.Address,
 		Txid:        hash32.Encode(hash32.Reverse(hash32.FromSlice(arg.Txid))),

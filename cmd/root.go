@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -20,14 +21,17 @@ import (
 
 	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/common/logging"
@@ -122,17 +126,27 @@ func fileExists(filename string) bool {
 // servers. MaxConcurrentStreams is the important one: unset, gRPC omits
 // SETTINGS_MAX_CONCURRENT_STREAMS from the connection preface, telling every
 // client it may open as many streams as it likes.
+// recoveryOption fails the one request whose handler panicked, instead of
+// letting the panic end the process.
+var recoveryOption = grpc_recovery.WithRecoveryHandlerContext(
+	func(ctx context.Context, p any) error {
+		common.Log.Errorf("panic in gRPC handler: %v\n%s", p, debug.Stack())
+		return status.Error(codes.Internal, "internal error")
+	})
+
 func serverOptions(opts *common.Options) []grpc.ServerOption {
 	serverOpts := []grpc.ServerOption{
 		grpc.ForceServerCodecV2(frontend.NewBoundedCodec()),
 		grpc.StatsHandler(&connStatsHandler{}),
 		grpc.StreamInterceptor(
 			grpc_middleware.ChainStreamServer(
+				grpc_recovery.StreamServerInterceptor(recoveryOption),
 				idleStreamInterceptor(time.Duration(opts.ClientStreamIdleTimeout)*time.Second),
 				grpc_prometheus.StreamServerInterceptor,
 				sendTimeoutInterceptor(streamSendTimeout)),
 		),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			grpc_recovery.UnaryServerInterceptor(recoveryOption),
 			logging.LogInterceptor,
 			grpc_prometheus.UnaryServerInterceptor),
 		),
