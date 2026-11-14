@@ -122,7 +122,6 @@ func refreshMempoolTxns(ctx context.Context) error {
 		}
 
 		// We haven't fetched this transaction already.
-		g_txidSeen[txid(txidstr)] = struct{}{}
 		txidJSON, err := json.Marshal(txidstr)
 		if err != nil {
 			return err
@@ -131,9 +130,19 @@ func refreshMempoolTxns(ctx context.Context) error {
 		params := []json.RawMessage{txidJSON, json.RawMessage("1")}
 		result, rpcErr := RawRequest(ctx, "getrawtransaction", params)
 		if rpcErr != nil {
-			// Not an error; mempool transactions can disappear
+			// g_txidSeen is shared by every client streaming the mempool,
+			// but ctx belongs to the one whose goroutine is refreshing. If
+			// that client has gone away, stop without recording anything,
+			// so the next refresh fetches the rest for everyone else.
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			// Otherwise the transaction has most likely left the mempool
+			// and won't be listed again. Don't mark it seen: if the failure
+			// was transient, the next refresh retries it.
 			continue
 		}
+		g_txidSeen[txid(txidstr)] = struct{}{}
 
 		rawtx, err := ParseRawTransaction(result)
 		if err != nil {
