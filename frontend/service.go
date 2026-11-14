@@ -95,14 +95,12 @@ func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerSe
 	return &DarksideStreamer{cache: cache}, nil
 }
 
+// Compiled once, since a request can check up to 10,000 addresses.
+var taddrRegexp = regexp.MustCompile(`\At[a-zA-Z0-9]{34}\z`)
+
 // Test to make sure Address is a single t address, return a gRPC error
 func checkTaddress(taddr string) error {
-	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(taddr))
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument,
-			"checkTaddress: invalid transparent address: %s error: %s", taddr, err.Error())
-	}
-	if !match {
+	if !taddrRegexp.MatchString(taddr) {
 		return status.Errorf(codes.InvalidArgument,
 			"checkTaddress: transparent address %s contains invalid characters", taddr)
 	}
@@ -1262,20 +1260,23 @@ func (s *lwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	return &response, nil
 }
 
+var (
+	hexRegexp   = regexp.MustCompile(`\A[a-fA-F0-9]+\z`)
+	alnumRegexp = regexp.MustCompile(`\A[a-zA-Z0-9]+\z`)
+)
+
 // SetMetaState lets the test driver control some GetLightdInfo values.
 func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMetaState) (*walletrpc.Empty, error) {
-	match, err := regexp.Match("\\A[a-fA-F0-9]+\\z", []byte(ms.BranchID))
-	if err != nil || !match {
+	if !hexRegexp.MatchString(ms.BranchID) {
 		return nil, status.Errorf(codes.InvalidArgument,
 			"Reset: invalid BranchID (must be hex): %s", ms.BranchID)
 	}
 
-	match, err = regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(ms.ChainName))
-	if err != nil || !match {
+	if !alnumRegexp.MatchString(ms.ChainName) {
 		return nil, status.Errorf(codes.InvalidArgument,
 			"Reset: invalid ChainName (must be alphanumeric): %s", ms.ChainName)
 	}
-	err = common.DarksideReset(
+	err := common.DarksideReset(
 		int(ms.SaplingActivation),
 		ms.BranchID,
 		ms.ChainName,
