@@ -696,7 +696,12 @@ func getTaddressBalanceZcashdRpc(ctx context.Context, addressList []string) (*wa
 
 	result, rpcErr := common.RawRequest(ctx, "getaddressbalance", params)
 	if rpcErr != nil {
-		var code codes.Code
+		// Default to Unavailable: a getaddressbalance error that matches
+		// neither case below is almost always a backend failure, and a
+		// zero-valued codes.Code would be codes.OK, for which
+		// status.Errorf returns a nil error -- the client would see a
+		// successful zero balance instead of the failure.
+		code := codes.Unavailable
 		switch {
 		case strings.Contains(rpcErr.Error(), "Invalid address"):
 			code = codes.InvalidArgument
@@ -1017,7 +1022,11 @@ func getAddressUtxos(ctx context.Context, arg *walletrpc.GetAddressUtxosArg, f f
 	params := []json.RawMessage{param}
 	result, rpcErr := common.RawRequest(ctx, "getaddressutxos", params)
 	if rpcErr != nil {
-		var code codes.Code
+		// Default to Unavailable, as above: a zero-valued codes.Code is
+		// codes.OK, for which status.Errorf returns a nil error, and the
+		// client would see a successful empty UTXO list instead of the
+		// backend failure.
+		code := codes.Unavailable
 		switch {
 		case strings.Contains(rpcErr.Error(), "Invalid address"):
 			code = codes.InvalidArgument
