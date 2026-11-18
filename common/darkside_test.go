@@ -106,6 +106,36 @@ func (s *subtreeRootStream) Context() context.Context     { return context.Backg
 func (s *subtreeRootStream) SendMsg(any) error            { return nil }
 func (s *subtreeRootStream) RecvMsg(any) error            { return nil }
 
+// TestDarksideGetStandardFee checks the darksidewalletd reply to the
+// getstandardfee RPC behind the GetStandardFee gRPC.
+func TestDarksideGetStandardFee(t *testing.T) {
+	cache := NewBlockCache(t.TempDir(), unitTestChain, 100, 0)
+
+	mutex.Lock()
+	state.cache = cache
+	mutex.Unlock()
+
+	if err := DarksideReset(100, "cafe", "test", 0, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := darksideRawRequest("getstandardfee", []json.RawMessage{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reply struct {
+		StandardFee uint64 `json:"standard_fee"`
+		Version     uint32 `json:"version"`
+	}
+	if err := json.Unmarshal(result, &reply); err != nil {
+		t.Fatal(err)
+	}
+	if reply.StandardFee != 1000 || reply.Version != 0 {
+		t.Fatal("expected standard fee 1000 with estimator version 0, got (",
+			reply.StandardFee, ",", reply.Version, ")")
+	}
+}
+
 // TestDarksideClearAllTreeStatesClearsHashIndex is a regression test for the
 // bug where DarksideClearAllTreeStates cleared the by-height map but left
 // the by-hash index populated, so tree states remained retrievable by hash.

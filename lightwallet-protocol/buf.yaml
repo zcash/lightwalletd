@@ -1,0 +1,19 @@
+version: v2
+modules:
+  - path: walletrpc
+lint:
+  use:
+    - BASIC
+  except:
+    # walletrpc/ does not match the proto package path cash/z/wallet/sdk/rpc/.
+    # Renaming the directory would break downstream consumers that vendor this
+    # repo via `git subtree --prefix=lightwallet-protocol/`.
+    - PACKAGE_DIRECTORY_MATCH
+    # Existing field and enum names use camelCase / lowercase. Renaming them
+    # would be JSON-name-breaking for downstream consumers; grandfather the
+    # current names rather than churn the wire contract.
+    - FIELD_LOWER_SNAKE_CASE
+    - ENUM_VALUE_UPPER_SNAKE_CASE
+breaking:
+  use:
+    - WIRE_JSON

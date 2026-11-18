@@ -42,6 +42,7 @@ const (
 	CompactTxStreamer_GetAddressUtxos_FullMethodName          = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxos"
 	CompactTxStreamer_GetAddressUtxosStream_FullMethodName    = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetAddressUtxosStream"
 	CompactTxStreamer_GetLightdInfo_FullMethodName            = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetLightdInfo"
+	CompactTxStreamer_GetStandardFee_FullMethodName           = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/GetStandardFee"
 	CompactTxStreamer_Ping_FullMethodName                     = "/cash.z.wallet.sdk.rpc.CompactTxStreamer/Ping"
 )
 
@@ -135,6 +136,12 @@ type CompactTxStreamerClient interface {
 	GetAddressUtxosStream(ctx context.Context, in *GetAddressUtxosArg, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAddressUtxosReply], error)
 	// Return information about this lightwalletd instance and the blockchain
 	GetLightdInfo(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*LightdInfo, error)
+	// Return the standard fee (the ZIP 317 marginal fee, in zatoshis per
+	// logical action) that the backend recommends wallets pay for a
+	// transaction to be mined in the next block. Requires a backend that
+	// implements the `getstandardfee` RPC. Backends that lack it return
+	// Unimplemented.
+	GetStandardFee(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StandardFee, error)
 	// Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
 	Ping(ctx context.Context, in *Duration, opts ...grpc.CallOption) (*PingResponse, error)
 }
@@ -414,6 +421,16 @@ func (c *compactTxStreamerClient) GetLightdInfo(ctx context.Context, in *Empty, 
 	return out, nil
 }
 
+func (c *compactTxStreamerClient) GetStandardFee(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*StandardFee, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StandardFee)
+	err := c.cc.Invoke(ctx, CompactTxStreamer_GetStandardFee_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *compactTxStreamerClient) Ping(ctx context.Context, in *Duration, opts ...grpc.CallOption) (*PingResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PingResponse)
@@ -514,6 +531,12 @@ type CompactTxStreamerServer interface {
 	GetAddressUtxosStream(*GetAddressUtxosArg, grpc.ServerStreamingServer[GetAddressUtxosReply]) error
 	// Return information about this lightwalletd instance and the blockchain
 	GetLightdInfo(context.Context, *Empty) (*LightdInfo, error)
+	// Return the standard fee (the ZIP 317 marginal fee, in zatoshis per
+	// logical action) that the backend recommends wallets pay for a
+	// transaction to be mined in the next block. Requires a backend that
+	// implements the `getstandardfee` RPC. Backends that lack it return
+	// Unimplemented.
+	GetStandardFee(context.Context, *Empty) (*StandardFee, error)
 	// Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
 	Ping(context.Context, *Duration) (*PingResponse, error)
 	mustEmbedUnimplementedCompactTxStreamerServer()
@@ -582,6 +605,9 @@ func (UnimplementedCompactTxStreamerServer) GetAddressUtxosStream(*GetAddressUtx
 }
 func (UnimplementedCompactTxStreamerServer) GetLightdInfo(context.Context, *Empty) (*LightdInfo, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLightdInfo not implemented")
+}
+func (UnimplementedCompactTxStreamerServer) GetStandardFee(context.Context, *Empty) (*StandardFee, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetStandardFee not implemented")
 }
 func (UnimplementedCompactTxStreamerServer) Ping(context.Context, *Duration) (*PingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
@@ -882,6 +908,24 @@ func _CompactTxStreamer_GetLightdInfo_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CompactTxStreamer_GetStandardFee_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompactTxStreamerServer).GetStandardFee(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CompactTxStreamer_GetStandardFee_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompactTxStreamerServer).GetStandardFee(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CompactTxStreamer_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Duration)
 	if err := dec(in); err != nil {
@@ -946,6 +990,10 @@ var CompactTxStreamer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLightdInfo",
 			Handler:    _CompactTxStreamer_GetLightdInfo_Handler,
+		},
+		{
+			MethodName: "GetStandardFee",
+			Handler:    _CompactTxStreamer_GetStandardFee_Handler,
 		},
 		{
 			MethodName: "Ping",
