@@ -145,6 +145,15 @@ message PingResponse {
     int64 exit = 2;
 }
 
+// StandardFee is the reply to the GetStandardFee rpc: the ZIP 317
+// marginal fee, in zatoshis per logical action, that wallets should
+// pay for a transaction to be mined in the next block, as reported by
+// the backend's `getstandardfee` RPC.
+message StandardFee {
+    uint64 feeZat = 1;           // standard fee in zatoshis per logical action
+    uint32 estimatorVersion = 2; // backend fee-estimator version, 0 = static ZIP 317 marginal fee
+}
+
 message Address {
     string address = 1;
 }
@@ -325,6 +334,13 @@ service CompactTxStreamer {
 
     // Return information about this lightwalletd instance and the blockchain
     rpc GetLightdInfo(Empty) returns (LightdInfo) {}
+
+    // Return the standard fee (the ZIP 317 marginal fee, in zatoshis per
+    // logical action) that the backend recommends wallets pay for a
+    // transaction to be mined in the next block. Requires a backend that
+    // implements the `getstandardfee` RPC. Backends that lack it return
+    // Unimplemented.
+    rpc GetStandardFee(Empty) returns (StandardFee) {}
 
     // Testing-only, requires lightwalletd --ping-very-insecure (do not enable in production)
     rpc Ping(Duration) returns (PingResponse) {}

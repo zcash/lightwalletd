@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -20,14 +21,17 @@ import (
 
 	"github.com/btcsuite/btcd/rpcclient"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 
 	"github.com/zcash/lightwalletd/common"
 	"github.com/zcash/lightwalletd/common/logging"
@@ -46,31 +50,39 @@ var rootCmd = &cobra.Command{
          bandwidth-efficient interface to the Zcash blockchain`,
 	Run: func(cmd *cobra.Command, args []string) {
 		opts := &common.Options{
-			GRPCBindAddr:        viper.GetString("grpc-bind-addr"),
-			GRPCLogging:         viper.GetBool("grpc-logging-insecure"),
-			HTTPBindAddr:        viper.GetString("http-bind-addr"),
-			TLSCertPath:         viper.GetString("tls-cert"),
-			TLSKeyPath:          viper.GetString("tls-key"),
-			LogLevel:            viper.GetUint64("log-level"),
-			LogFile:             viper.GetString("log-file"),
-			ZcashConfPath:       viper.GetString("zcash-conf-path"),
-			RPCUser:             viper.GetString("rpcuser"),
-			RPCPassword:         viper.GetString("rpcpassword"),
-			RPCHost:             viper.GetString("rpchost"),
-			RPCPort:             viper.GetString("rpcport"),
-			NoBackendCheck:      viper.GetBool("no-backend-check"),
-			NoTLSVeryInsecure:   viper.GetBool("no-tls-very-insecure"),
-			GenCertVeryInsecure: viper.GetBool("gen-cert-very-insecure"),
-			DataDir:             viper.GetString("data-dir"),
-			Redownload:          viper.GetBool("redownload"),
-			NoCache:             viper.GetBool("nocache"),
-			SyncFromHeight:      viper.GetInt("sync-from-height"),
-			PingEnable:          viper.GetBool("ping-very-insecure"),
-			Darkside:            viper.GetBool("darkside-very-insecure"),
-			DarksideTimeout:     viper.GetUint64("darkside-timeout"),
+			GRPCBindAddr:             viper.GetString("grpc-bind-addr"),
+			GRPCLogging:              viper.GetBool("grpc-logging-insecure"),
+			GRPCMaxConcurrentStreams: viper.GetUint64("grpc-max-concurrent-streams"),
+			MaxConcurrentBlockRange:  viper.GetUint64("max-concurrent-blockrange"),
+			ClientStreamIdleTimeout:  viper.GetUint64("client-stream-idle-timeout"),
+			MaxConcurrentSendTxMiB:   viper.GetUint64("max-concurrent-sendtx-mib"),
+			MaxConcurrentRecv:        viper.GetUint64("max-concurrent-recv"),
+			HTTPBindAddr:             viper.GetString("http-bind-addr"),
+			TLSCertPath:              viper.GetString("tls-cert"),
+			TLSKeyPath:               viper.GetString("tls-key"),
+			LogLevel:                 viper.GetUint64("log-level"),
+			LogFile:                  viper.GetString("log-file"),
+			ZcashConfPath:            viper.GetString("zcash-conf-path"),
+			RPCUser:                  viper.GetString("rpcuser"),
+			RPCPassword:              viper.GetString("rpcpassword"),
+			RPCHost:                  viper.GetString("rpchost"),
+			RPCPort:                  viper.GetString("rpcport"),
+			NoBackendCheck:           viper.GetBool("no-backend-check"),
+			NoTLSVeryInsecure:        viper.GetBool("no-tls-very-insecure"),
+			GenCertVeryInsecure:      viper.GetBool("gen-cert-very-insecure"),
+			DataDir:                  viper.GetString("data-dir"),
+			Redownload:               viper.GetBool("redownload"),
+			NoCache:                  viper.GetBool("nocache"),
+			SyncFromHeight:           viper.GetInt("sync-from-height"),
+			PingEnable:               viper.GetBool("ping-very-insecure"),
+			Darkside:                 viper.GetBool("darkside-very-insecure"),
+			DarksideTimeout:          viper.GetUint64("darkside-timeout"),
 		}
 
-		common.Log.Debugf("Options: %#v\n", opts)
+		// Log viper's view rather than opts, which holds the RPC password.
+		settings := viper.AllSettings()
+		delete(settings, "rpcpassword")
+		common.Log.Debugf("Options: %v\n", settings)
 
 		filesThatShouldExist := []string{
 			opts.LogFile,
@@ -110,6 +122,50 @@ func fileExists(filename string) bool {
 	return !info.IsDir()
 }
 
+// serverOptions returns the gRPC options common to the TLS and plaintext
+// servers. MaxConcurrentStreams is the important one: unset, gRPC omits
+// SETTINGS_MAX_CONCURRENT_STREAMS from the connection preface, telling every
+// client it may open as many streams as it likes.
+// recoveryOption fails the one request whose handler panicked, instead of
+// letting the panic end the process.
+var recoveryOption = grpc_recovery.WithRecoveryHandlerContext(
+	func(ctx context.Context, p any) error {
+		common.Log.Errorf("panic in gRPC handler: %v\n%s", p, debug.Stack())
+		return status.Error(codes.Internal, "internal error")
+	})
+
+func serverOptions(opts *common.Options) []grpc.ServerOption {
+	serverOpts := []grpc.ServerOption{
+		grpc.ForceServerCodecV2(frontend.NewBoundedCodec()),
+		grpc.StatsHandler(&connStatsHandler{}),
+		grpc.StreamInterceptor(
+			grpc_middleware.ChainStreamServer(
+				grpc_recovery.StreamServerInterceptor(recoveryOption),
+				idleStreamInterceptor(time.Duration(opts.ClientStreamIdleTimeout)*time.Second),
+				grpc_prometheus.StreamServerInterceptor,
+				sendTimeoutInterceptor(streamSendTimeout)),
+		),
+		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			grpc_recovery.UnaryServerInterceptor(recoveryOption),
+			logging.LogInterceptor,
+			grpc_prometheus.UnaryServerInterceptor),
+		),
+	}
+	if opts.GRPCMaxConcurrentStreams > 0 {
+		serverOpts = append(serverOpts,
+			grpc.MaxConcurrentStreams(uint32(opts.GRPCMaxConcurrentStreams)))
+	}
+	// Darkside stages hex-encoded blocks, which can exceed maxRecvMsgSize.
+	if !opts.Darkside {
+		serverOpts = append(serverOpts, grpc.MaxRecvMsgSize(maxRecvMsgSize))
+		if opts.MaxConcurrentRecv > 0 {
+			serverOpts = append(serverOpts,
+				newRecvLimiter(opts.MaxConcurrentRecv).serverOptions()...)
+		}
+	}
+	return serverOpts
+}
+
 func startServer(opts *common.Options) error {
 	if opts.LogFile != "" {
 		// instead write parsable logs for logstash/splunk/etc
@@ -135,22 +191,16 @@ func startServer(opts *common.Options) error {
 		"buildUser": common.BuildUser,
 	}).Infof("Starting lightwalletd process version %s", common.Version)
 
+	if limit := common.SetMemoryLimit(); limit > 0 {
+		common.Log.Infof("Set Go soft memory limit to %d bytes from the cgroup limit", limit)
+	}
+
 	// gRPC initialization
-	var server *grpc.Server
+	serverOpts := serverOptions(opts)
 
 	if opts.NoTLSVeryInsecure {
 		common.Log.Warningln("Starting insecure no-TLS (plaintext) server")
 		fmt.Println("Starting insecure server")
-		server = grpc.NewServer(
-			grpc.StatsHandler(&connStatsHandler{}),
-			grpc.StreamInterceptor(
-				grpc_middleware.ChainStreamServer(
-					grpc_prometheus.StreamServerInterceptor),
-			),
-			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-				logging.LogInterceptor,
-				grpc_prometheus.UnaryServerInterceptor),
-			))
 	} else {
 		var transportCreds credentials.TransportCredentials
 		if opts.GenCertVeryInsecure {
@@ -169,17 +219,9 @@ func startServer(opts *common.Options) error {
 				}).Fatal("couldn't load TLS credentials")
 			}
 		}
-		server = grpc.NewServer(
-			grpc.Creds(transportCreds),
-			grpc.StatsHandler(&connStatsHandler{}),
-			grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
-				grpc_prometheus.StreamServerInterceptor),
-			),
-			grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-				logging.LogInterceptor,
-				grpc_prometheus.UnaryServerInterceptor),
-			))
+		serverOpts = append(serverOpts, grpc.Creds(transportCreds))
 	}
+	server := grpc.NewServer(serverOpts...)
 	grpc_prometheus.EnableHandlingTimeHistogram()
 	grpc_prometheus.Register(server)
 	go startHTTPServer(opts)
@@ -340,7 +382,8 @@ func startServer(opts *common.Options) error {
 
 	// Compact transaction service initialization
 	{
-		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable)
+		service, err := frontend.NewLwdStreamer(cache, chainName, opts.PingEnable,
+			opts.MaxConcurrentBlockRange, opts.MaxConcurrentSendTxMiB<<20)
 		if err != nil {
 			common.Log.WithFields(logrus.Fields{
 				"error": err,
@@ -408,6 +451,11 @@ func init() {
 	rootCmd.Flags().String("http-bind-addr", "127.0.0.1:9068", "the address to listen for http on")
 	rootCmd.Flags().String("grpc-bind-addr", "127.0.0.1:9067", "the address to listen for grpc on")
 	rootCmd.Flags().Bool("grpc-logging-insecure", false, "enable grpc logging to stderr")
+	rootCmd.Flags().Uint("grpc-max-concurrent-streams", 100, "max concurrent grpc streams per client connection (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-blockrange", 200, "max block-range requests served at once, server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("client-stream-idle-timeout", 30, "seconds a client-streaming RPC may stall before it is cancelled (0 to disable)")
+	rootCmd.Flags().Uint("max-concurrent-recv", 32, "max requests being received at once, server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-sendtx-mib", 16, "max transaction data, in MiB, that SendTransaction handles at once, server-wide (0 for unlimited)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -433,6 +481,16 @@ func init() {
 	viper.SetDefault("grpc-bind-addr", "127.0.0.1:9067")
 	viper.BindPFlag("grpc-logging-insecure", rootCmd.Flags().Lookup("grpc-logging-insecure"))
 	viper.SetDefault("grpc-logging-insecure", false)
+	viper.BindPFlag("grpc-max-concurrent-streams", rootCmd.Flags().Lookup("grpc-max-concurrent-streams"))
+	viper.SetDefault("grpc-max-concurrent-streams", 100)
+	viper.BindPFlag("max-concurrent-blockrange", rootCmd.Flags().Lookup("max-concurrent-blockrange"))
+	viper.SetDefault("max-concurrent-blockrange", 200)
+	viper.BindPFlag("client-stream-idle-timeout", rootCmd.Flags().Lookup("client-stream-idle-timeout"))
+	viper.SetDefault("client-stream-idle-timeout", 30)
+	viper.BindPFlag("max-concurrent-sendtx-mib", rootCmd.Flags().Lookup("max-concurrent-sendtx-mib"))
+	viper.SetDefault("max-concurrent-sendtx-mib", 16)
+	viper.BindPFlag("max-concurrent-recv", rootCmd.Flags().Lookup("max-concurrent-recv"))
+	viper.SetDefault("max-concurrent-recv", 32)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))
@@ -529,7 +587,28 @@ func initConfig() {
 	}
 }
 
+// metricsReadHeaderTimeout bounds how long a metrics request's headers may
+// take to arrive. A variable so tests can shorten it.
+var metricsReadHeaderTimeout = 10 * time.Second
+
+// newMetricsServer returns the Prometheus HTTP server with timeouts, so a
+// peer that sends a partial request can't hold a connection open forever.
+func newMetricsServer(addr string) *http.Server {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	return &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: metricsReadHeaderTimeout,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 16,
+	}
+}
+
 func startHTTPServer(opts *common.Options) {
-	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(opts.HTTPBindAddr, nil)
+	if err := newMetricsServer(opts.HTTPBindAddr).ListenAndServe(); err != nil {
+		common.Log.Error("metrics HTTP server: ", err)
+	}
 }
