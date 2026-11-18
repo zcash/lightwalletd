@@ -327,6 +327,17 @@ func (c *BlockCache) Reorg(height int) {
 	c.setLatestHash()
 }
 
+// recoverIfStillCorrupt clears the cache only if the failed height is still
+// present and unreadable after this goroutine obtains the write lock.
+func (c *BlockCache) recoverIfStillCorrupt(height int) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if height >= c.firstBlock && height < c.nextBlock && c.readBlock(height) == nil {
+		c.recoverFromCorruption()
+	}
+}
+
 // Get returns the compact block at the requested height if it's
 // in the cache, else nil.
 func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
@@ -338,12 +349,7 @@ func (c *BlockCache) Get(height int) *walletrpc.CompactBlock {
 	}
 	block := c.readBlock(height)
 	if block == nil {
-		go func() {
-			// We hold only the read lock, need the exclusive lock.
-			c.mutex.Lock()
-			c.recoverFromCorruption()
-			c.mutex.Unlock()
-		}()
+		go c.recoverIfStillCorrupt(height)
 		return nil
 	}
 	return block
