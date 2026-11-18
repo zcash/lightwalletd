@@ -55,6 +55,9 @@ type Options struct {
 	GRPCLogging              bool   `json:"grpc_logging_insecure,omitempty"`
 	GRPCMaxConcurrentStreams uint64 `json:"grpc_max_concurrent_streams,omitempty"`
 	MaxConcurrentBlockRange  uint64 `json:"max_concurrent_blockrange,omitempty"`
+	ClientStreamIdleTimeout  uint64 `json:"client_stream_idle_timeout,omitempty"`
+	MaxConcurrentSendTxMiB   uint64 `json:"max_concurrent_sendtx_mib,omitempty"`
+	MaxConcurrentRecv        uint64 `json:"max_concurrent_recv,omitempty"`
 	HTTPBindAddr             string `json:"http_bind_address,omitempty"`
 	TLSCertPath              string `json:"tls_cert_path,omitempty"`
 	TLSKeyPath               string `json:"tls_cert_key,omitempty"`
@@ -277,7 +280,11 @@ func FirstRPC() {
 }
 
 func GetBlockChainInfo() (*ZcashdRpcReplyGetblockchaininfo, error) {
-	result, rpcErr := RawRequest(context.Background(), "getblockchaininfo", []json.RawMessage{})
+	return getBlockChainInfo(context.Background())
+}
+
+func getBlockChainInfo(ctx context.Context) (*ZcashdRpcReplyGetblockchaininfo, error) {
+	result, rpcErr := RawRequest(ctx, "getblockchaininfo", []json.RawMessage{})
 	if rpcErr != nil {
 		return nil, rpcErr
 	}
@@ -611,6 +618,27 @@ func GetBlock(ctx context.Context, cache *BlockCache, height int) (*walletrpc.Co
 	return block, nil
 }
 
+// CanonicalPoolTypes drops repeats and collapses unknown values to one (GHSA-8vh8-6jg3-8f5v).
+func CanonicalPoolTypes(poolTypes []walletrpc.PoolType) []walletrpc.PoolType {
+	seen := make(map[walletrpc.PoolType]bool, len(walletrpc.PoolType_name))
+	sawUnknown := false
+	r := make([]walletrpc.PoolType, 0, len(walletrpc.PoolType_name)+1)
+	for _, p := range poolTypes {
+		if _, known := walletrpc.PoolType_name[int32(p)]; !known {
+			if !sawUnknown {
+				sawUnknown = true
+				r = append(r, p)
+			}
+			continue
+		}
+		if !seen[p] {
+			seen[p] = true
+			r = append(r, p)
+		}
+	}
+	return r
+}
+
 // FilterTxPool returns a new transaction that is a subset of the argument tx
 // (which is not modified), with only those parts that are requested by the
 // pool type argument. Returns nil if the tx ends up with no components.
@@ -674,6 +702,7 @@ func filterBlockPool(vtx []*walletrpc.CompactTx, poolTypes []walletrpc.PoolType)
 // the unbuffered `blockOut` send after the consumer (the gRPC handler) returns,
 // leaking one goroutine per cancelled stream.
 func GetBlockRange(ctx context.Context, cache *BlockCache, blockOut chan<- *walletrpc.CompactBlock, errOut chan<- error, span *walletrpc.BlockRange) {
+	span.PoolTypes = CanonicalPoolTypes(span.PoolTypes)
 	if slices.Contains(span.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
 		select {
 		case errOut <- fmt.Errorf("GetBlockRange: invalid pool type requested"):

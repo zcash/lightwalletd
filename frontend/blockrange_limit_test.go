@@ -24,7 +24,7 @@ func shortBlockRangeWait(t *testing.T, d time.Duration) {
 
 func newLimited(t *testing.T, permits uint64) *lwdStreamer {
 	t.Helper()
-	s, err := NewLwdStreamer(nil, "main", false, permits)
+	s, err := NewLwdStreamer(nil, "main", false, permits, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
