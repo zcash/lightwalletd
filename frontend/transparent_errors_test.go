@@ -28,7 +28,7 @@ import (
 // normal EOF. Neither is an acceptable response to a failed backend lookup.
 func TestTransparentRPCBackendErrors(t *testing.T) {
 	defer resetGlobals()
-	service, err := NewLwdStreamer(nil, "main", false)
+	service, err := NewLwdStreamer(nil, "main", false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -26,7 +26,7 @@ import (
 
 func TestGetTransactionBackendStatus(t *testing.T) {
 	defer resetGlobals()
-	service, err := NewLwdStreamer(nil, "main", false)
+	service, err := NewLwdStreamer(nil, "main", false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestGetTransactionDarksideMissing(t *testing.T) {
 	if err := common.DarksideReset(0, "test", "regtest", 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
-	service, err := NewLwdStreamer(cache, "regtest", false)
+	service, err := NewLwdStreamer(cache, "regtest", false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
