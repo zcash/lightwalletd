@@ -10,7 +10,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"maps"
 	"os"
 	"regexp"
 	"slices"
@@ -33,13 +35,53 @@ type lwdStreamer struct {
 	cache      *common.BlockCache
 	chainName  string
 	pingEnable bool
-	mutex      sync.Mutex
+	// permits bounds concurrent block-range work; nil means unlimited.
+	permits chan struct{}
+	// sendTxBudget bounds the transaction bytes in flight; nil means unlimited.
+	sendTxBudget *byteBudget
+	mutex        sync.Mutex
 	walletrpc.UnimplementedCompactTxStreamerServer
 }
 
-// NewLwdStreamer constructs a gRPC context.
-func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool) (walletrpc.CompactTxStreamerServer, error) {
-	return &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing}, nil
+// blockRangeWait caps how long a request queues for a permit. A variable so
+// tests need not wait it out.
+var blockRangeWait = 10 * time.Second
+
+// NewLwdStreamer constructs a gRPC context. maxBlockRange bounds how many
+// block-range requests may be served at once, and maxSendTxBytes how many
+// transaction bytes SendTransaction handles at once; zero means unlimited.
+func NewLwdStreamer(cache *common.BlockCache, chainName string, enablePing bool, maxBlockRange, maxSendTxBytes uint64) (walletrpc.CompactTxStreamerServer, error) {
+	s := &lwdStreamer{cache: cache, chainName: chainName, pingEnable: enablePing,
+		sendTxBudget: newByteBudget(maxSendTxBytes)}
+	if maxBlockRange > 0 {
+		s.permits = make(chan struct{}, maxBlockRange)
+	}
+	return s, nil
+}
+
+// acquireBlockRange takes a permit for block-range work, waiting for one if
+// none is free, and returns the function that gives it back.
+func (s *lwdStreamer) acquireBlockRange(ctx context.Context) (func(), error) {
+	if s.permits == nil {
+		return func() {}, nil
+	}
+	// Fires at whichever comes first, our cap or the client's own deadline, so
+	// a client that set one is never held past it.
+	waitCtx, cancel := context.WithTimeout(ctx, blockRangeWait)
+	defer cancel()
+	select {
+	case s.permits <- struct{}{}:
+		return func() { <-s.permits }, nil
+	case <-waitCtx.Done():
+		if ctx.Err() != nil {
+			// The client gave up rather than us running out of patience.
+			return nil, ctx.Err()
+		}
+		// Unavailable, not ResourceExhausted: wallet clients retry the former
+		// with backoff and surface the latter as a hard error.
+		return nil, status.Error(codes.Unavailable,
+			"too many concurrent block-range requests; retry shortly")
+	}
 }
 
 // DarksideStreamer holds the gRPC state for darksidewalletd.
@@ -53,14 +95,12 @@ func NewDarksideStreamer(cache *common.BlockCache) (walletrpc.DarksideStreamerSe
 	return &DarksideStreamer{cache: cache}, nil
 }
 
+// Compiled once, since a request can check up to 10,000 addresses.
+var taddrRegexp = regexp.MustCompile(`\At[a-zA-Z0-9]{34}\z`)
+
 // Test to make sure Address is a single t address, return a gRPC error
 func checkTaddress(taddr string) error {
-	match, err := regexp.Match("\\At[a-zA-Z0-9]{34}\\z", []byte(taddr))
-	if err != nil {
-		return status.Errorf(codes.InvalidArgument,
-			"checkTaddress: invalid transparent address: %s error: %s", taddr, err.Error())
-	}
-	if !match {
+	if !taddrRegexp.MatchString(taddr) {
 		return status.Errorf(codes.InvalidArgument,
 			"checkTaddress: transparent address %s contains invalid characters", taddr)
 	}
@@ -285,6 +325,11 @@ func (s *lwdStreamer) GetBlockRange(span *walletrpc.BlockRange, resp walletrpc.C
 			"GetBlockRange: must specify start and end heights")
 	}
 	ctx := resp.Context()
+	release, err := s.acquireBlockRange(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go common.GetBlockRange(ctx, s.cache, blockChan, errChan, span)
@@ -325,6 +370,11 @@ func (s *lwdStreamer) GetBlockRangeNullifiers(span *walletrpc.BlockRange, resp w
 	}
 	span.PoolTypes = filtered
 	ctx := resp.Context()
+	release, err := s.acquireBlockRange(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
 	blockChan := make(chan *walletrpc.CompactBlock)
 	errChan := make(chan error)
 	go common.GetBlockRange(ctx, s.cache, blockChan, errChan, span)
@@ -516,6 +566,44 @@ func (s *lwdStreamer) GetLightdInfo(ctx context.Context, in *walletrpc.Empty) (*
 	return lightdinfo, err
 }
 
+// GetStandardFee returns the ZIP 317 marginal fee, in zatoshis per
+// logical action, via the backend's `getstandardfee` JSON-RPC method.
+func (s *lwdStreamer) GetStandardFee(ctx context.Context, in *walletrpc.Empty) (*walletrpc.StandardFee, error) {
+	common.Log.Debugf("gRPC GetStandardFee(%+v)\n", in)
+	result, err := common.RawRequest(ctx, "getstandardfee", []json.RawMessage{})
+	if err != nil {
+		// A backend without this RPC fails with JSON-RPC method-not-found.
+		// Return Unimplemented (non-retryable), not Unavailable.
+		var rpcErr *btcjson.RPCError
+		if errors.As(err, &rpcErr) && rpcErr.Code == btcjson.ErrRPCMethodNotFound.Code {
+			return nil, status.Errorf(codes.Unimplemented,
+				"GetStandardFee: the backend does not support the getstandardfee RPC: %s", err.Error())
+		}
+		if ctx.Err() != nil {
+			return nil, status.FromContextError(ctx.Err()).Err()
+		}
+		return nil, status.Errorf(codes.Unavailable,
+			"GetStandardFee: getstandardfee failed: %s", err.Error())
+	}
+	var reply struct {
+		StandardFee uint64 `json:"standard_fee"`
+		Version     uint32 `json:"version"`
+	}
+	if err := json.Unmarshal(result, &reply); err != nil {
+		return nil, status.Errorf(codes.Internal,
+			"GetStandardFee: failed to parse getstandardfee reply: %s", err.Error())
+	}
+	if reply.StandardFee == 0 {
+		// A sane backend never reports a zero fee.
+		return nil, status.Error(codes.Internal,
+			"GetStandardFee: the backend reported a zero standard fee")
+	}
+	return &walletrpc.StandardFee{
+		FeeZat:           reply.StandardFee,
+		EstimatorVersion: reply.Version,
+	}, nil
+}
+
 // maxRawTxSize bounds the raw transaction bytes lightwalletd will forward to
 // zcashd. A Zcash transaction cannot exceed the 2,000,000-byte block size
 // limit, so anything larger is unminable by definition and there is no reason
@@ -524,7 +612,7 @@ const maxRawTxSize = 2000000
 
 // SendTransaction forwards raw transaction bytes to a zcashd instance over JSON-RPC
 func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawTransaction) (*walletrpc.SendResponse, error) {
-	common.Log.Debugf("gRPC SendTransaction(%+v)\n", rawtx)
+	common.Log.Debugf("gRPC SendTransaction(%d bytes)\n", len(rawtx.GetData()))
 	// sendrawtransaction "hexstring" ( allowhighfees )
 	//
 	// Submits raw transaction (binary) to local node and network.
@@ -546,6 +634,12 @@ func (s *lwdStreamer) SendTransaction(ctx context.Context, rawtx *walletrpc.RawT
 			"SendTransaction: transaction is too large: %d bytes (limit %d)",
 			len(rawtx.Data), maxRawTxSize)
 	}
+	// Taken before the bytes are expanded (GHSA-xrx5-jc6q-9h8r).
+	release, err := s.sendTxBudget.reserve(len(rawtx.Data))
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 
 	// Construct raw JSON-RPC params
 	params := make([]json.RawMessage, 1)
@@ -708,8 +802,19 @@ var mempoolMap *map[string]*walletrpc.CompactTx
 // Txids in big-endian hex (from the backend)
 var mempoolList []string
 
-// Last time we pulled a copy of the mempool from zcashd.
+// Time of the last refresh that published a new copy of the mempool.
 var lastMempool time.Time
+
+// mempoolRefreshing is set while one call refreshes the mempool, so others
+// serve the cached copy rather than refreshing too.
+var mempoolRefreshing bool
+
+// mempoolRefreshTimeout bounds a refresh, which no client can cancel.
+var mempoolRefreshTimeout = 30 * time.Second
+
+// mempoolPartial holds what a timed-out refresh fetched, unpublished, so the
+// next refresh can carry on from there. Only the refresher uses it.
+var mempoolPartial map[string]*walletrpc.CompactTx
 
 // maxExcludeTxidSuffixes bounds the exclude list a client may send to
 // GetMempoolTx. The list names transactions the caller already has, so it is
@@ -736,6 +841,7 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 			return status.Errorf(codes.InvalidArgument, "exclude txid %d is larger than 32 bytes", i)
 		}
 	}
+	exclude.PoolTypes = common.CanonicalPoolTypes(exclude.PoolTypes)
 	if slices.Contains(exclude.PoolTypes, walletrpc.PoolType_POOL_TYPE_INVALID) {
 		return status.Errorf(codes.InvalidArgument, "invalid pool type requested")
 	}
@@ -760,13 +866,12 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	}
 
 	// Hold the mutex only long enough to decide whether this call refreshes
-	// the cache, and to snapshot it and update lastMempool to prevent another
-	// thread from refreshing while our thread is doing that.
+	// the cache, and to snapshot it.
 	streamCtx := resp.Context()
 	s.mutex.Lock()
-	refresh := time.Since(lastMempool).Seconds() >= 2
+	refresh := !mempoolRefreshing && time.Since(lastMempool).Seconds() >= 2
 	if refresh {
-		lastMempool = time.Now()
+		mempoolRefreshing = true
 	}
 	cachedList := mempoolList
 	var cachedMap map[string]*walletrpc.CompactTx
@@ -776,79 +881,26 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	s.mutex.Unlock()
 
 	if refresh {
-		// Refresh our copy of the mempool.
-		params := make([]json.RawMessage, 0)
-		result, rpcErr := common.RawRequest(streamCtx, "getrawmempool", params)
-		if rpcErr != nil {
-			return status.Errorf(codes.Internal, "GetMempoolTx: getrawmempool error: %s", rpcErr.Error())
+		// The refresh is shared, so a caller's cancel mustn't discard it.
+		type result struct {
+			list []string
+			m    map[string]*walletrpc.CompactTx
+			err  error
 		}
-		var newmempoolList []string
-		err := json.Unmarshal(result, &newmempoolList)
-		if err != nil {
-			return status.Errorf(codes.Unknown,
-				"GetMempoolTx: failed to unmarshal getrawmempool reply, error: %s", err.Error())
+		done := make(chan result, 1)
+		go func() {
+			list, m, err := s.refreshMempoolTx(context.WithoutCancel(streamCtx), cachedMap)
+			done <- result{list, m, err}
+		}()
+		select {
+		case r := <-done:
+			if r.err != nil {
+				return r.err
+			}
+			cachedList, cachedMap = r.list, r.m
+		case <-streamCtx.Done():
+			return status.FromContextError(streamCtx.Err()).Err()
 		}
-		newmempoolMap := make(map[string]*walletrpc.CompactTx)
-		for _, txidstr := range newmempoolList {
-			if err := streamCtx.Err(); err != nil {
-				return status.FromContextError(err).Err()
-			}
-			if ctx, ok := cachedMap[txidstr]; ok {
-				// This ctx has already been fetched, copy pointer to it.
-				newmempoolMap[txidstr] = ctx
-				continue
-			}
-			txidJSON, err := json.Marshal(txidstr)
-			if err != nil {
-				return status.Errorf(codes.Unknown,
-					"GetMempoolTx: failed to marshal txid, error: %s", err.Error())
-			}
-			// The "0" is because we only need the raw hex, which is returned as
-			// just a hex string, and not even a json string (with quotes).
-			params := []json.RawMessage{txidJSON, json.RawMessage("0")}
-			result, rpcErr := common.RawRequest(streamCtx, "getrawtransaction", params)
-			if rpcErr != nil {
-				// Not an error; mempool transactions can disappear
-				continue
-			}
-			// strip the quotes
-			var txStr string
-			err = json.Unmarshal(result, &txStr)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed to unmarshal getrawtransaction reply, error: %s", err.Error())
-			}
-
-			// convert to binary
-			txBytes, err := hex.DecodeString(txStr)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed decode getrawtransaction reply, error: %s", err.Error())
-			}
-			tx := parser.NewTransaction()
-			txdata, err := tx.ParseFromSlice(txBytes)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed to parse getrawtransaction reply, error: %s", err.Error())
-			}
-			if len(txdata) > 0 {
-				return status.Error(codes.Internal,
-					"GetMempoolTx: extra data deserializing transaction")
-			}
-			txidBigEndian, err := hex.DecodeString(txidstr)
-			if err != nil {
-				return status.Errorf(codes.Internal,
-					"GetMempoolTx: failed decode txid, error: %s", err.Error())
-			}
-			// convert from big endian bytes to little endian and set as the txid
-			tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
-			newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
-		}
-		s.mutex.Lock()
-		mempoolList = newmempoolList
-		mempoolMap = &newmempoolMap
-		s.mutex.Unlock()
-		cachedList, cachedMap = newmempoolList, newmempoolMap
 	}
 	for _, txid := range MempoolFilter(cachedList, excludeHex) {
 		ctx, ok := cachedMap[txid]
@@ -868,10 +920,118 @@ func (s *lwdStreamer) GetMempoolTx(exclude *walletrpc.GetMempoolTxRequest, resp 
 	return nil
 }
 
+// refreshMempoolTx fetches and publishes a new copy of the mempool. The
+// caller must have set mempoolRefreshing.
+func (s *lwdStreamer) refreshMempoolTx(ctx context.Context, cachedMap map[string]*walletrpc.CompactTx) ([]string, map[string]*walletrpc.CompactTx, error) {
+	ctx, cancel := context.WithTimeout(ctx, mempoolRefreshTimeout)
+	defer cancel()
+	// Only a published refresh moves lastMempool (GHSA-w64p-hjp5-3mj7).
+	refreshStart := time.Now()
+	known := make(map[string]*walletrpc.CompactTx, len(cachedMap)+len(mempoolPartial))
+	maps.Copy(known, cachedMap)
+	maps.Copy(known, mempoolPartial)
+	list, m, err := fetchMempoolTx(ctx, known)
+	mempoolPartial = nil
+	if err != nil {
+		mempoolPartial = m
+	}
+	s.mutex.Lock()
+	if err == nil {
+		mempoolList = list
+		mempoolMap = &m
+		lastMempool = refreshStart
+	}
+	mempoolRefreshing = false
+	s.mutex.Unlock()
+	return list, m, err
+}
+
+func fetchMempoolTx(ctx context.Context, cachedMap map[string]*walletrpc.CompactTx) ([]string, map[string]*walletrpc.CompactTx, error) {
+	// Refresh our copy of the mempool.
+	params := make([]json.RawMessage, 0)
+	result, rpcErr := common.RawRequest(ctx, "getrawmempool", params)
+	if rpcErr != nil {
+		return nil, nil, status.Errorf(codes.Internal, "GetMempoolTx: getrawmempool error: %s", rpcErr.Error())
+	}
+	var newmempoolList []string
+	err := json.Unmarshal(result, &newmempoolList)
+	if err != nil {
+		return nil, nil, status.Errorf(codes.Unknown,
+			"GetMempoolTx: failed to unmarshal getrawmempool reply, error: %s", err.Error())
+	}
+	newmempoolMap := make(map[string]*walletrpc.CompactTx)
+	for _, txidstr := range newmempoolList {
+		if err := ctx.Err(); err != nil {
+			return nil, newmempoolMap, status.FromContextError(err).Err()
+		}
+		if ctx, ok := cachedMap[txidstr]; ok {
+			// This ctx has already been fetched, copy pointer to it.
+			newmempoolMap[txidstr] = ctx
+			continue
+		}
+		txidJSON, err := json.Marshal(txidstr)
+		if err != nil {
+			return nil, nil, status.Errorf(codes.Unknown,
+				"GetMempoolTx: failed to marshal txid, error: %s", err.Error())
+		}
+		// The "0" is because we only need the raw hex, which is returned as
+		// just a hex string, and not even a json string (with quotes).
+		params := []json.RawMessage{txidJSON, json.RawMessage("0")}
+		result, rpcErr := common.RawRequest(ctx, "getrawtransaction", params)
+		if rpcErr != nil {
+			// An aborted refresh must not publish a copy missing the rest.
+			if err := ctx.Err(); err != nil {
+				return nil, newmempoolMap, status.FromContextError(err).Err()
+			}
+			// Not an error; mempool transactions can disappear
+			continue
+		}
+		tx, err := parseMempoolTx(txidstr, result)
+		if err != nil {
+			// One bad reply mustn't fail every refresh; it's retried next time.
+			common.Log.WithField("txid", txidstr).Warn("GetMempoolTx: skipping transaction: ", err)
+			continue
+		}
+		newmempoolMap[txidstr] = tx.ToCompact( /* height */ 0)
+	}
+	return newmempoolList, newmempoolMap, nil
+}
+
+// parseMempoolTx decodes a getrawtransaction reply for txidstr.
+func parseMempoolTx(txidstr string, result json.RawMessage) (*parser.Transaction, error) {
+	// strip the quotes
+	var txStr string
+	if err := json.Unmarshal(result, &txStr); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal getrawtransaction reply: %w", err)
+	}
+	txBytes, err := hex.DecodeString(txStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode getrawtransaction reply: %w", err)
+	}
+	tx := parser.NewTransaction()
+	txdata, err := tx.ParseFromSlice(txBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse getrawtransaction reply: %w", err)
+	}
+	if len(txdata) > 0 {
+		return nil, errors.New("extra data deserializing transaction")
+	}
+	txidBigEndian, err := hex.DecodeString(txidstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode txid: %w", err)
+	}
+	// convert from big endian bytes to little endian and set as the txid
+	tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
+	return tx, nil
+}
+
 // Return the subset of items that aren't excluded, but
 // if more than one item matches an exclude entry, return
-// all those items.
+// all those items. The arguments are not modified: GetMempoolTx passes the
+// shared mempoolList, which it reads without holding s.mutex.
 func MempoolFilter(items, exclude []string) []string {
+	items = slices.Clone(items)
+	exclude = slices.Clone(exclude)
 	slices.Sort(items)
 	slices.Sort(exclude)
 	// Determine how many items match each exclude item.
@@ -1112,20 +1272,23 @@ func (s *lwdStreamer) Ping(ctx context.Context, in *walletrpc.Duration) (*wallet
 	return &response, nil
 }
 
+var (
+	hexRegexp   = regexp.MustCompile(`\A[a-fA-F0-9]+\z`)
+	alnumRegexp = regexp.MustCompile(`\A[a-zA-Z0-9]+\z`)
+)
+
 // SetMetaState lets the test driver control some GetLightdInfo values.
 func (s *DarksideStreamer) Reset(ctx context.Context, ms *walletrpc.DarksideMetaState) (*walletrpc.Empty, error) {
-	match, err := regexp.Match("\\A[a-fA-F0-9]+\\z", []byte(ms.BranchID))
-	if err != nil || !match {
+	if !hexRegexp.MatchString(ms.BranchID) {
 		return nil, status.Errorf(codes.InvalidArgument,
 			"Reset: invalid BranchID (must be hex): %s", ms.BranchID)
 	}
 
-	match, err = regexp.Match("\\A[a-zA-Z0-9]+\\z", []byte(ms.ChainName))
-	if err != nil || !match {
+	if !alnumRegexp.MatchString(ms.ChainName) {
 		return nil, status.Errorf(codes.InvalidArgument,
 			"Reset: invalid ChainName (must be alphanumeric): %s", ms.ChainName)
 	}
-	err = common.DarksideReset(
+	err := common.DarksideReset(
 		int(ms.SaplingActivation),
 		ms.BranchID,
 		ms.ChainName,
@@ -1243,6 +1406,10 @@ func (s *DarksideStreamer) ClearIncomingTransactions(ctx context.Context, e *wal
 
 // AddAddressUtxo adds a UTXO which will be returned by GetAddressUtxos() (above)
 func (s *DarksideStreamer) AddAddressUtxo(ctx context.Context, arg *walletrpc.GetAddressUtxosReply) (*walletrpc.Empty, error) {
+	if len(arg.Txid) != 32 {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"AddAddressUtxo: transaction ID has invalid length: %d", len(arg.Txid))
+	}
 	utxosReply := common.ZcashdRpcReplyGetaddressutxos{
 		Address:     arg.Address,
 		Txid:        hash32.Encode(hash32.Reverse(hash32.FromSlice(arg.Txid))),

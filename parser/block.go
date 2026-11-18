@@ -79,6 +79,9 @@ func (b *Block) GetHeight() int {
 	if b.height != -1 {
 		return b.height
 	}
+	if len(b.vtx) == 0 || len(b.vtx[0].transparentInputs) == 0 {
+		return -1
+	}
 	coinbaseScript := bytestring.String(b.vtx[0].transparentInputs[0].ScriptSig)
 	var heightNum int64
 	if !coinbaseScript.ReadScriptInt64(&heightNum) {
@@ -156,6 +159,13 @@ func (b *Block) ParseFromSlice(data []byte) (rest []byte, err error) {
 	}
 	if i < txCount {
 		return nil, errors.New("parsing block transactions: not enough data")
+	}
+	// GetHeight reads the coinbase's first input, which consensus requires.
+	if len(vtx) == 0 {
+		return nil, errors.New("block has no transactions")
+	}
+	if len(vtx[0].transparentInputs) == 0 {
+		return nil, errors.New("coinbase has no transparent input")
 	}
 	b.hdr = hdr
 	b.vtx = vtx
