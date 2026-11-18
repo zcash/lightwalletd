@@ -278,7 +278,7 @@ func transparentRangeBackend(t *testing.T, address string, start, end uint64, st
 
 func transparentRangeGRPCClient(t *testing.T) walletrpc.CompactTxStreamerClient {
 	t.Helper()
-	handler, err := NewLwdStreamer(nil, "main", false)
+	handler, err := NewLwdStreamer(nil, "main", false, 0, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
