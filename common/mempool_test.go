@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -258,6 +259,8 @@ func TestMempoolStaleStreamDoesNotRefresh(t *testing.T) {
 	// What another stream's refresh does on seeing a new block.
 	g_lock.Lock()
 	g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{BestBlockHash: "new-hash"}
+	g_txList = []*walletrpc.RawTransaction{}
+	g_generation++
 	g_lastTime = time.Time{}
 	g_lock.Unlock()
 
@@ -271,5 +274,57 @@ func TestMempoolStaleStreamDoesNotRefresh(t *testing.T) {
 	}
 	if n := calls.Load(); n != 0 {
 		t.Fatalf("stale stream made %d backend calls, want 0", n)
+	}
+}
+
+// A stream blocked sending must return, not panic, if the list was reset while
+// it waited, even when the tip hash is the same again (GHSA-fhv5-hm8v-q7fw).
+func TestMempoolStreamSeesResetWhenTipHashRecurs(t *testing.T) {
+	defer resetGlobals()
+	stableMempoolGlobals()
+	g_lastTime = time.Now()
+	g_txList = []*walletrpc.RawTransaction{{Height: 1}, {Height: 2}}
+	RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		return nil, errors.New("unexpected RPC: " + method)
+	}
+	sending := make(chan struct{})
+	release := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				done <- fmt.Errorf("panic: %v", r)
+			}
+		}()
+		first := true
+		done <- GetMempool(context.Background(), func(*walletrpc.RawTransaction) error {
+			if first {
+				first = false
+				close(sending)
+				<-release
+			}
+			return nil
+		})
+	}()
+	<-sending
+
+	// Two resets while the stream is blocked, H1 -> H2 -> H1.
+	for _, hash := range []string{"other-hash", "stable-hash"} {
+		g_lock.Lock()
+		g_lastBlockChainInfo = &ZcashdRpcReplyGetblockchaininfo{BestBlockHash: hash}
+		g_txList = []*walletrpc.RawTransaction{}
+		g_generation++
+		g_lastTime = time.Now()
+		g_lock.Unlock()
+	}
+	close(release)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("stream returned %v, want nil", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("stream did not return")
 	}
 }
