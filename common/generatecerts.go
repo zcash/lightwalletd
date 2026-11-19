@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"math/big"
+	"net"
 	"time"
 )
 
@@ -45,6 +46,7 @@ func GenerateCerts() *tls.Certificate {
 
 	// List of hostnames and IPs for the cert
 	template.DNSNames = append(template.DNSNames, "localhost")
+	template.IPAddresses = []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")}
 
 	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey, privKey)
 	if err != nil {

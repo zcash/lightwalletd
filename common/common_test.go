@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -949,8 +950,18 @@ func TestGetBlockRangeReverse(t *testing.T) {
 }
 
 func TestGenerateCerts(t *testing.T) {
-	if GenerateCerts() == nil {
+	cert := GenerateCerts()
+	if cert == nil {
 		t.Fatal("GenerateCerts returned nil")
+	}
+	leaf, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, host := range []string{"localhost", "127.0.0.1", "::1"} {
+		if err := leaf.VerifyHostname(host); err != nil {
+			t.Errorf("generated certificate is invalid for %s: %v", host, err)
+		}
 	}
 }
 
