@@ -43,6 +43,24 @@ func unpackedPoolTypes(count int) []byte {
 	return b
 }
 
+// inRange wraps encoded BlockRange fields as the range of a
+// TransparentAddressBlockFilter, split over the given number of occurrences,
+// which protobuf merges.
+func inRange(encode func(int) []byte, occurrences int) func(int) []byte {
+	return func(count int) []byte {
+		var b []byte
+		for i := range occurrences {
+			n := count / occurrences
+			if i == 0 {
+				n += count % occurrences
+			}
+			b = protowire.AppendTag(b, 2, protowire.BytesType)
+			b = protowire.AppendBytes(b, encode(n))
+		}
+		return b
+	}
+}
+
 func decode(b []byte, v any) error {
 	return NewBoundedCodec().Unmarshal(mem.BufferSlice{mem.SliceBuffer(b)}, v)
 }
@@ -68,6 +86,12 @@ func TestBoundedCodecLimits(t *testing.T) {
 			func() proto.Message { return &walletrpc.BlockRange{} }},
 		{"BlockRange unpacked poolTypes", unpackedPoolTypes, maxDecodedPoolTypes,
 			func() proto.Message { return &walletrpc.BlockRange{} }},
+		{"TransparentAddressBlockFilter packed range.poolTypes", inRange(packedPoolTypes, 1), maxDecodedPoolTypes,
+			func() proto.Message { return &walletrpc.TransparentAddressBlockFilter{} }},
+		{"TransparentAddressBlockFilter unpacked range.poolTypes", inRange(unpackedPoolTypes, 1), maxDecodedPoolTypes,
+			func() proto.Message { return &walletrpc.TransparentAddressBlockFilter{} }},
+		{"TransparentAddressBlockFilter range.poolTypes over 3 ranges", inRange(packedPoolTypes, 3), maxDecodedPoolTypes,
+			func() proto.Message { return &walletrpc.TransparentAddressBlockFilter{} }},
 	} {
 		// At the limit the message decodes exactly as the stock codec decodes it.
 		atLimit := tc.encode(tc.limit)

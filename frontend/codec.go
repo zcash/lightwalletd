@@ -27,18 +27,24 @@ type repeatedBound struct {
 	name   string
 	max    int
 	scalar bool // varint elements, which may also arrive packed
+	// inner bounds a message field's own fields, summed over its occurrences.
+	inner []repeatedBound
 }
 
 func requestBounds(v any) []repeatedBound {
-	addresses := repeatedBound{1, "addresses", maxDecodedAddresses, false}
-	poolTypes := repeatedBound{3, "poolTypes", maxDecodedPoolTypes, true}
+	addresses := repeatedBound{field: 1, name: "addresses", max: maxDecodedAddresses}
+	poolTypes := repeatedBound{field: 3, name: "poolTypes", max: maxDecodedPoolTypes, scalar: true}
 	switch v.(type) {
 	case *walletrpc.AddressList, *walletrpc.GetAddressUtxosArg:
 		return []repeatedBound{addresses}
 	case *walletrpc.GetMempoolTxRequest:
-		return []repeatedBound{{1, "exclude_txid_suffixes", maxDecodedExcludes, false}, poolTypes}
+		return []repeatedBound{{field: 1, name: "exclude_txid_suffixes", max: maxDecodedExcludes}, poolTypes}
 	case *walletrpc.BlockRange:
 		return []repeatedBound{poolTypes}
+	case *walletrpc.TransparentAddressBlockFilter:
+		rangePoolTypes := poolTypes
+		rangePoolTypes.name = "range.poolTypes"
+		return []repeatedBound{{field: 2, name: "range", inner: []repeatedBound{rangePoolTypes}}}
 	}
 	return nil
 }
@@ -68,10 +74,13 @@ func (c BoundedCodec) Unmarshal(data mem.BufferSlice, v any) error {
 	return proto.Unmarshal(b, v.(proto.Message))
 }
 
-// checkRepeatedCounts scans the encoded message without allocating. Malformed
+// checkRepeatedCounts scans the encoded message without decoding it. Malformed
 // input is left for proto.Unmarshal to reject.
 func checkRepeatedCounts(b []byte, bounds []repeatedBound) error {
-	counts := make([]int, len(bounds))
+	return countRepeated(b, bounds, map[*repeatedBound]int{})
+}
+
+func countRepeated(b []byte, bounds []repeatedBound, counts map[*repeatedBound]int) error {
 	for len(b) > 0 {
 		num, typ, n := protowire.ConsumeTag(b)
 		if n < 0 {
@@ -82,25 +91,35 @@ func checkRepeatedCounts(b []byte, bounds []repeatedBound) error {
 		if n < 0 {
 			return nil
 		}
-		for i, bound := range bounds {
+		for i := range bounds {
+			bound := &bounds[i]
 			if num != bound.field {
+				continue
+			}
+			if bound.inner != nil {
+				if typ == protowire.BytesType {
+					payload, _ := protowire.ConsumeBytes(b[:n])
+					if err := countRepeated(payload, bound.inner, counts); err != nil {
+						return err
+					}
+				}
 				continue
 			}
 			switch {
 			case bound.scalar && typ == protowire.VarintType:
-				counts[i]++
+				counts[bound]++
 			case bound.scalar && typ == protowire.BytesType:
 				// Packed: every varint ends in a byte with the high bit clear.
 				payload, _ := protowire.ConsumeBytes(b[:n])
 				for _, c := range payload {
 					if c < 0x80 {
-						counts[i]++
+						counts[bound]++
 					}
 				}
 			case !bound.scalar && typ == protowire.BytesType:
-				counts[i]++
+				counts[bound]++
 			}
-			if counts[i] > bound.max {
+			if counts[bound] > bound.max {
 				return fmt.Errorf("%s has more than %d elements", bound.name, bound.max)
 			}
 		}
