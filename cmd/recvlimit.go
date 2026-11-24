@@ -10,6 +10,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	reflectionv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
+	reflectionv1alpha "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/tap"
@@ -116,7 +118,11 @@ func newRecvLimiter(limit uint64) *recvLimiter {
 		clientStreaming: map[string]bool{},
 		timeout:         recvFirstMsgTimeout,
 	}
-	for _, desc := range []grpc.ServiceDesc{walletrpc.CompactTxStreamer_ServiceDesc} {
+	for _, desc := range []grpc.ServiceDesc{
+		walletrpc.CompactTxStreamer_ServiceDesc,
+		reflectionv1.ServerReflection_ServiceDesc,
+		reflectionv1alpha.ServerReflection_ServiceDesc,
+	} {
 		for _, s := range desc.Streams {
 			if s.ClientStreams {
 				l.clientStreaming["/"+desc.ServiceName+"/"+s.StreamName] = true

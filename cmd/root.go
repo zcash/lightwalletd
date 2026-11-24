@@ -57,6 +57,8 @@ var rootCmd = &cobra.Command{
 			ClientStreamIdleTimeout:  viper.GetUint64("client-stream-idle-timeout"),
 			MaxConcurrentSendTxMiB:   viper.GetUint64("max-concurrent-sendtx-mib"),
 			MaxConcurrentRecv:        viper.GetUint64("max-concurrent-recv"),
+			MaxStreamRPCs:            viper.GetUint64("max-concurrent-stream-rpcs"),
+			MaxStreamRPCsPerIP:       viper.GetUint64("max-concurrent-stream-rpcs-per-ip"),
 			HTTPBindAddr:             viper.GetString("http-bind-addr"),
 			TLSCertPath:              viper.GetString("tls-cert"),
 			TLSKeyPath:               viper.GetString("tls-key"),
@@ -143,6 +145,7 @@ func serverOptions(opts *common.Options) []grpc.ServerOption {
 				grpc_recovery.StreamServerInterceptor(recoveryOption),
 				idleStreamInterceptor(time.Duration(opts.ClientStreamIdleTimeout)*time.Second),
 				grpc_prometheus.StreamServerInterceptor,
+				streamLimitInterceptor(opts.MaxStreamRPCs, opts.MaxStreamRPCsPerIP),
 				sendTimeoutInterceptor(streamSendTimeout)),
 		),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
@@ -456,6 +459,8 @@ func init() {
 	rootCmd.Flags().Uint("client-stream-idle-timeout", 30, "seconds a client-streaming RPC may stall before it is cancelled (0 to disable)")
 	rootCmd.Flags().Uint("max-concurrent-recv", 32, "max requests being received at once, server-wide (0 for unlimited)")
 	rootCmd.Flags().Uint("max-concurrent-sendtx-mib", 16, "max transaction data, in MiB, that SendTransaction handles at once, server-wide (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-stream-rpcs", 400, "max active streaming RPCs server-wide, excluding block ranges (0 for unlimited)")
+	rootCmd.Flags().Uint("max-concurrent-stream-rpcs-per-ip", 0, "max active streaming RPCs per TCP peer IP, excluding block ranges (0 to disable, clients behind a proxy share its IP)")
 	rootCmd.Flags().String("tls-cert", "./cert.pem", "the path to a TLS certificate")
 	rootCmd.Flags().String("tls-key", "./cert.key", "the path to a TLS key file")
 	rootCmd.Flags().Int("log-level", int(logrus.InfoLevel), "log level (logrus 1-7)")
@@ -491,6 +496,10 @@ func init() {
 	viper.SetDefault("max-concurrent-sendtx-mib", 16)
 	viper.BindPFlag("max-concurrent-recv", rootCmd.Flags().Lookup("max-concurrent-recv"))
 	viper.SetDefault("max-concurrent-recv", 32)
+	viper.BindPFlag("max-concurrent-stream-rpcs", rootCmd.Flags().Lookup("max-concurrent-stream-rpcs"))
+	viper.SetDefault("max-concurrent-stream-rpcs", 400)
+	viper.BindPFlag("max-concurrent-stream-rpcs-per-ip", rootCmd.Flags().Lookup("max-concurrent-stream-rpcs-per-ip"))
+	viper.SetDefault("max-concurrent-stream-rpcs-per-ip", 0)
 	viper.BindPFlag("http-bind-addr", rootCmd.Flags().Lookup("http-bind-addr"))
 	viper.SetDefault("http-bind-addr", "127.0.0.1:9068")
 	viper.BindPFlag("tls-cert", rootCmd.Flags().Lookup("tls-cert"))
