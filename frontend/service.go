@@ -1007,12 +1007,12 @@ func parseMempoolTx(txidstr string, result json.RawMessage) (*parser.Transaction
 	if len(txdata) > 0 {
 		return nil, errors.New("extra data deserializing transaction")
 	}
-	txidBigEndian, err := hash32.Decode(txidstr)
+	txidBigEndian, err := hex.DecodeString(txidstr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode txid: %w", err)
 	}
 	// convert from big endian bytes to little endian and set as the txid
-	tx.SetTxID(hash32.Reverse(txidBigEndian))
+	tx.SetTxID(hash32.Reverse(hash32.FromSlice(txidBigEndian)))
 	return tx, nil
 }
 

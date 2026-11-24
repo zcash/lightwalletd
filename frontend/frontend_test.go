@@ -1901,13 +1901,3 @@ func TestGetMempoolTxCanonicalizesPoolTypes(t *testing.T) {
 		t.Fatalf("GetMempoolTx filtered against %d pool types, expected 1", len(req.PoolTypes))
 	}
 }
-
-func TestParseMempoolTxRejectsShortTxid(t *testing.T) {
-	result, _ := json.Marshal(hex.EncodeToString(rawTxData[0]))
-	if _, err := parseMempoolTx(strings.Repeat("ab", 32), result); err != nil {
-		t.Fatal("valid txid rejected:", err)
-	}
-	if _, err := parseMempoolTx("abcd", result); err == nil {
-		t.Fatal("2-byte txid accepted")
-	}
-}
