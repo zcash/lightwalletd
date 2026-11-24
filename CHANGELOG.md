@@ -22,9 +22,9 @@ The most recent changes are listed first.
   into memory before any handler runs, so many large requests arriving at
   once could exhaust memory. A request over the limit is refused with
   `UNAVAILABLE` before its body is read, and one whose body hasn't arrived
-  within 20 seconds is canceled. Client-streaming calls count against a
-  separate pool of the same size for as long as they're open. Set it to 0 for
-  no limit (GHSA-xrx5-jc6q-9h8r).
+  within 20 seconds is canceled. Client-streaming calls, including gRPC
+  reflection, count against a separate pool of the same size for as long as
+  they're open. Set it to 0 for no limit (GHSA-xrx5-jc6q-9h8r).
 
   When a pool is full, a new request can take the oldest slot of the
   connection holding the most, so one connection can't lock out the rest.

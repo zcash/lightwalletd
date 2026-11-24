@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
+	reflectionv1 "google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/grpc/status"
 
 	"github.com/zcash/lightwalletd/common"
@@ -164,5 +166,49 @@ func TestServerOptionsBoundMessageSize(t *testing.T) {
 		&walletrpc.RawTransaction{Data: make([]byte, maxRecvMsgSize)})
 	if status.Code(err) != codes.ResourceExhausted {
 		t.Fatalf("oversized request got %v, want ResourceExhausted", err)
+	}
+}
+
+func TestRecvLimiterReflectionUsesStreamPool(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := grpc.NewServer(newRecvLimiter(1).serverOptions()...)
+	walletrpc.RegisterCompactTxStreamerServer(server, recvLimitStub{})
+	reflection.Register(server)
+	go server.Serve(listener)
+	t.Cleanup(server.Stop)
+	conn, err := grpc.NewClient(listener.Addr().String(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close() })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	client := reflectionv1.NewServerReflectionClient(conn)
+	req := &reflectionv1.ServerReflectionRequest{
+		MessageRequest: &reflectionv1.ServerReflectionRequest_ListServices{},
+	}
+	first, err := client.ServerReflectionInfo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Send(req); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.Recv(); err != nil {
+		t.Fatal(err)
+	}
+	// The first stream keeps its slot after its first message.
+	second, err := client.ServerReflectionInfo(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second.Send(req)
+	if _, err := second.Recv(); status.Code(err) != codes.Unavailable {
+		t.Fatalf("second reflection stream got %v, want Unavailable", err)
 	}
 }
