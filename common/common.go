@@ -58,6 +58,8 @@ type Options struct {
 	ClientStreamIdleTimeout  uint64 `json:"client_stream_idle_timeout,omitempty"`
 	MaxConcurrentSendTxMiB   uint64 `json:"max_concurrent_sendtx_mib,omitempty"`
 	MaxConcurrentRecv        uint64 `json:"max_concurrent_recv,omitempty"`
+	MaxStreamRPCs            uint64 `json:"max_concurrent_stream_rpcs,omitempty"`
+	MaxStreamRPCsPerIP       uint64 `json:"max_concurrent_stream_rpcs_per_ip,omitempty"`
 	HTTPBindAddr             string `json:"http_bind_address,omitempty"`
 	TLSCertPath              string `json:"tls_cert_path,omitempty"`
 	TLSKeyPath               string `json:"tls_cert_key,omitempty"`
