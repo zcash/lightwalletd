@@ -1343,3 +1343,59 @@ func TestGetBlockRangeCanonicalizesPoolTypes(t *testing.T) {
 		t.Fatalf("GetBlockRange filtered against %d pool types, expected 1", len(span.PoolTypes))
 	}
 }
+
+// A bad getbestblockhash reply is retried like a failed call, not fatal.
+func TestBlockIngestorRetriesBadGetbestblockhashReply(t *testing.T) {
+	testT = t
+	RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+		step++
+		switch step {
+		case 1:
+			checkSleepMethod(0, 0, "getbestblockhash", method)
+			return json.RawMessage("123"), nil
+		case 2:
+			checkSleepMethod(1, 1, "getbestblockhash", method)
+			return json.RawMessage(`"abcd"`), nil
+		case 3:
+			checkSleepMethod(2, 3, "getbestblockhash", method)
+			r, _ := json.Marshal(hash32.Encode(hash32.Reverse(testcache.GetLatestHash())))
+			return r, nil
+		}
+		testT.Error("called too many times")
+		return nil, nil
+	}
+	defer resetGlobals()
+	Time.Sleep = sleepStub
+	Time.Now = nowStub
+	os.RemoveAll(unitTestPath)
+	testcache = NewBlockCache(unitTestPath, unitTestChain, 380640, -1)
+	BlockIngestor(testcache, 3)
+	if step != 3 {
+		t.Error("unexpected final step", step)
+	}
+	os.RemoveAll(unitTestPath)
+}
+
+func TestGetBlockFromRPCRejectsBadVerboseReply(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		verbose string
+	}{
+		{"not JSON", "{"},
+		{"too few txids", `{"Tx": [], "Hash": "` + testBlockid40 + `"}`},
+		{"too many txids", `{"Tx": ["` + testTxid + `", "` + testTxid + `", "` + testTxid + `", "` + testTxid + `", "` + testTxid + `"], "Hash": "` + testBlockid40 + `"}`},
+	} {
+		calls := 0
+		RawRequest = func(ctx context.Context, method string, params []json.RawMessage) (json.RawMessage, error) {
+			calls++
+			if calls == 1 {
+				return json.RawMessage(tc.verbose), nil
+			}
+			return blocks[0], nil
+		}
+		if _, err := getBlockFromRPC(context.Background(), 380640); err == nil {
+			t.Errorf("%s: no error", tc.name)
+		}
+	}
+	resetGlobals()
+}

@@ -392,11 +392,11 @@ func getBlockFromRPC(ctx context.Context, height int) (*walletrpc.CompactBlock, 
 	var block1 ZcashRpcReplyGetblock1
 	err = json.Unmarshal(result, &block1)
 	if err != nil {
-		Log.Fatal("getBlockFromRPC: Can't unmarshal block:", err)
+		return nil, fmt.Errorf("error reading verbose block: %w", err)
 	}
 	blockHash, err := json.Marshal(block1.Hash)
 	if err != nil {
-		Log.Fatal("getBlockFromRPC bad block hash", block1.Hash)
+		return nil, fmt.Errorf("bad block hash %q: %w", block1.Hash, err)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -431,6 +431,10 @@ func getBlockFromRPC(ctx context.Context, height int) (*walletrpc.CompactBlock, 
 	}
 	if block.GetHeight() != height {
 		return nil, errors.New("received unexpected height block")
+	}
+	if len(block1.Tx) != len(block.Transactions()) {
+		return nil, fmt.Errorf("verbose block lists %d txids, raw block has %d transactions",
+			len(block1.Tx), len(block.Transactions()))
 	}
 	for i, t := range block.Transactions() {
 		txidBigEndian, err := hash32.Decode(block1.Tx[i])
@@ -500,6 +504,19 @@ var bestBlockHashLastSuccess = promauto.NewGauge(prometheus.GaugeOpts{
 	Help: "Unix time of the last successful getbestblockhash call to the backend.",
 })
 
+// parseBestBlockHash decodes a getbestblockhash reply, a big-endian hex hash.
+func parseBestBlockHash(result json.RawMessage) (hash32.T, error) {
+	var hashHex string
+	if err := json.Unmarshal(result, &hashHex); err != nil {
+		return hash32.T{}, fmt.Errorf("bad getbestblockhash reply %s: %w", result, err)
+	}
+	hash, err := hash32.Decode(hashHex)
+	if err != nil {
+		return hash32.T{}, fmt.Errorf("bad getbestblockhash reply %q: %w", hashHex, err)
+	}
+	return hash, nil
+}
+
 // BlockIngestor runs as a goroutine and polls zcashd for new blocks, adding them
 // to the cache. The repetition count, rep, is nonzero only for unit-testing.
 func BlockIngestor(c *BlockCache, rep int) {
@@ -517,7 +534,11 @@ func BlockIngestor(c *BlockCache, rep int) {
 		default:
 		}
 
+		var lastBestBlockHashBE hash32.T
 		result, err := RawRequest(context.Background(), "getbestblockhash", []json.RawMessage{})
+		if err == nil {
+			lastBestBlockHashBE, err = parseBestBlockHash(result)
+		}
 		if err != nil {
 			// Retry transient backend errors (e.g. HTTP 429 "Too many connections").
 			if bestBlockHashFailures == 0 {
@@ -539,15 +560,6 @@ func BlockIngestor(c *BlockCache, rep int) {
 		if bestBlockHashFailures > 0 {
 			Log.Info(NodeName+" getbestblockhash rpc recovered after ", bestBlockHashFailures, " failures")
 			bestBlockHashFailures = 0
-		}
-		var hashHex string
-		err = json.Unmarshal(result, &hashHex)
-		if err != nil {
-			Log.Fatal("bad getbestblockhash return:", err, result)
-		}
-		lastBestBlockHashBE, err := hash32.Decode(hashHex)
-		if err != nil {
-			Log.Fatal("error decoding getbestblockhash", err, hashHex)
 		}
 
 		height := c.GetNextHeight()
