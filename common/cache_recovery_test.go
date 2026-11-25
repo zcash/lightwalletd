@@ -77,6 +77,40 @@ func TestCacheRecoveryStillClearsUnrepairedCorruption(t *testing.T) {
 	}
 }
 
+func TestCacheRecoveryAfterReorgAndReAddPreservesAllBlocks(t *testing.T) {
+	cacheRecoveryTestLogger(t)
+	cache, dir, blocks := cacheRecoveryTestCache(t, 0)
+
+	cacheRecoveryCorruptTip(t, cache)
+	cacheRecoveryAssertTipCorrupt(t, cache)
+	cache.Reorg(5)
+	if err := cache.Add(5, blocks[5]); err != nil {
+		t.Fatalf("re-add block 5 after reorg: %v", err)
+	}
+	cache.recoverIfStillCorrupt(5)
+
+	if got := cache.GetNextHeight(); got != 6 {
+		t.Fatalf("recovery cleared the re-added tip: next height %d, want 6", got)
+	}
+	for height, want := range blocks {
+		if got := cache.Get(height); got == nil || !proto.Equal(got, want) {
+			t.Fatalf("block %d is missing after recovery", height)
+		}
+	}
+
+	cache.Close()
+	cache = NewBlockCache(dir, "unittestnet", 0, -1)
+	defer cache.Close()
+	if got := cache.GetNextHeight(); got != 6 {
+		t.Fatalf("re-added cache was not preserved after restart: next height %d, want 6", got)
+	}
+	for height, want := range blocks {
+		if got := cache.Get(height); got == nil || !proto.Equal(got, want) {
+			t.Fatalf("block %d is missing after restart", height)
+		}
+	}
+}
+
 func cacheRecoveryTestLogger(t *testing.T) {
 	t.Helper()
 	old := Log
