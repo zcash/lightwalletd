@@ -6,6 +6,45 @@ and this library adheres to Rust's notion of
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 The most recent changes are listed first.
 
+## [0.6.3] - 2026-11-24
+
+### Added
+
+- Lightwalletd bounds active streaming gRPCs across connections with
+  `--max-concurrent-stream-rpcs` (default 400, zero disables it). Both block-range
+  RPCs use their existing `--max-concurrent-blockrange` limit. Setting that flag
+  to zero disables their server-wide limit. The optional
+  `--max-concurrent-stream-rpcs-per-ip` cap defaults to zero (disabled). If
+  enabled, it uses the immediate TCP peer IP, so clients behind the same proxy
+  or shared address count toward one per-IP limit (#628).
+
+### Fixed
+
+- Transparent balance and UTXO RPCs now report unclassified backend failures as
+  `Unknown` instead of returning a successful zero balance or empty UTXO result.
+  This applies to unary and streaming variants; the existing `InvalidArgument`
+  and `NotFound` mappings are unchanged.
+
+  `GetTransaction` now reserves `NotFound` for the backend's structured
+  missing-transaction response. Other backend failures return `Unknown`;
+  canceled and timed-out backend requests retain their context status.
+
+- A `GetMempoolStream` call that was waiting on a slow client could panic if
+  the mempool list was reset twice meanwhile and the tip hash was the same
+  again. In 0.6.1 that ended the process; in 0.6.2 it left a lock held, so
+  every later `GetMempoolStream` call blocked until a restart
+  (GHSA-fhv5-hm8v-q7fw).
+
+- The limit on repeated request fields checked before decoding now also
+  covers `poolTypes` in the `range` of a `TransparentAddressBlockFilter`
+  (`GetTaddressTxids`, `GetTaddressTransactions`), which the 0.6.2 fix
+  missed (GHSA-jjjw-r66r-mjgf).
+
+- `GetTaddressTransactions` now aborts before sending a transaction that is no
+  longer mined in the requested range. Clients can restart the request when
+  address-index results and later transaction lookups observe different chain
+  state.
+
 ## [0.6.2] - 2026-11-17
 
 ### Added

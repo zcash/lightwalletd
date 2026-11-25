@@ -37,6 +37,9 @@ var (
 	// g_refreshing is set while one caller refreshes the above variables.
 	g_refreshing bool
 
+	// g_generation counts resets of g_txList, since a tip hash can recur.
+	g_generation uint64
+
 	// Mutex to protect the above variables.
 	g_lock sync.Mutex
 )
@@ -44,8 +47,8 @@ var (
 func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction) error) error {
 	g_lock.Lock()
 	index := 0
-	// Stay in this function until the tip block hash changes.
-	stayHash := g_lastBlockChainInfo.BestBlockHash
+	// Stay in this function until the list is reset for a new tip.
+	stayGeneration := g_generation
 	g_lock.Unlock()
 
 	// Wait for more transactions to be added to the list
@@ -60,7 +63,7 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 		// Don't fetch the mempool more often than every 2 seconds, and let
 		// only one caller at a time do it (GHSA-hp3q-vfr4-v8m6).
 		g_lock.Lock()
-		if g_lastBlockChainInfo.BestBlockHash != stayHash {
+		if g_generation != stayGeneration {
 			// Another stream saw a new block; don't refresh for the old one.
 			g_lock.Unlock()
 			return nil
@@ -84,7 +87,7 @@ func GetMempool(ctx context.Context, sendToClient func(*walletrpc.RawTransaction
 			}
 		}
 		g_lock.Lock()
-		if g_lastBlockChainInfo.BestBlockHash != stayHash {
+		if g_generation != stayGeneration {
 			g_lock.Unlock()
 			return nil
 		}
@@ -130,6 +133,7 @@ func refreshMempool(ctx context.Context) error {
 		g_lastBlockChainInfo = blockChainInfo
 		g_txidSeen = map[txid]struct{}{}
 		g_txList = []*walletrpc.RawTransaction{}
+		g_generation++
 		g_lastTime = time.Time{}
 		g_lock.Unlock()
 		return nil
