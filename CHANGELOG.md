@@ -40,6 +40,11 @@ The most recent changes are listed first.
   (`GetTaddressTxids`, `GetTaddressTransactions`), which the 0.6.2 fix
   missed (GHSA-jjjw-r66r-mjgf).
 
+- `GetTaddressTransactions` now aborts before sending a transaction that is no
+  longer mined in the requested range. Clients can restart the request when
+  address-index results and later transaction lookups observe different chain
+  state.
+
 ## [0.6.2] - 2026-11-17
 
 ### Added
