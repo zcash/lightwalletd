@@ -18,8 +18,11 @@ type T [32]byte
 // so we use that to represent an unset or undefined hash value.
 var Nil = [32]byte{}
 
-// FromSlice converts a slice to a hash32. If the slice is too long, the
-// return is only the first 32 bytes; if it is too short, this panics.
+// FromSlice converts a slice to a hash32. If the slice is too long,
+// the return is only the first 32 bytes. If the slice is too short,
+// this panics (a Go slice-to-array conversion requires the slice to be
+// at least as long as the array), so callers must validate the length
+// of untrusted input first; see Decode for a checking alternative.
 func FromSlice(arg []byte) T {
 	return T(arg)
 }
